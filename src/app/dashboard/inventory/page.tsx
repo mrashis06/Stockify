@@ -75,7 +75,8 @@ export default function InventoryPage() {
             toast({ title: 'Success', description: 'New brand added successfully.' });
         } catch (error) {
             console.error('Error adding brand:', error);
-            toast({ title: 'Error', description: 'Failed to add new brand.', variant: 'destructive' });
+            const errorMessage = (error as Error).message || 'Failed to add new brand.';
+            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     };
     
@@ -351,5 +352,3 @@ export default function InventoryPage() {
     </main>
   );
 }
-
-    
