@@ -125,45 +125,32 @@ export default function ReportsPage() {
 
         const startDate = date?.from ? format(date.from, 'PPP') : '';
         const endDate = date?.to ? format(date.to, 'PPP') : startDate;
-        const title = isSameDay(date?.from || 0, date?.to || 1) 
+        
+        const isSingleDay = !date?.to || isSameDay(date?.from || new Date(), date.to);
+        const title = isSingleDay
             ? `Sales Report for ${startDate}`
             : `Sales Report: ${startDate} to ${endDate}`;
 
         doc.autoTable({
             head: [tableColumn],
             body: tableRows,
+            foot: [['Total Sales', `₹${totalSales.toLocaleString('en-IN')}`]],
             startY: 20,
             headStyles: {
                 fillColor: [22, 163, 74], // Green background for header
                 textColor: [255, 255, 255],
                 fontStyle: 'bold'
             },
+            footStyles: {
+                fillColor: [244, 244, 245],
+                textColor: [20, 20, 20],
+                fontStyle: 'bold',
+            },
             didDrawPage: (data) => {
-                doc.setFontSize(20);
+                doc.setFontSize(16);
                 doc.setTextColor(40);
                 doc.text(title, data.settings.margin.left, 15);
             },
-            // Add a footer row for the total
-            didDrawCell: (data) => {
-                if (data.section === 'body' && data.row.index === tableRows.length - 1) {
-                     doc.autoTable({
-                        startY: data.cursor.y + data.row.height,
-                        head: [['Total Sales', `₹${totalSales.toLocaleString('en-IN')}`]],
-                        theme: 'grid',
-                        styles: {
-                            fontStyle: 'bold',
-                            halign: 'right'
-                        },
-                        headStyles: {
-                            fillColor: [244, 244, 245],
-                            textColor: [20, 20, 20]
-                        },
-                        columnStyles: {
-                            0: { halign: 'left' }
-                        }
-                    });
-                }
-            }
         });
 
         doc.save(`sales_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
@@ -308,4 +295,3 @@ export default function ReportsPage() {
   );
 }
 
-    
