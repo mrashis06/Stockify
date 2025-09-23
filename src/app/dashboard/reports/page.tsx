@@ -123,7 +123,7 @@ export default function ReportsPage() {
                             <XAxis type="number" stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${Number(value) / 1000}k`} />
                             <Tooltip
                                 cursor={{ fill: 'hsla(var(--muted-foreground), 0.2)' }}
-                                content={<ChartTooltipContent indicator="dot" />}
+                                content={<ChartTooltipContent indicator="dot" formatter={(value) => `₹${value.toLocaleString()}`} />}
                             />
                             <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]}>
                                 <LabelList dataKey="sales" position="right" offset={10} className="fill-foreground" formatter={(value: number) => `₹${value.toLocaleString()}`} />
