@@ -117,33 +117,38 @@ export function useInventory() {
     try {
         const id = generateProductId(newItemData.brand, newItemData.size);
         const docRef = doc(db, 'inventory', id);
-        const docSnap = await getDoc(docRef);
 
-        if (docSnap.exists()) {
-            throw new Error(`Product ${newItemData.brand} (${newItemData.size}) already exists.`);
-        }
-        
         const masterItemData = {
             brand: newItemData.brand,
             size: newItemData.size,
             price: newItemData.price,
             category: newItemData.category,
             prevStock: newItemData.prevStock,
-        }
+        };
 
-        // Set master record
-        await setDoc(docRef, masterItemData);
+        // Use set with merge to create or update the master record
+        await setDoc(docRef, masterItemData, { merge: true });
         
         // Set today's daily record
         const dailyDocRef = doc(db, 'dailyInventory', today);
+        const dailyDocSnap = await getDoc(dailyDocRef);
+        const dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
+
+        const currentDailyItem = dailyData[id] || {};
+        
         const dailyItemData = {
-            ...masterItemData,
-            added: 0,
-            sales: 0,
-            opening: newItemData.prevStock,
-            closing: newItemData.prevStock,
-            prevStock: newItemData.prevStock,
+            brand: newItemData.brand,
+            size: newItemData.size,
+            price: newItemData.price,
+            category: newItemData.category,
+            prevStock: newItemData.prevStock, // Use the new initial stock
+            added: currentDailyItem.added || 0,
+            sales: currentDailyItem.sales || 0,
         };
+
+        dailyItemData.opening = dailyItemData.prevStock + dailyItemData.added;
+        dailyItemData.closing = dailyItemData.opening - dailyItemData.sales;
+
         await setDoc(dailyDocRef, { [id]: dailyItemData }, { merge: true });
 
     } finally {
@@ -320,5 +325,3 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField };
 }
-
-    
