@@ -37,10 +37,17 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (loading) return;
 
-    if (!loading && !user && !['/login', '/signup', '/'].includes(pathname)) {
+    const isAuthPage = ['/login', '/signup'].includes(pathname);
+    const isProtectedPage = !['/login', '/signup', '/'].includes(pathname);
+
+    if (!user && isProtectedPage) {
       router.push('/login');
+    }
+
+    if (user && isAuthPage) {
+      router.push('/dashboard');
     }
   }, [user, loading, router, pathname]);
 
