@@ -11,24 +11,6 @@ import { PlaceHolderImages } from "@/lib/placeholder-images";
 export default function Home() {
   const heroImage = PlaceHolderImages.find(p => p.id === 'hero-liquor-bottles');
 
-  const features = [
-    {
-      icon: <PackageSearch className="h-10 w-10 text-primary" />,
-      title: "Inventory Tracking",
-      description: "Keep a real-time pulse on your stock levels. Our system updates automatically with every sale and delivery.",
-    },
-    {
-      icon: <BarChart3 className="h-10 w-10 text-primary" />,
-      title: "Sales Reporting",
-      description: "Gain valuable insights with detailed sales analytics. Understand your best-sellers and optimize your purchasing.",
-    },
-    {
-      icon: <BellRing className="h-10 w-10 text-primary" />,
-      title: "Low Stock Alerts",
-      description: "Never run out of a popular item again. Get timely alerts when inventory runs low, so you can reorder with confidence.",
-    },
-  ];
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
@@ -60,28 +42,6 @@ export default function Home() {
               <Button asChild size="lg" variant="outline" className="border-2 border-primary-foreground bg-transparent text-primary-foreground transition-transform hover:scale-105 hover:bg-primary-foreground/10">
                 <Link href="#">Learn More</Link>
               </Button>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section id="features" className="w-full py-16 md:py-24">
-          <div className="container mx-auto px-4">
-            <h2 className="font-headline mb-12 text-center text-3xl font-bold md:text-4xl">
-              Everything You Need to Succeed
-            </h2>
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-              {features.map((feature, index) => (
-                <Card key={index} className="transform border-2 bg-card text-card-foreground shadow-lg transition-transform duration-300 hover:-translate-y-2 hover:shadow-2xl">
-                  <CardHeader className="items-center">
-                    {feature.icon}
-                    <CardTitle className="mt-4 text-center font-headline text-2xl font-semibold">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-center text-muted-foreground">{feature.description}</p>
-                  </CardContent>
-                </Card>
-              ))}
             </div>
           </div>
         </section>
