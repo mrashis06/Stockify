@@ -55,7 +55,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button asChild size="lg" className="transition-transform hover:scale-105">
-                <Link href="#">Get Started</Link>
+                <Link href="/login">Get Started</Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="border-2 border-primary-foreground bg-transparent text-primary-foreground transition-transform hover:scale-105 hover:bg-primary-foreground/10">
                 <Link href="#">Learn More</Link>
@@ -96,7 +96,7 @@ export default function Home() {
               Join dozens of liquor stores streamlining their operations with StockSmart.
             </p>
             <Button asChild size="lg" variant="secondary" className="mt-8 transition-transform hover:scale-105">
-              <Link href="#">Get Started Now</Link>
+              <Link href="/login">Get Started Now</Link>
             </Button>
           </div>
         </section>

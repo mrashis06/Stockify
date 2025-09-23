@@ -36,7 +36,7 @@ const Navbar = () => {
         </nav>
         <div className="hidden items-center gap-4 md:flex">
           <Button variant="ghost" asChild>
-            <Link href="#">Log In</Link>
+            <Link href="/login">Log In</Link>
           </Button>
           <Button asChild>
             <Link href="#">Sign Up</Link>
@@ -76,7 +76,7 @@ const Navbar = () => {
                 </nav>
                 <div className="mt-auto flex flex-col gap-4 border-t pt-6">
                   <Button variant="ghost" asChild>
-                    <Link href="#" onClick={() => setIsOpen(false)}>Log In</Link>
+                    <Link href="/login" onClick={() => setIsOpen(false)}>Log In</Link>
                   </Button>
                   <Button asChild>
                     <Link href="#" onClick={() => setIsOpen(false)}>Sign Up</Link>
