@@ -3,10 +3,10 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, AuthError } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -56,42 +56,8 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result && result.user) {
-          const user = result.user;
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-
-          if (!userDoc.exists()) {
-            await setDoc(userDocRef, {
-              name: user.displayName,
-              email: user.email,
-              role: 'staff',
-              createdAt: serverTimestamp(),
-            });
-          }
-           // The useAuth hook will handle the redirect to dashboard
-        }
-      } catch (error) {
-        console.error("Error handling redirect result: ", error);
-        toast({
-          title: "Authentication Error",
-          description: "Failed to sign in with Google. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    handleRedirectResult();
-  }, [toast, router]);
-
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,20 +78,35 @@ export default function LoginPage() {
   };
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
+    setGoogleLoading(true);
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+          name: user.displayName,
+          email: user.email,
+          role: 'staff',
+          createdAt: serverTimestamp(),
+        });
+      }
+      // The useAuth hook will handle the redirect.
+    } catch (error) {
+      console.error("Error with Google sign-in: ", error);
+      toast({
+        title: "Authentication Error",
+        description: "Failed to sign in with Google. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setGoogleLoading(false);
+    }
   };
   
-  if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <p className="mt-4 text-muted-foreground">Authenticating...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-sm">
@@ -146,13 +127,15 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading || googleLoading}
               />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading || googleLoading} />
             </div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={loading || googleLoading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Login
             </Button>
           </form>
@@ -166,8 +149,12 @@ export default function LoginPage() {
                 </span>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-              <GoogleIcon className="mr-2 h-4 w-4" />
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={loading || googleLoading}>
+              {googleLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <GoogleIcon className="mr-2 h-4 w-4" />
+              )}
               Sign in with Google
             </Button>
           <div className="mt-4 text-center text-sm">
