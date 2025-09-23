@@ -20,6 +20,7 @@ import NavLink from './nav-link';
 import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -32,7 +33,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background dark">
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
         <div>Loading...</div>
       </div>
     );
@@ -43,12 +44,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
   
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background dark">
+    <div className="flex min-h-screen w-full flex-col bg-background">
       <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
         <nav className="flex-1 flex items-center gap-6">
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 text-lg font-semibold md:text-base text-white"
+            className="flex items-center gap-2 text-lg font-semibold md:text-base"
           >
             <Package className="h-6 w-6 text-primary" />
             <span className="font-bold text-xl">Stockify</span>
@@ -77,6 +78,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         </nav>
         <div className="flex items-center gap-4">
+          <ThemeToggle />
           <Button variant="ghost" size="icon" className="rounded-full">
             <Bell className="h-5 w-5" />
             <span className="sr-only">Toggle notifications</span>

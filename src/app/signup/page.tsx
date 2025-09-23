@@ -70,7 +70,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 dark">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
@@ -82,7 +82,7 @@ export default function SignupPage() {
           <form onSubmit={handleEmailSignUp} className="grid gap-4">
             <div className="grid gap-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" type="text" placeholder="John Doe" required className="bg-input" value={name} onChange={(e) => setName(e.target.value)} />
+                <Input id="name" type="text" placeholder="John Doe" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email address</Label>
@@ -91,18 +91,17 @@ export default function SignupPage() {
                 type="email"
                 placeholder="m@example.com"
                 required
-                className="bg-input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required className="bg-input" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input id="confirm-password" type="password" required className="bg-input" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <Input id="confirm-password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
             <Button type="submit" className="w-full">
               Sign Up

@@ -7,6 +7,7 @@ import { Menu, Package, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,6 +23,7 @@ const Navbar = () => {
           <span className="font-headline text-xl font-bold">Stockify</span>
         </Link>
         <div className="hidden items-center gap-4 md:flex">
+          <ThemeToggle />
           <Button variant="ghost" asChild>
             <Link href="/login">Log In</Link>
           </Button>
@@ -49,6 +51,11 @@ const Navbar = () => {
                       <span className="sr-only">Close menu</span>
                    </Button>
                 </div>
+                <nav className="flex-1 overflow-y-auto pt-6">
+                    <div className="flex flex-col gap-4">
+                        <ThemeToggle />
+                    </div>
+                </nav>
                 <div className="mt-auto flex flex-col gap-4 border-t pt-6">
                   <Button variant="ghost" asChild>
                     <Link href="/login" onClick={() => setIsOpen(false)}>Log In</Link>
