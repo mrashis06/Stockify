@@ -49,6 +49,7 @@ type TrackedFormValues = z.infer<typeof trackedSchema>;
 const manualSchema = z.object({
     brand: z.string().min(1, 'Brand name is required.'),
     size: z.string().min(1, 'Size is required (e.g., 750ml).'),
+    category: z.string().min(1, 'Category is required'),
     totalVolume: z.coerce.number().int().min(1, 'Volume must be a positive number.'),
 });
 type ManualFormValues = z.infer<typeof manualSchema>;
@@ -61,6 +62,9 @@ type AddOnBarItemDialogProps = {
   onBarInventory: OnBarItem[];
   onAddItem: (inventoryItemId: string, volume: number) => void; // This might need adjustment
 };
+
+const categories = ['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine', 'Gin', 'Tequila', 'IML'];
+
 
 function TrackedForm({ shopInventory, onBarInventory, onOpenChange }: { shopInventory: InventoryItem[], onBarInventory: OnBarItem[], onOpenChange: (isOpen: boolean) => void }) {
     const form = useFormContext<TrackedFormValues>();
@@ -197,6 +201,28 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
                     />
                 <FormField
                     control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                            {categories.map(cat => (
+                                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
                     name="totalVolume"
                     render={({ field }) => (
                         <FormItem>
@@ -222,7 +248,7 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
 
 export default function AddOnBarItemDialog({ isOpen, onOpenChange, shopInventory, onBarInventory, onAddItem }: AddOnBarItemDialogProps) {
   const trackedForm = useForm<TrackedFormValues>({ resolver: zodResolver(trackedSchema) });
-  const manualForm = useForm<ManualFormValues>({ resolver: zodResolver(manualSchema), defaultValues: { brand: '', size: '', totalVolume: 750 } });
+  const manualForm = useForm<ManualFormValues>({ resolver: zodResolver(manualSchema), defaultValues: { brand: '', size: '', category: '', totalVolume: 750 } });
   
   useEffect(() => {
     if (!isOpen) {

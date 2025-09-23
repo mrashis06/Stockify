@@ -20,6 +20,7 @@ export type OnBarItem = {
   inventoryId: string; // The ID from the main inventory collection, 'manual' if not tracked
   brand: string;
   size: string;
+  category: string;
   totalVolume: number; // e.g., 750 for a 750ml bottle
   remainingVolume: number;
   salesVolume: number; // Volume sold today in ml
@@ -93,7 +94,7 @@ export function useOnBarInventory() {
         if (!itemDoc.exists()) {
           throw new Error("Item not found on bar.");
         }
-        const itemData = itemDoc.data();
+        const itemData = itemDoc.data() as OnBarItem;
         const currentVolume = itemData.remainingVolume;
         
         if (currentVolume < pegSize) {

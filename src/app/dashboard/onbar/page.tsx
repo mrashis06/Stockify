@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Minus, Plus, GlassWater, Loader2, Wine } from 'lucide-react';
+import { Minus, Plus, GlassWater, Loader2, Wine, Beer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -28,13 +28,13 @@ export default function OnBarPage() {
         }
     };
     
-    const handleSellPeg = async (id: string, pegSize: number) => {
+    const handleSell = async (id: string, volume: number) => {
         try {
-            await sellPeg(id, pegSize);
-            toast({ title: 'Success', description: `${pegSize}ml peg sold.` });
+            await sellPeg(id, volume);
+            toast({ title: 'Success', description: `${volume}ml sold.` });
         } catch (error) {
-            console.error('Error selling peg:', error);
-            const errorMessage = (error as Error).message || 'Failed to sell peg.';
+            console.error('Error selling item:', error);
+            const errorMessage = (error as Error).message || 'Failed to sell item.';
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     };
@@ -87,49 +87,62 @@ export default function OnBarPage() {
                             <CardHeader>
                                 <CardTitle className="text-lg truncate">{item.brand} <span className="text-sm font-normal text-muted-foreground">({item.size})</span></CardTitle>
                             </CardHeader>
-                            <CardContent className="flex-1 flex flex-col justify-between p-6">
-                                <div className="text-center">
-                                    <p className="text-4xl font-bold tracking-tighter">{Math.max(0, item.remainingVolume)}<span className="text-xl font-normal text-muted-foreground">ml</span></p>
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Remaining</p>
-                                </div>
-                                <div className="my-6">
-                                     <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-                                        <div
-                                            className="absolute top-0 left-0 h-full bg-primary transition-all duration-300"
-                                            style={{ width: `${(item.remainingVolume / item.totalVolume) * 100}%` }}
-                                        />
+                             <CardContent className="flex-1 flex flex-col justify-between p-6">
+                                <div>
+                                    <div className="text-center">
+                                        <p className="text-4xl font-bold tracking-tighter">{Math.max(0, item.remainingVolume)}<span className="text-xl font-normal text-muted-foreground">ml</span></p>
+                                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Remaining</p>
+                                    </div>
+                                    <div className="my-6">
+                                        <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                                            <div
+                                                className="absolute top-0 left-0 h-full bg-primary transition-all duration-300"
+                                                style={{ width: `${(item.remainingVolume / item.totalVolume) * 100}%` }}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                     <div className="flex justify-center gap-2">
+                                     {item.category === 'Beer' ? (
                                         <Button
                                             variant="outline"
-                                            onClick={() => handleSellPeg(item.id, 30)}
-                                            disabled={item.remainingVolume < 30}
-                                            className="flex-1"
+                                            onClick={() => handleSell(item.id, item.totalVolume)}
+                                            disabled={item.remainingVolume <= 0}
+                                            className="w-full"
                                         >
-                                            <Minus className="h-4 w-4 md:mr-2" />
-                                            <span className="hidden md:inline">30ml</span>
+                                            <Beer className="mr-2 h-4 w-4" /> Sell Bottle
                                         </Button>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => handleSellPeg(item.id, 60)}
-                                            disabled={item.remainingVolume < 60}
-                                            className="flex-1"
-                                        >
-                                            <Minus className="h-4 w-4 md:mr-2" />
-                                            <span className="hidden md:inline">60ml</span>
-                                        </Button>
-                                         <Button
-                                            variant="outline"
-                                            onClick={() => handleSellPeg(item.id, 90)}
-                                            disabled={item.remainingVolume < 90}
-                                            className="flex-1"
-                                        >
-                                            <Minus className="h-4 w-4 md:mr-2" />
-                                            <span className="hidden md:inline">90ml</span>
-                                        </Button>
-                                    </div>
+                                     ) : (
+                                        <div className="flex justify-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => handleSell(item.id, 30)}
+                                                disabled={item.remainingVolume < 30}
+                                                className="flex-1"
+                                            >
+                                                <Minus className="h-4 w-4 md:mr-2" />
+                                                <span className="hidden md:inline">30ml</span>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => handleSell(item.id, 60)}
+                                                disabled={item.remainingVolume < 60}
+                                                className="flex-1"
+                                            >
+                                                <Minus className="h-4 w-4 md:mr-2" />
+                                                <span className="hidden md:inline">60ml</span>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => handleSell(item.id, 90)}
+                                                disabled={item.remainingVolume < 90}
+                                                className="flex-1"
+                                            >
+                                                <Minus className="h-4 w-4 md:mr-2" />
+                                                <span className="hidden md:inline">90ml</span>
+                                            </Button>
+                                        </div>
+                                     )}
                                     {item.remainingVolume <= 0 && (
                                         <Button
                                             variant="destructive"
