@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -25,13 +25,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+// The item prop is now a grouped item, but we only need productId and total quantity
+// so the GodownItem type is close enough for the structure.
 import type { GodownItem } from '@/hooks/use-godown-inventory';
 
 type TransferToShopDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  item: GodownItem;
-  onTransfer: (itemId: string, quantity: number) => void;
+  item: GodownItem; // Represents the grouped item, where id is productId and quantity is totalQuantity
+  onTransfer: (productId: string, quantity: number) => void;
 };
 
 export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTransfer }: TransferToShopDialogProps) {
@@ -51,7 +53,14 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
     },
   });
 
+  // Reset form when item changes
+  useEffect(() => {
+    form.reset({ quantity: 1 });
+  }, [item, form]);
+
+
   const onSubmit = (data: TransferFormValues) => {
+    // The `id` on the item passed to this dialog is actually the `productId`
     onTransfer(item.id, data.quantity);
   };
   
@@ -67,7 +76,7 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
         <DialogHeader>
           <DialogTitle>Transfer to Shop</DialogTitle>
           <DialogDescription>
-            Move stock from the godown to the main shop inventory.
+            Move stock from the godown to the main shop inventory. Batches will be used on a First-In, First-Out basis.
           </DialogDescription>
         </DialogHeader>
         <div className="text-sm">

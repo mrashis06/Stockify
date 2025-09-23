@@ -75,7 +75,7 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Item to Godown</DialogTitle>
+          <DialogTitle>Add New Batch to Godown</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
@@ -146,7 +146,7 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" className="bg-green-600 hover:bg-green-700">Add Item</Button>
+              <Button type="submit" className="bg-green-600 hover:bg-green-700">Add Batch</Button>
             </DialogFooter>
           </form>
         </Form>
