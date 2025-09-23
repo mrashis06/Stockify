@@ -27,6 +27,7 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <head>
+                <meta charSet="utf-8" />
                 <title>{metadata.title}</title>
                 <meta name="description" content={metadata.description} />
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -53,6 +54,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta charSet="utf-8" />
         <title>{metadata.title}</title>
         <meta name="description" content={metadata.description} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
