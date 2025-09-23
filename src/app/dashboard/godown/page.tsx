@@ -48,7 +48,7 @@ type GroupedGodownItem = {
     batches: GodownItem[];
 }
 
-export default function GodownPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function GodownPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
         godownInventory,
         loading,
@@ -307,5 +307,3 @@ export default function GodownPage({ searchParams }: { searchParams?: { [key: st
     </main>
   );
 }
-
-    

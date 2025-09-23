@@ -5,9 +5,11 @@ import { ThemeProvider } from '@/components/theme-provider';
 
 export default function RootLayout({
   children,
+  params,
   searchParams,
 }: Readonly<{
   children: React.ReactNode;
+  params: { slug: string };
   searchParams?: { [key: string]: string | string[] | undefined };
 }>) {
 
@@ -40,5 +42,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    

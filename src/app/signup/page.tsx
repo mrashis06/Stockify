@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
-export default function SignupPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function SignupPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const router = useRouter();
   const { toast } = useToast();
   const [name, setName] = React.useState('');
@@ -118,5 +118,3 @@ export default function SignupPage({ searchParams }: { searchParams?: { [key: st
     </div>
   );
 }
-
-    

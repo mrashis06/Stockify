@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
-export default function InventoryPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
         inventory,
         loading,
@@ -417,5 +417,3 @@ export default function InventoryPage({ searchParams }: { searchParams?: { [key:
     </main>
   );
 }
-
-    

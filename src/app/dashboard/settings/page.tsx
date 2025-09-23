@@ -39,7 +39,7 @@ const UserProfileItem = ({ label, description, isLogout = false, onClick }: { la
     </div>
 )
 
-export default function SettingsPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function SettingsPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -95,5 +95,3 @@ export default function SettingsPage({ searchParams }: { searchParams?: { [key: 
     </div>
   );
 }
-
-    

@@ -51,7 +51,7 @@ function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
 }
 
 
-export default function LoginPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function LoginPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const router = useRouter();
   const { toast } = useToast();
   const [email, setEmail] = React.useState('');
@@ -173,5 +173,3 @@ export default function LoginPage({ searchParams }: { searchParams?: { [key: str
     </div>
   );
 }
-
-    
