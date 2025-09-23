@@ -87,7 +87,7 @@ export default function OnBarPage() {
                             <CardHeader>
                                 <CardTitle className="text-lg">{item.brand} <span className="text-sm font-normal text-muted-foreground">({item.size})</span></CardTitle>
                             </CardHeader>
-                            <CardContent className="flex-1 flex flex-col justify-between">
+                            <CardContent className="flex flex-1 flex-col justify-between">
                                 <div className="flex-1">
                                     <div className="text-center mb-4">
                                         <p className="text-3xl font-bold">{Math.max(0, item.remainingVolume)}<span className="text-lg font-normal text-muted-foreground"> / {item.totalVolume}ml</span></p>
