@@ -8,11 +8,10 @@ import {
   getDoc,
   getDocs,
   writeBatch,
-  addDoc,
-  deleteDoc,
-  onSnapshot,
   setDoc,
   updateDoc,
+  deleteDoc,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
@@ -157,8 +156,10 @@ export function useInventory() {
         const dailyDocSnap = await getDoc(dailyDocRef);
         if (dailyDocSnap.exists()) {
             const dailyData = dailyDocSnap.data();
-            delete dailyData[id];
-            batch.set(dailyDocRef, dailyData);
+            if(dailyData[id]) {
+                delete dailyData[id];
+                batch.set(dailyDocRef, dailyData);
+            }
         }
         
         await batch.commit();
@@ -178,17 +179,24 @@ export function useInventory() {
         const opening = (item.prevStock ?? 0) + (item.added ?? 0);
         const closing = opening - (item.sales ?? 0);
         
-        const updatedItem = {
-          ...item,
+        // This is a snapshot of the item's state at the time of saving
+        const savedItemState = {
+          brand: item.brand,
+          size: item.size,
+          price: item.price,
+          category: item.category,
+          prevStock: item.prevStock,
+          added: item.added,
+          sales: item.sales,
           opening,
           closing,
         };
         
-        dailyData[item.id] = updatedItem;
+        dailyData[item.id] = savedItemState;
       });
 
       const dailyDocRef = doc(db, 'dailyInventory', today);
-      batch.set(dailyDocRef, dailyData, { merge: true });
+      batch.set(dailyDocRef, dailyData); // Using set to overwrite the whole day's data for consistency
 
       await batch.commit();
     } catch (error) {
@@ -202,4 +210,5 @@ export function useInventory() {
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, saveChanges };
 }
 
+    
     

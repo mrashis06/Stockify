@@ -145,13 +145,25 @@ export default function InventoryPage() {
         setSelectedRows(newSelection);
     };
 
+    const processedInventory = useMemo(() => {
+        return inventory.map(item => {
+            const opening = (item.prevStock ?? 0) + (item.added ?? 0);
+            const closing = opening - (item.sales ?? 0);
+            return {
+                ...item,
+                opening,
+                closing,
+            };
+        });
+    }, [inventory]);
+
     const filteredInventory = useMemo(() => {
-        return inventory.filter(item => {
+        return processedInventory.filter(item => {
             const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
             return matchesSearch && matchesCategory;
         });
-    }, [inventory, searchQuery, categoryFilter]);
+    }, [processedInventory, searchQuery, categoryFilter]);
 
     const allCategories = useMemo(() => {
         const cats = new Set(inventory.map(i => i.category).filter(Boolean));
@@ -271,9 +283,7 @@ export default function InventoryPage() {
                         </TableHeader>
                         <TableBody>
                         {filteredInventory.map(item => {
-                            const opening = (item.prevStock ?? 0) + (item.added ?? 0);
-                            const closing = opening - (item.sales ?? 0);
-                            const isLowStock = closing < 10;
+                            const isLowStock = (item.closing ?? 0) < 10;
 
                             return (
                                 <TableRow 
@@ -323,7 +333,7 @@ export default function InventoryPage() {
                                             onChange={(e) => handleInputChange(item.id, 'added', e.target.value)}
                                         />
                                     </TableCell>
-                                    {showOpening && <TableCell>{opening}</TableCell>}
+                                    {showOpening && <TableCell>{item.opening}</TableCell>}
                                     <TableCell>
                                         <Input
                                             type="number"
@@ -332,7 +342,7 @@ export default function InventoryPage() {
                                             onChange={(e) => handleInputChange(item.id, 'sales', e.target.value)}
                                         />
                                     </TableCell>
-                                    {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{closing}</TableCell>}
+                                    {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{item.closing}</TableCell>}
                                 </TableRow>
                             )
                         })}
@@ -352,3 +362,5 @@ export default function InventoryPage() {
     </main>
   );
 }
+
+    
