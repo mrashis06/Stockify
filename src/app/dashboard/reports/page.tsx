@@ -133,23 +133,38 @@ export default function ReportsPage() {
             head: [tableColumn],
             body: tableRows,
             startY: 20,
+            headStyles: {
+                fillColor: [22, 163, 74], // Green background for header
+                textColor: [255, 255, 255],
+                fontStyle: 'bold'
+            },
             didDrawPage: (data) => {
                 doc.setFontSize(20);
                 doc.setTextColor(40);
                 doc.text(title, data.settings.margin.left, 15);
             },
+            // Add a footer row for the total
+            didDrawCell: (data) => {
+                if (data.section === 'body' && data.row.index === tableRows.length - 1) {
+                     doc.autoTable({
+                        startY: data.cursor.y + data.row.height,
+                        head: [['Total Sales', `₹${totalSales.toLocaleString('en-IN')}`]],
+                        theme: 'grid',
+                        styles: {
+                            fontStyle: 'bold',
+                            halign: 'right'
+                        },
+                        headStyles: {
+                            fillColor: [244, 244, 245],
+                            textColor: [20, 20, 20]
+                        },
+                        columnStyles: {
+                            0: { halign: 'left' }
+                        }
+                    });
+                }
+            }
         });
-
-        const finalY = (doc as any).autoTable.previous.finalY;
-        if (finalY) {
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text(
-                `Total Sales: ₹${totalSales.toLocaleString('en-IN')}`,
-                doc.internal.pageSize.getWidth() - doc.getTextWidth(`Total Sales: ₹${totalSales.toLocaleString('en-IN')}`) - 14,
-                finalY + 10
-            );
-        }
 
         doc.save(`sales_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
@@ -292,3 +307,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
