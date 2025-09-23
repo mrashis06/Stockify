@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 export type InventoryItem = {
   id: string;
@@ -52,6 +53,7 @@ export function useInventory() {
     const dailyDocRef = doc(db, 'dailyInventory', today);
 
     const unsubscribe = onSnapshot(dailyDocRef, async (dailySnap) => {
+      try {
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
         
         // Fetch all master inventory items
@@ -87,8 +89,19 @@ export function useInventory() {
             }
         });
 
-        setInventory(items.sort((a, b) => a.brand.localeCompare(b.brand)));
+        const processedInventory = items.map(item => {
+             const opening = (item.prevStock ?? 0) + (item.added ?? 0);
+             const closing = opening - (item.sales ?? 0);
+             return { ...item, opening, closing };
+        });
+
+        setInventory(processedInventory.sort((a, b) => a.brand.localeCompare(b.brand)));
+      } catch (error) {
+        console.error("Error fetching inventory data: ", error);
+        toast({ title: 'Error', description: 'Failed to load inventory data.', variant: 'destructive' });
+      } finally {
         setLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -230,8 +243,13 @@ export function useInventory() {
                     const newGodownQuantity = godownQuantity - difference;
                     
                     if(newGodownQuantity < 0) {
-                        // Not a full rollback, just prevent the negative update
-                        throw new Error(`Not enough stock in godown for ${dailyData[id].brand}. Available: ${godownQuantity}, Tried to use: ${difference}.`);
+                        toast({
+                            title: 'Stock Error',
+                            description: `Not enough stock in godown for ${dailyData[id].brand}. Available: ${godownQuantity}, Tried to use: ${difference}.`,
+                            variant: 'destructive',
+                        });
+                        // By not throwing, we allow the transaction to be safely cancelled by returning.
+                        return;
                     }
                     
                     if (godownDoc.exists()) {
@@ -261,8 +279,11 @@ export function useInventory() {
       } catch (error) {
         console.error(`Error updating ${field}:`, error);
         // Revert local state on error
-        setInventory(prev => prev.map(item => item.id === id ? originalItemState! : item));
-        throw error;
+        if (originalItemState) {
+          setInventory(prev => prev.map(item => item.id === id ? originalItemState : item));
+        }
+        // Rethrow with a user-friendly message
+        throw new Error(`Failed to update ${field}. Please try again.`);
       } finally {
         setSaving(false);
       }
