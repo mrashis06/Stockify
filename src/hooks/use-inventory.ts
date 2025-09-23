@@ -71,11 +71,13 @@ export function useInventory() {
             const id = masterItem.id;
             const dailyItem = dailyData[id];
             
+            const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
+
             if (dailyItem) {
-                items.push({ ...masterItem, ...dailyItem });
+                // Ensure prevStock from yesterday is correctly assigned
+                items.push({ ...masterItem, ...dailyItem, prevStock });
             } else {
                 // If no record for today, create one based on yesterday or master
-                const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
                 items.push({
                     ...masterItem,
                     prevStock,
@@ -141,7 +143,7 @@ export function useInventory() {
         batch.update(docRef, data);
         
         const dailyDocRef = doc(db, 'dailyInventory', today);
-        const dailyDocSnap = await getDoc(dailyDocRef); // Use getDoc instead of transaction.get
+        const dailyDocSnap = await getDoc(dailyDocRef);
         if (dailyDocSnap.exists()) {
             const dailyData = dailyDocSnap.data();
             if (dailyData[id]) {
@@ -186,15 +188,16 @@ export function useInventory() {
   
   const updateItemField = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => {
       setSaving(true);
+      const originalItemState = inventory.find(item => item.id === id);
+
       try {
         await runTransaction(db, async (transaction) => {
             const dailyDocRef = doc(db, 'dailyInventory', today);
             const dailyDocSnap = await transaction.get(dailyDocRef);
-            const dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
-            const currentItem = dailyData[id];
+            let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
             
-            if (!currentItem) {
-                // This can happen if the item was just added. Let's get it from master.
+            // Ensure dailyData for the item exists, creating it if necessary
+            if (!dailyData[id]) {
                 const masterRef = doc(db, 'inventory', id);
                 const masterSnap = await transaction.get(masterRef);
                 if (!masterSnap.exists()) throw new Error("Item does not exist.");
@@ -204,9 +207,11 @@ export function useInventory() {
                 const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
                 
                 const masterData = masterSnap.data();
+                const prevStock = yesterdayData[id]?.closing ?? masterData.prevStock ?? 0;
+
                 dailyData[id] = {
                     ...masterData,
-                    prevStock: yesterdayData[id]?.closing ?? masterData.prevStock ?? 0,
+                    prevStock: prevStock,
                     added: 0,
                     sales: 0
                 };
@@ -225,30 +230,38 @@ export function useInventory() {
                     const newGodownQuantity = godownQuantity - difference;
                     
                     if(newGodownQuantity < 0) {
-                        throw new Error(`Not enough stock in godown for ${id}. Available: ${godownQuantity}, Tried to use: ${difference}.`);
+                        // Not a full rollback, just prevent the negative update
+                        throw new Error(`Not enough stock in godown for ${dailyData[id].brand}. Available: ${godownQuantity}, Tried to use: ${difference}.`);
                     }
                     
                     if (godownDoc.exists()) {
                         transaction.update(godownItemRef, { quantity: newGodownQuantity });
-                    } else if (newGodownQuantity > 0) {
-                        // This case handles returning stock to a godown item that was deleted
-                        transaction.set(godownItemRef, {
-                            ...dailyData[id], // use daily data as a base
+                    } else {
+                         transaction.set(godownItemRef, {
+                            brand: dailyData[id].brand,
+                            size: dailyData[id].size,
+                            category: dailyData[id].category,
                             quantity: newGodownQuantity
                         });
                     }
                 }
+            }
+             if (field === 'price') {
+                const masterRef = doc(db, 'inventory', id);
+                transaction.update(masterRef, { price: value });
             }
 
             // Recalculate opening and closing
             dailyData[id].opening = (dailyData[id].prevStock || 0) + (dailyData[id].added || 0);
             dailyData[id].closing = dailyData[id].opening - (dailyData[id].sales || 0);
 
-            transaction.set(dailyDocRef, dailyData);
+            transaction.set(dailyDocRef, dailyData, { merge: true });
         });
 
       } catch (error) {
         console.error(`Error updating ${field}:`, error);
+        // Revert local state on error
+        setInventory(prev => prev.map(item => item.id === id ? originalItemState! : item));
         throw error;
       } finally {
         setSaving(false);
@@ -258,5 +271,3 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField };
 }
-
-    
