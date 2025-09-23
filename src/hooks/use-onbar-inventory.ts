@@ -117,6 +117,42 @@ export function useOnBarInventory() {
     }
   };
 
+  const refillPeg = async (id: string, amount: number) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+        const itemRef = doc(db, 'onBarInventory', id);
+        await runTransaction(db, async (transaction) => {
+            const itemDoc = await transaction.get(itemRef);
+            if (!itemDoc.exists()) {
+                throw new Error("Item not found on bar.");
+            }
+            const itemData = itemDoc.data() as OnBarItem;
+
+            // Ensure we don't refill more than was sold or more than the bottle's total volume
+            const effectiveAmount = Math.min(amount, itemData.salesVolume || 0);
+            if (effectiveAmount <= 0) return;
+
+            let newRemainingVolume = itemData.remainingVolume + effectiveAmount;
+            if (newRemainingVolume > itemData.totalVolume) {
+                newRemainingVolume = itemData.totalVolume;
+            }
+
+            const newSalesVolume = (itemData.salesVolume || 0) - (newRemainingVolume - itemData.remainingVolume);
+            
+            transaction.update(itemRef, {
+                remainingVolume: newRemainingVolume,
+                salesVolume: Math.max(0, newSalesVolume)
+            });
+        });
+    } catch (error) {
+        console.error("Error refilling peg: ", error);
+        throw error;
+    } finally {
+        setSaving(false);
+    }
+  };
+
   const removeOnBarItem = async (id: string) => {
       if(saving) return;
       setSaving(true);
@@ -131,5 +167,5 @@ export function useOnBarInventory() {
       }
   }
 
-  return { onBarInventory, loading, saving, addOnBarItem, addOnBarItemManual, sellPeg, removeOnBarItem };
+  return { onBarInventory, loading, saving, addOnBarItem, addOnBarItemManual, sellPeg, refillPeg, removeOnBarItem };
 }

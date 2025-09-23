@@ -11,7 +11,7 @@ import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import { useInventory } from '@/hooks/use-inventory';
 
 export default function OnBarPage() {
-    const { onBarInventory, loading, sellPeg, removeOnBarItem } = useOnBarInventory();
+    const { onBarInventory, loading, sellPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
     const { inventory: shopInventory } = useInventory();
     const { toast } = useToast();
 
@@ -35,6 +35,17 @@ export default function OnBarPage() {
         } catch (error) {
             console.error('Error selling item:', error);
             const errorMessage = (error as Error).message || 'Failed to sell item.';
+            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+        }
+    };
+
+    const handleRefill = async (id: string, volume: number) => {
+        try {
+            await refillPeg(id, volume);
+            toast({ title: 'Success', description: `${volume}ml refilled.` });
+        } catch (error) {
+            console.error('Error refilling item:', error);
+            const errorMessage = (error as Error).message || 'Failed to refill item.';
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     };
@@ -113,33 +124,44 @@ export default function OnBarPage() {
                                             <Beer className="mr-2 h-4 w-4" /> Sell Bottle
                                         </Button>
                                      ) : (
-                                        <div className="flex justify-center gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 flex justify-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => handleSell(item.id, 30)}
+                                                    disabled={item.remainingVolume < 30}
+                                                    className="flex-1"
+                                                >
+                                                    <Minus className="h-4 w-4 md:mr-2" />
+                                                    <span className="hidden md:inline">30ml</span>
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => handleSell(item.id, 60)}
+                                                    disabled={item.remainingVolume < 60}
+                                                    className="flex-1"
+                                                >
+                                                    <Minus className="h-4 w-4 md:mr-2" />
+                                                    <span className="hidden md:inline">60ml</span>
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => handleSell(item.id, 90)}
+                                                    disabled={item.remainingVolume < 90}
+                                                    className="flex-1"
+                                                >
+                                                    <Minus className="h-4 w-4 md:mr-2" />
+                                                    <span className="hidden md:inline">90ml</span>
+                                                </Button>
+                                            </div>
                                             <Button
                                                 variant="outline"
-                                                onClick={() => handleSell(item.id, 30)}
-                                                disabled={item.remainingVolume < 30}
-                                                className="flex-1"
+                                                size="icon"
+                                                onClick={() => handleRefill(item.id, 30)}
+                                                disabled={item.remainingVolume >= item.totalVolume || (item.salesVolume || 0) < 30}
+                                                className="shrink-0"
                                             >
-                                                <Minus className="h-4 w-4 md:mr-2" />
-                                                <span className="hidden md:inline">30ml</span>
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => handleSell(item.id, 60)}
-                                                disabled={item.remainingVolume < 60}
-                                                className="flex-1"
-                                            >
-                                                <Minus className="h-4 w-4 md:mr-2" />
-                                                <span className="hidden md:inline">60ml</span>
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => handleSell(item.id, 90)}
-                                                disabled={item.remainingVolume < 90}
-                                                className="flex-1"
-                                            >
-                                                <Minus className="h-4 w-4 md:mr-2" />
-                                                <span className="hidden md:inline">90ml</span>
+                                                <Plus className="h-4 w-4" />
                                             </Button>
                                         </div>
                                      )}
