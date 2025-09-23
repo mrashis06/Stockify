@@ -90,6 +90,7 @@ export default function DashboardPage() {
             const image = PlaceHolderImages.find(p => p.id === category.imageId);
             return (
               <Card key={category.name} className="overflow-hidden hover:shadow-lg transition-shadow">
+               <Link href="/dashboard/inventory">
                 <CardContent className="p-0">
                   <div className="relative aspect-square w-full">
                     {image && (
@@ -106,6 +107,7 @@ export default function DashboardPage() {
                     <h3 className="text-center font-semibold">{category.name}</h3>
                   </div>
                 </CardContent>
+                </Link>
               </Card>
             )
           })}
