@@ -12,6 +12,7 @@ import {
   deleteDoc,
   onSnapshot,
   setDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
@@ -119,6 +120,31 @@ export function useInventory() {
     }
   };
 
+  const updateBrand = async (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => {
+    setSaving(true);
+    try {
+        const docRef = doc(db, 'inventory', id);
+        await updateDoc(docRef, data);
+        
+        // Also update in today's daily record if it exists
+        const dailyDocRef = doc(db, 'dailyInventory', today);
+        const dailyDocSnap = await getDoc(dailyDocRef);
+        if (dailyDocSnap.exists()) {
+            const dailyData = dailyDocSnap.data();
+            if (dailyData[id]) {
+                const updatedDailyItem = { ...dailyData[id], ...data };
+                await setDoc(dailyDocRef, { [id]: updatedDailyItem }, { merge: true });
+            }
+        }
+
+    } catch (error) {
+      console.error("Error updating brand: ", error);
+      throw error;
+    } finally {
+        setSaving(false);
+    }
+  };
+
   const deleteBrand = async (id: string) => {
      setSaving(true);
      try {
@@ -173,5 +199,7 @@ export function useInventory() {
     }
   };
 
-  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, saveChanges };
+  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, saveChanges };
 }
+
+    

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2 } from 'lucide-react';
+import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import AddBrandDialog from '@/components/dashboard/add-brand-dialog';
+import EditBrandDialog from '@/components/dashboard/edit-brand-dialog';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -53,12 +54,15 @@ export default function InventoryPage() {
         saving,
         addBrand,
         deleteBrand,
+        updateBrand,
         saveChanges
     } = useInventory();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
+    const [isEditBrandOpen, setIsEditBrandOpen] = useState(false);
+    const [editingBrand, setEditingBrand] = useState<InventoryItem | null>(null);
     const [showOpening, setShowOpening] = useState(true);
     const [showClosing, setShowClosing] = useState(true);
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
@@ -72,6 +76,21 @@ export default function InventoryPage() {
         } catch (error) {
             console.error('Error adding brand:', error);
             toast({ title: 'Error', description: 'Failed to add new brand.', variant: 'destructive' });
+        }
+    };
+    
+    const handleEditBrand = (brand: InventoryItem) => {
+        setEditingBrand(brand);
+        setIsEditBrandOpen(true);
+    };
+
+    const handleUpdateBrand = async (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => {
+        try {
+            await updateBrand(id, data);
+            toast({ title: 'Success', description: 'Brand updated successfully.' });
+        } catch (error) {
+            console.error('Error updating brand:', error);
+            toast({ title: 'Error', description: 'Failed to update brand.', variant: 'destructive' });
         }
     };
 
@@ -146,6 +165,14 @@ export default function InventoryPage() {
             onOpenChange={setIsAddBrandOpen}
             onAddBrand={handleAddBrand}
         />
+        {editingBrand && (
+            <EditBrandDialog
+                isOpen={isEditBrandOpen}
+                onOpenChange={setIsEditBrandOpen}
+                brandData={editingBrand}
+                onUpdateBrand={handleUpdateBrand}
+            />
+        )}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -261,7 +288,12 @@ export default function InventoryPage() {
                                             onChange={() => handleRowSelect(item.id)}
                                         />
                                     </TableCell>
-                                    <TableCell className="font-medium">{item.brand}</TableCell>
+                                    <TableCell className="font-medium flex items-center">
+                                        {item.brand}
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-2" onClick={() => handleEditBrand(item)}>
+                                            <Pencil className="h-3 w-3" />
+                                        </Button>
+                                    </TableCell>
                                     <TableCell>
                                         <Input
                                             type="text"
@@ -319,3 +351,5 @@ export default function InventoryPage() {
     </main>
   );
 }
+
+    
