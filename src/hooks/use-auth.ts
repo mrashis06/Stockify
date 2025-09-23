@@ -40,7 +40,7 @@ export function useAuth() {
     if (loading) return;
 
     const isAuthPage = ['/login', '/signup'].includes(pathname);
-    const isProtectedPage = !['/login', '/signup', '/'].includes(pathname);
+    const isProtectedPage = !isAuthPage && pathname !== '/';
 
     if (!user && isProtectedPage) {
       router.push('/login');

@@ -20,6 +20,21 @@ export default function RootLayout({
     description: 'Smart Inventory Management for Your Liquor Store',
   };
 
+  const isAuthPage = ['/login', '/signup'].includes(pathname);
+  const isProtectedPage = !isAuthPage && pathname !== '/';
+
+  if (loading && isProtectedPage) {
+    return (
+        <html lang="en" suppressHydrationWarning>
+            <body className="font-body antialiased">
+                <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
+                    <div>Loading...</div>
+                </div>
+            </body>
+        </html>
+    );
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
