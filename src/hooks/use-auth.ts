@@ -24,14 +24,7 @@ export function useAuth() {
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
           setUser({ ...user, ...userDoc.data() });
-          // If user is on login/signup, redirect to dashboard
-          if (['/login', '/signup'].includes(pathname)) {
-            router.push('/dashboard');
-          }
         } else {
-          // New user who just signed up with a provider but doc not created yet,
-          // or a user whose DB entry was deleted.
-          // Let them proceed to create a doc (e.g. on signup page)
           setUser(user);
         }
       } else {

@@ -58,7 +58,7 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
         createdAt: serverTimestamp(),
       });
 
-      // The useAuth hook will handle the redirect
+      router.push('/dashboard');
     } catch (error) {
       console.error("Error signing up with email and password: ", error);
       toast({

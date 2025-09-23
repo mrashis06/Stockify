@@ -64,7 +64,7 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // The useAuth hook will handle the redirect.
+      router.push('/dashboard');
     } catch (error) {
       console.error("Error signing in with email and password: ", error);
       toast({
@@ -94,13 +94,9 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           createdAt: serverTimestamp(),
         });
       }
-      // The useAuth hook will now reliably handle the redirect to /dashboard
-      // after the auth state has changed.
+      router.push('/dashboard');
     } catch (error: any) {
-      // Don't show an error toast if the user closes the popup
-      if (error.code === 'auth/popup-closed-by-user') {
-        console.log("Google sign-in popup closed by user.");
-      } else {
+      if (error.code !== 'auth/popup-closed-by-user') {
         console.error("Error with Google sign-in: ", error);
         toast({
           title: "Authentication Error",
