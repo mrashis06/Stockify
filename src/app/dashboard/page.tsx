@@ -131,13 +131,13 @@ export default function DashboardPage({ searchParams }: { searchParams?: { [key:
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Stock</CardTitle>
+            <CardTitle className="text-sm font-medium">Today's Stock</CardTitle>
             <PackageCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalStock} Units</div>
             <p className="text-xs text-muted-foreground">
-              Total units across all items
+              Today's closing stock across all items
             </p>
           </CardContent>
         </Card>
@@ -215,5 +215,3 @@ export default function DashboardPage({ searchParams }: { searchParams?: { [key:
     </main>
   );
 }
-
-    
