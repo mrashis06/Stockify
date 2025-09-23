@@ -1,27 +1,18 @@
 
-"use client";
-
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
-import { useAuth } from '@/hooks/use-auth';
-import { usePathname } from 'next/navigation';
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { user, loading } = useAuth();
-  const pathname = usePathname();
 
   const metadata = {
     title: 'Stockify - Liquor Store Inventory Management',
     description: 'Smart Inventory Management for Your Liquor Store',
   };
-
-  const isAuthPage = ['/login', '/signup'].includes(pathname);
-  const isProtectedPage = !isAuthPage && pathname !== '/';
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -40,13 +31,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {loading && isProtectedPage ? (
-            <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
-                <div>Loading...</div>
-            </div>
-          ) : (
-            children
-          )}
+          {children}
           <Toaster />
         </ThemeProvider>
       </body>
