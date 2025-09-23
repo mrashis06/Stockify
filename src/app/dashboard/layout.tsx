@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Settings, Warehouse } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,19 +12,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import NavLink from './nav-link';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen w-full flex-col bg-background dark">
       <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
-        <nav className="flex-1">
+        <nav className="flex-1 flex items-center gap-6">
           <Link
             href="/dashboard"
             className="flex items-center gap-2 text-lg font-semibold md:text-base"
           >
             <Package className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl">Stockify</span>
+            <span className="font-bold text-xl">Inventory Manager</span>
           </Link>
+          <div className="hidden md:flex items-center gap-4">
+             <NavLink href="/dashboard" Icon={LayoutDashboard}>Dashboard</NavLink>
+             <NavLink href="/dashboard/inventory" Icon={Warehouse}>Inventory</NavLink>
+             <NavLink href="#" Icon={FileText}>Reports</NavLink>
+             <NavLink href="#" Icon={Settings}>Settings</NavLink>
+          </div>
         </nav>
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" className="rounded-full">
@@ -35,7 +42,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src="https://picsum.photos/seed/user-avatar/40/40" data-ai-hint="female avatar" alt="User" />
+                  <AvatarImage src="https://picsum.photos/seed/user-avatar/40/40" data-ai-hint="male avatar" alt="User" />
                   <AvatarFallback>
                     <User className="h-5 w-5" />
                   </AvatarFallback>
