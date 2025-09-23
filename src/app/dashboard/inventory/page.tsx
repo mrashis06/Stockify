@@ -418,6 +418,4 @@ export default function InventoryPage() {
   );
 }
 
-
-
     
