@@ -230,15 +230,15 @@ export default function InventoryPage() {
                     <Table>
                         <TableHeader>
                         <TableRow>
-                            <TableHead></TableHead>
-                            <TableHead>Brand</TableHead>
-                            <TableHead>Size</TableHead>
-                            <TableHead>Price</TableHead>
-                            <TableHead>Prev. Stock</TableHead>
-                            <TableHead>Added</TableHead>
-                            {showOpening && <TableHead>Opening</TableHead>}
-                            <TableHead>Sales</TableHead>
-                            {showClosing && <TableHead>Closing</TableHead>}
+                            <TableHead className="font-bold text-foreground"></TableHead>
+                            <TableHead className="font-bold text-foreground">Brand</TableHead>
+                            <TableHead className="font-bold text-foreground">Size</TableHead>
+                            <TableHead className="font-bold text-foreground">Price</TableHead>
+                            <TableHead className="font-bold text-foreground">Prev. Stock</TableHead>
+                            <TableHead className="font-bold text-foreground">Added</TableHead>
+                            {showOpening && <TableHead className="font-bold text-foreground">Opening</TableHead>}
+                            <TableHead className="font-bold text-foreground">Sales</TableHead>
+                            {showClosing && <TableHead className="font-bold text-foreground">Closing</TableHead>}
                         </TableRow>
                         </TableHeader>
                         <TableBody>
