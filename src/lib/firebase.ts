@@ -9,10 +9,9 @@ const firebaseConfig = {
   apiKey: "AIzaSyAazS8f8-G0Wigt46j5vj7HTZjplcajFRY",
   authDomain: "stock-inventory-918cc.firebaseapp.com",
   projectId: "stock-inventory-918cc",
-  storageBucket: "stock-inventory-918cc.appspot.com",
+  storageBucket: "stock-inventory-918cc.firebasestorage.app",
   messagingSenderId: "364811359425",
-  appId: "1:364811359425:web:ded734b476b4274c358485",
-  measurementId: "G-XXXXXXXXXX"
+  appId: "1:364811359425:web:5c253ec19bef838e39f040",
 };
 
 // Initialize Firebase
