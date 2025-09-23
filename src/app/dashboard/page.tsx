@@ -48,7 +48,10 @@ export default function DashboardPage() {
             <IndianRupee className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹0</div>
+            <div className="text-2xl font-bold flex items-center">
+                <IndianRupee className="h-6 w-6 mr-1" />
+                0
+            </div>
             <p className="text-xs text-muted-foreground">
               No sales recorded today
             </p>
@@ -65,7 +68,7 @@ export default function DashboardPage() {
                 {lowStockItems.length > 0 ? lowStockItems.map(item => (
                     <div key={item.name} className="flex justify-between">
                         <span>{item.name}</span>
-                        <span className="font-semibold text-destructive">{item.units} units left</span>
+                        <span className="font-semibold text-destructive">{item.units} left</span>
                     </div>
                 )) : (
                     <p className="text-xs text-muted-foreground">No items are low on stock.</p>
