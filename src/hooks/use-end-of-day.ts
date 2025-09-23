@@ -39,25 +39,25 @@ export function useEndOfDay() {
         if (Object.prototype.hasOwnProperty.call(todaysData, itemId)) {
           const item = todaysData[itemId];
           
-          // Calculate today's closing stock just to be sure
-          const opening = (item.prevStock || 0) + (item.added || 0);
-          const closing = opening - (item.sales || 0);
+          // Use the final, pre-calculated closing stock from today's document.
+          // This is more reliable than recalculating it here.
+          const closingStock = item.closing ?? ((item.prevStock || 0) + (item.added || 0) - (item.sales || 0));
 
           newDailyData[itemId] = {
             brand: item.brand,
             size: item.size,
             category: item.category,
             price: item.price,
-            prevStock: closing, // Today's closing is tomorrow's previous
+            prevStock: closingStock, // Today's closing is tomorrow's previous
             added: 0,
             sales: 0,
-            opening: closing, // Initially opening is the same as prevStock
-            closing: closing, // Initially closing is the same as opening
+            opening: closingStock, // Initially opening is the same as prevStock
+            closing: closingStock, // Initially closing is the same as opening
           };
           
           // Also update the master inventory's prevStock for resilience
           const masterInventoryRef = doc(db, 'inventory', itemId);
-          batch.update(masterInventoryRef, { prevStock: closing });
+          batch.update(masterInventoryRef, { prevStock: closingStock });
         }
       }
       
