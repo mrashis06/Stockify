@@ -3,10 +3,10 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, AuthError } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, AuthError } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -55,9 +56,46 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          const user = result.user;
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (!userDoc.exists()) {
+            await setDoc(userDocRef, {
+              name: user.displayName,
+              email: user.email,
+              role: 'staff',
+              createdAt: serverTimestamp(),
+            });
+          }
+           // The useAuth hook will handle the redirect to dashboard
+        }
+      } catch (error) {
+        console.error("Error handling redirect result: ", error);
+        toast({
+          title: "Authentication Error",
+          description: "Failed to sign in with Google. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleRedirectResult();
+  }, [toast, router]);
+
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       // The useAuth hook will handle the redirect.
@@ -68,43 +106,25 @@ export default function LoginPage() {
         description: "Failed to sign in. Please check your credentials.",
         variant: "destructive",
       });
+    } finally {
+        setLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
+    setLoading(true);
     const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Check if user exists in Firestore
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (!userDoc.exists()) {
-        // Create user in Firestore
-        await setDoc(userDocRef, {
-          name: user.displayName,
-          email: user.email,
-          role: 'staff',
-          createdAt: serverTimestamp(),
-        });
-      }
-      // The useAuth hook will handle the redirect.
-    } catch (error) {
-      const authError = error as AuthError;
-      // Don't show an error toast if the user closes the popup
-      if (authError.code === 'auth/popup-closed-by-user') {
-        return;
-      }
-      console.error("Error signing in with Google: ", error);
-      toast({
-        title: "Authentication Error",
-        description: "Failed to sign in with Google. Please try again.",
-        variant: "destructive",
-      });
-    }
+    await signInWithRedirect(auth, provider);
   };
+  
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="mt-4 text-muted-foreground">Authenticating...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
