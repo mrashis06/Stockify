@@ -40,10 +40,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !['/login', '/signup', '/'].includes(window.location.pathname)) {
         router.push('/login');
     }
-    return null;
+    return (
+         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
+            <div>Loading...</div>
+        </div>
+    );
   }
   
   return (
