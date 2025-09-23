@@ -372,7 +372,7 @@ export default function InventoryPage() {
                                         <Input
                                             type="number"
                                             className="h-8 w-20 bg-card"
-                                            defaultValue={item.added || 0}
+                                            defaultValue={item.added ?? 0}
                                             onBlur={(e) => handleFieldChange(item.id, 'added', e.target.value)}
                                             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                         />
@@ -382,7 +382,7 @@ export default function InventoryPage() {
                                         <Input
                                             type="number"
                                             className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
-                                            defaultValue={item.sales || 0}
+                                            defaultValue={item.sales ?? 0}
                                             onBlur={(e) => handleFieldChange(item.id, 'sales', e.target.value)}
                                             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                         />
@@ -417,5 +417,3 @@ export default function InventoryPage() {
     </main>
   );
 }
-
-    

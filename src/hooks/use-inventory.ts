@@ -79,11 +79,15 @@ export function useInventory() {
             
             const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
 
+            // This is the critical change: ensure added and sales default to 0 if not present.
+            const added = dailyItem?.added ?? 0;
+            const sales = dailyItem?.sales ?? 0;
+
             if (dailyItem) {
-                // Ensure prevStock from yesterday is correctly assigned
-                items.push({ ...masterItem, ...dailyItem, prevStock, added: dailyItem.added || 0, sales: dailyItem.sales || 0 });
+                // Ensure prevStock from yesterday is correctly assigned and use explicit zero defaults
+                items.push({ ...masterItem, ...dailyItem, prevStock, added, sales });
             } else {
-                // If no record for today, create one based on yesterday or master
+                // If no record for today, create one based on yesterday or master with zero for added/sales
                 items.push({
                     ...masterItem,
                     prevStock,
