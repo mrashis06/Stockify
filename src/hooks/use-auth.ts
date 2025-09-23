@@ -24,29 +24,28 @@ export function useAuth() {
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
           setUser({ ...user, ...userDoc.data() });
+          // If user is on login/signup, redirect to dashboard
           if (['/login', '/signup'].includes(pathname)) {
             router.push('/dashboard');
           }
         } else {
-          // New user, not in DB yet. Or user exists but document is not found.
-           setUser(user);
-           if (pathname !== '/signup') {
-            // This might happen for a user who signed up but doc creation failed.
-            // Or if they are trying to access a protected route without a db entry.
-            // Let's guide them to login/signup. If they are on login, they can stay.
-           }
+          // New user who just signed up with a provider but doc not created yet,
+          // or a user whose DB entry was deleted.
+          // Let them proceed to create a doc (e.g. on signup page)
+          setUser(user);
         }
       } else {
         setUser(null);
-        const isAuthPage = ['/login', '/signup'].includes(pathname);
-        const isHomePage = pathname === '/';
-        if (!isAuthPage && !isHomePage) {
-            router.push('/login');
+        // If user is not logged in, and not on a public page, redirect to login
+        const isPublicPage = ['/login', '/signup', '/'].includes(pathname);
+        if (!isPublicPage) {
+          router.push('/login');
         }
       }
       setLoading(false);
     });
 
+    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, [router, pathname]);
 
