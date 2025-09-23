@@ -35,10 +35,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <Warehouse className="h-4 w-4" />
                 Inventory
             </NavLink>
-             <NavLink href="/dashboard/sales">
-                <BarChartHorizontal className="h-4 w-4" />
-                Sales
-            </NavLink>
              <NavLink href="/dashboard/reports">
                 <FileText className="h-4 w-4" />
                 Reports

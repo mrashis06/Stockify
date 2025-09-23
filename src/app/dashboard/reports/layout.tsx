@@ -26,10 +26,6 @@ export default function ReportsLayout({ children }: { children: ReactNode }) {
               <Warehouse className="h-5 w-5" />
               Inventory
           </NavLink>
-           <NavLink href="/dashboard/sales">
-              <BarChartHorizontal className="h-5 w-5" />
-              Sales
-          </NavLink>
            <NavLink href="/dashboard/reports">
               <FileText className="h-5 w-5" />
               Reports
