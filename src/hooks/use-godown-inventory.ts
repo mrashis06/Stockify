@@ -137,11 +137,24 @@ export function useGodownInventory() {
             const shopItemDoc = await transaction.get(shopItemRef);
             const dailyDoc = await transaction.get(dailyInventoryRef);
             const yesterdayDoc = await transaction.get(yesterdayInventoryRef);
+            
+            let shopItemData: any;
 
             if (!shopItemDoc.exists()) {
-                throw new Error("Cannot transfer stock. The item does not exist in the main shop inventory. Please add it there first.");
+                // If item doesn't exist in master, create it.
+                const firstBatch = godownBatches[0];
+                shopItemData = {
+                    brand: firstBatch.brand,
+                    size: firstBatch.size,
+                    category: firstBatch.category,
+                    price: 0, // Price needs to be set manually
+                    prevStock: 0
+                };
+                transaction.set(shopItemRef, shopItemData);
+            } else {
+                shopItemData = shopItemDoc.data();
             }
-            const shopItemData = shopItemDoc.data();
+
 
             let remainingToTransfer = quantityToTransfer;
 
@@ -178,13 +191,12 @@ export function useGodownInventory() {
                  prevStock: prevStockFromYesterday,
                  added: 0,
                  sales: 0,
-                 transferred: 0,
             };
             
-            currentDailyItem.transferred = (currentDailyItem.transferred || 0) + quantityToTransfer;
+            currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
             currentDailyItem.prevStock = prevStockFromYesterday; 
 
-            currentDailyItem.opening = currentDailyItem.prevStock + (currentDailyItem.added || 0) + (currentDailyItem.transferred || 0);
+            currentDailyItem.opening = currentDailyItem.prevStock + (currentDailyItem.added || 0);
             currentDailyItem.closing = currentDailyItem.opening - (currentDailyItem.sales || 0);
             
             transaction.set(dailyInventoryRef, { [productId]: currentDailyItem }, { merge: true });

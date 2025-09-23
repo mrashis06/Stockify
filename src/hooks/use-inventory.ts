@@ -230,40 +230,8 @@ export function useInventory() {
                 };
             }
 
-            const originalValue = dailyData[id][field] || 0;
             dailyData[id][field] = value;
 
-            // If "added" changed, update godown
-            if (field === 'added') {
-                const difference = (value as number) - originalValue;
-                if (difference !== 0) {
-                    const godownItemRef = doc(db, 'godownInventory', id);
-                    const godownDoc = await transaction.get(godownItemRef);
-                    const godownQuantity = godownDoc.exists() ? godownDoc.data().quantity : 0;
-                    const newGodownQuantity = godownQuantity - difference;
-                    
-                    if(newGodownQuantity < 0) {
-                        toast({
-                            title: 'Stock Error',
-                            description: `Not enough stock in godown for ${dailyData[id].brand}. Available: ${godownQuantity}, Tried to use: ${difference}.`,
-                            variant: 'destructive',
-                        });
-                        // By not throwing, we allow the transaction to be safely cancelled by returning.
-                        return;
-                    }
-                    
-                    if (godownDoc.exists()) {
-                        transaction.update(godownItemRef, { quantity: newGodownQuantity });
-                    } else {
-                         transaction.set(godownItemRef, {
-                            brand: dailyData[id].brand,
-                            size: dailyData[id].size,
-                            category: dailyData[id].category,
-                            quantity: newGodownQuantity
-                        });
-                    }
-                }
-            }
              if (field === 'price') {
                 const masterRef = doc(db, 'inventory', id);
                 transaction.update(masterRef, { price: value });
