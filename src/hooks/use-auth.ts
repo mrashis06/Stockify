@@ -37,6 +37,8 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     if (!loading && !user && !['/login', '/signup', '/'].includes(pathname)) {
       router.push('/login');
     }
