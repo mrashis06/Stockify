@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil } from 'lucide-react';
+import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
+import { useEndOfDay } from '@/hooks/use-end-of-day';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +56,9 @@ export default function InventoryPage() {
         updateBrand,
         updateItemField,
     } = useInventory();
+    
+    const { isEndingDay, endOfDayProcess } = useEndOfDay();
+
 
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
@@ -65,6 +69,7 @@ export default function InventoryPage() {
     const [showClosing, setShowClosing] = useState(true);
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
 
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing'>) => {
@@ -140,6 +145,24 @@ export default function InventoryPage() {
         setSelectedRows(newSelection);
     };
 
+    const handleEndOfDay = async () => {
+        setIsEndOfDayDialogOpen(false);
+        try {
+            await endOfDayProcess();
+            toast({
+                title: 'End of Day Successful',
+                description: 'Today\'s inventory has been closed and tomorrow\'s has been prepared.'
+            });
+        } catch (error) {
+            console.error("End of day process failed:", error);
+            toast({
+                title: 'End of Day Failed',
+                description: (error as Error).message || 'An unexpected error occurred.',
+                variant: 'destructive',
+            });
+        }
+    };
+
     const processedInventory = useMemo(() => {
         return inventory.map(item => {
             const opening = (item.prevStock ?? 0) + (item.added ?? 0);
@@ -193,6 +216,23 @@ export default function InventoryPage() {
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive hover:bg-destructive/90">
                         Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={isEndOfDayDialogOpen} onOpenChange={setIsEndOfDayDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>End of Day Process</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Are you sure you want to close today's inventory? This will finalize all sales and stock for today and prepare the inventory for tomorrow. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleEndOfDay} disabled={isEndingDay}>
+                         {isEndingDay ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Confirm End of Day
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -251,6 +291,9 @@ export default function InventoryPage() {
                         </Button>
                         <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)}>
                             <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedRows.size})
+                        </Button>
+                         <Button onClick={() => setIsEndOfDayDialogOpen(true)} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isEndingDay}>
+                            <LogOut className="mr-2 h-4 w-4" /> End of Day
                         </Button>
                     </div>
                 </div>
@@ -348,3 +391,5 @@ export default function InventoryPage() {
     </main>
   );
 }
+
+    
