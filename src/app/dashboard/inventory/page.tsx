@@ -25,7 +25,18 @@ import {
     TableRow,
   } from "@/components/ui/table"
 
-const initialInventoryData = [
+type InventoryItem = {
+    id: number;
+    brand: string;
+    size: string;
+    price: number;
+    prevStock: number;
+    added: number;
+    sales: number;
+    category: string;
+};
+
+const initialInventoryData: InventoryItem[] = [
   { id: 1, brand: 'Antiquity Blue', size: '750ml', price: 2100, prevStock: 50, added: 0, sales: 0, category: 'Whiskey' },
   { id: 2, brand: 'Old Monk', size: '180ml', price: 190, prevStock: 30, added: 0, sales: 0, category: 'Rum' },
   { id: 3, brand: 'Red Label', size: '750ml', price: 2500, prevStock: 40, added: 0, sales: 0, category: 'Whiskey' },
@@ -37,14 +48,21 @@ export default function InventoryPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
 
-    const handleInputChange = (id: number, field: 'added' | 'sales', value: string) => {
-        const numericValue = parseInt(value, 10);
-        if (isNaN(numericValue) && value !== '') return;
-
+    const handleInputChange = (id: number, field: keyof InventoryItem, value: string) => {
         setInventory(
-            inventory.map(item =>
-                item.id === id ? { ...item, [field]: value === '' ? 0 : numericValue } : item
-            )
+            inventory.map(item => {
+                if (item.id === id) {
+                    let processedValue: string | number = value;
+                    if (field === 'price' || field === 'prevStock' || field === 'added' || field === 'sales') {
+                        processedValue = value === '' ? 0 : parseFloat(value);
+                        if (isNaN(processedValue as number)) {
+                            processedValue = item[field]; // Keep old value if parse fails
+                        }
+                    }
+                    return { ...item, [field]: processedValue };
+                }
+                return item;
+            })
         );
     };
 
@@ -121,12 +139,36 @@ export default function InventoryPage() {
                             return (
                                 <TableRow key={item.id} className={isLowStock ? 'bg-destructive/10 hover:bg-destructive/20' : ''}>
                                     <TableCell className="font-medium">{item.brand}</TableCell>
-                                    <TableCell>{item.size}</TableCell>
-                                    <TableCell className="flex items-center"><IndianRupee className="h-4 w-4 mr-1" />{item.price.toFixed(2)}</TableCell>
-                                    <TableCell>{item.prevStock}</TableCell>
                                     <TableCell>
-                                        <Input 
-                                            type="number" 
+                                        <Input
+                                            type="text"
+                                            className="h-8 w-24 bg-card"
+                                            value={item.size}
+                                            onChange={(e) => handleInputChange(item.id, 'size', e.target.value)}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center">
+                                            <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                            <Input
+                                                type="number"
+                                                className="h-8 w-24 bg-card"
+                                                value={item.price}
+                                                onChange={(e) => handleInputChange(item.id, 'price', e.target.value)}
+                                            />
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Input
+                                            type="number"
+                                            className="h-8 w-20 bg-card"
+                                            value={item.prevStock}
+                                            onChange={(e) => handleInputChange(item.id, 'prevStock', e.target.value)}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Input
+                                            type="number"
                                             className="h-8 w-20 bg-card"
                                             value={item.added || ''}
                                             onChange={(e) => handleInputChange(item.id, 'added', e.target.value)}
@@ -134,8 +176,8 @@ export default function InventoryPage() {
                                     </TableCell>
                                     <TableCell>{opening}</TableCell>
                                     <TableCell>
-                                        <Input 
-                                            type="number" 
+                                        <Input
+                                            type="number"
                                             className={`h-8 w-20 bg-card ${isLowStock && item.sales > 0 ? 'bg-destructive/50' : ''}`}
                                             value={item.sales || ''}
                                             onChange={(e) => handleInputChange(item.id, 'sales', e.target.value)}
