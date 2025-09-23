@@ -124,36 +124,34 @@ export default function OnBarPage() {
                                             <Beer className="mr-2 h-4 w-4" /> Sell Bottle
                                         </Button>
                                      ) : (
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex-1 flex justify-center gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => handleSell(item.id, 30)}
-                                                    disabled={item.remainingVolume < 30}
-                                                    className="flex-1"
-                                                >
-                                                    <Minus className="h-4 w-4 md:mr-2" />
-                                                    <span className="hidden md:inline">30ml</span>
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => handleSell(item.id, 60)}
-                                                    disabled={item.remainingVolume < 60}
-                                                    className="flex-1"
-                                                >
-                                                    <Minus className="h-4 w-4 md:mr-2" />
-                                                    <span className="hidden md:inline">60ml</span>
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => handleSell(item.id, 90)}
-                                                    disabled={item.remainingVolume < 90}
-                                                    className="flex-1"
-                                                >
-                                                    <Minus className="h-4 w-4 md:mr-2" />
-                                                    <span className="hidden md:inline">90ml</span>
-                                                </Button>
-                                            </div>
+                                        <div className="flex justify-center items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => handleSell(item.id, 30)}
+                                                disabled={item.remainingVolume < 30}
+                                                className="flex-1"
+                                            >
+                                                <Minus className="h-4 w-4 mr-1" />
+                                                <span>30ml</span>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => handleSell(item.id, 60)}
+                                                disabled={item.remainingVolume < 60}
+                                                className="flex-1"
+                                            >
+                                                <Minus className="h-4 w-4 mr-1" />
+                                                <span>60ml</span>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => handleSell(item.id, 90)}
+                                                disabled={item.remainingVolume < 90}
+                                                className="flex-1"
+                                            >
+                                                <Minus className="h-4 w-4 mr-1" />
+                                                <span>90ml</span>
+                                            </Button>
                                             <Button
                                                 variant="outline"
                                                 size="icon"
