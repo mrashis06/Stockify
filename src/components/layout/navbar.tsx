@@ -39,7 +39,7 @@ const Navbar = () => {
             <Link href="/login">Log In</Link>
           </Button>
           <Button asChild>
-            <Link href="#">Sign Up</Link>
+            <Link href="/signup">Sign Up</Link>
           </Button>
         </div>
         <div className="md:hidden">
@@ -79,7 +79,7 @@ const Navbar = () => {
                     <Link href="/login" onClick={() => setIsOpen(false)}>Log In</Link>
                   </Button>
                   <Button asChild>
-                    <Link href="#" onClick={() => setIsOpen(false)}>Sign Up</Link>
+                    <Link href="/signup" onClick={() => setIsOpen(false)}>Sign Up</Link>
                   </Button>
                 </div>
               </div>

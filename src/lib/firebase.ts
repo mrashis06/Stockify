@@ -6,12 +6,12 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyAazS8f8-G0Wigt46j5vj7HTZjplcajFRY",
-  authDomain: "stock-inventory-918cc.firebaseapp.com",
-  projectId: "stock-inventory-918cc",
-  storageBucket: "stock-inventory-918cc.firebasestorage.app",
-  messagingSenderId: "364811359425",
-  appId: "1:364811359425:web:5c253ec19bef838e39f040",
+  "projectId": "studio-8867609365-e1454",
+  "appId": "1:606856816045:web:b74c33836dfe99597b2d24",
+  "apiKey": "AIzaSyBllYuCJ_7e7QXzWkmStlTZOACnKPMMYkc",
+  "authDomain": "studio-8867609365-e1454.firebaseapp.com",
+  "measurementId": "",
+  "messagingSenderId": "606856816045"
 };
 
 // Initialize Firebase

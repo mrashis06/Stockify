@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import React from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +43,23 @@ function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push('/dashboard');
+    } catch (error) {
+      console.error("Error signing in with email and password: ", error);
+      toast({
+        title: "Authentication Error",
+        description: "Failed to sign in. Please check your credentials.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
@@ -68,7 +86,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4">
+          <form onSubmit={handleEmailSignIn} className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">Email address</Label>
               <Input
@@ -77,16 +95,19 @@ export default function LoginPage() {
                 placeholder="m@example.com"
                 required
                 className="bg-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required className="bg-input" />
+              <Input id="password" type="password" required className="bg-input" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <Button type="submit" className="w-full">
               Login
             </Button>
-            <div className="relative my-2">
+          </form>
+            <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
@@ -100,10 +121,9 @@ export default function LoginPage() {
               <GoogleIcon className="mr-2 h-4 w-4" />
               Sign in with Google
             </Button>
-          </div>
           <div className="mt-4 text-center text-sm">
             Don&apos;t have an account?{' '}
-            <Link href="#" className="text-primary underline">
+            <Link href="/signup" className="text-primary underline">
               Sign up
             </Link>
           </div>

@@ -1,6 +1,10 @@
+
+"use client";
+
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Settings, Warehouse, Home } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Settings, Warehouse, Home, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -13,8 +17,31 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import NavLink from './nav-link';
+import { useAuth } from '@/hooks/use-auth';
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background dark">
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // The useAuth hook will handle the redirect
+  }
+  
   return (
     <div className="flex min-h-screen w-full flex-col bg-background dark">
       <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
@@ -58,23 +85,26 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src="https://picsum.photos/seed/user-avatar/40/40" data-ai-hint="male avatar" alt="User" />
+                  <AvatarImage src={user.photoURL || "https://picsum.photos/seed/user-avatar/40/40"} data-ai-hint="male avatar" alt="User" />
                   <AvatarFallback>
-                    <User className="h-5 w-5" />
+                    {user.email ? user.email.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
                   </AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Toggle user menu</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>{user.displayName || user.email || 'My Account'}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <Link href="/dashboard/settings">
                 <DropdownMenuItem>Settings</DropdownMenuItem>
               </Link>
               <DropdownMenuItem>Support</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Logout</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Logout</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

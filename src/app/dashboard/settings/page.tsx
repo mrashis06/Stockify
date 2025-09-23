@@ -1,12 +1,15 @@
 "use client";
 
 import React from 'react';
-import { ChevronRight, LogOut, Bell, User, Settings as SettingsIcon } from 'lucide-react';
+import { ChevronRight, LogOut } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 
 const SettingsItem = ({ label, description, value, isToggle = false, onToggleChange, defaultChecked }: { label: string, description: string, value: string, isToggle?: boolean, onToggleChange?: (checked: boolean) => void, defaultChecked?: boolean }) => (
   <div className="flex items-center justify-between py-4">
@@ -25,8 +28,8 @@ const SettingsItem = ({ label, description, value, isToggle = false, onToggleCha
   </div>
 );
 
-const UserProfileItem = ({ label, description, isLogout = false }: { label: string, description:string, isLogout?: boolean}) => (
-    <div className="flex items-center justify-between py-4">
+const UserProfileItem = ({ label, description, isLogout = false, onClick }: { label: string, description:string, isLogout?: boolean, onClick?: () => void }) => (
+    <div className="flex items-center justify-between py-4" onClick={onClick}>
         <div className="flex flex-col">
             <span className={`font-medium ${isLogout ? 'text-destructive' : ''}`}>{label}</span>
             <span className="text-sm text-muted-foreground">{description}</span>
@@ -36,6 +39,13 @@ const UserProfileItem = ({ label, description, isLogout = false }: { label: stri
 )
 
 export default function SettingsPage() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <header className="mb-8">
@@ -75,7 +85,7 @@ export default function SettingsPage() {
                     <UserProfileItem label="Subscription Plan" description="View and manage your subscription plan." />
                 </Link>
                 <Separator />
-                 <Button variant="ghost" className="w-full justify-start p-0 h-auto hover:bg-muted/50 rounded-md">
+                 <Button variant="ghost" className="w-full justify-start p-0 h-auto hover:bg-muted/50 rounded-md" onClick={handleLogout}>
                     <UserProfileItem label="Log Out" description="Log out from the application." isLogout={true} />
                 </Button>
             </section>
