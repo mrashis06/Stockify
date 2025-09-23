@@ -1,3 +1,6 @@
+
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { BarChart3, BellRing, PackageSearch } from "lucide-react";
@@ -7,9 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Home() {
+  const { user, loading } = useAuth();
   const heroImage = PlaceHolderImages.find(p => p.id === 'hero-liquor-bottles');
+  const getStartedLink = loading ? '#' : user ? '/dashboard' : '/login';
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -37,7 +43,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button asChild size="lg" className="transition-transform hover:scale-105">
-                <Link href="/login">Get Started</Link>
+                <Link href={getStartedLink}>Get Started</Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="border-2 border-primary-foreground bg-transparent text-primary-foreground transition-transform hover:scale-105 hover:bg-primary-foreground/10">
                 <Link href="#">Learn More</Link>
@@ -56,7 +62,7 @@ export default function Home() {
               Join dozens of liquor stores streamlining their operations with Stockify.
             </p>
             <Button asChild size="lg" variant="secondary" className="mt-8 transition-transform hover:scale-105">
-              <Link href="/login">Get Started Now</Link>
+              <Link href={getStartedLink}>Get Started Now</Link>
             </Button>
           </div>
         </section>
