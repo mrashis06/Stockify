@@ -32,6 +32,8 @@ const categories = [
 export default function DashboardPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dailySalesData, setDailySalesData] = useState<any>({});
+
 
   useEffect(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -41,34 +43,29 @@ export default function DashboardPage() {
     const unsubscribe = onSnapshot(dailyDocRef, async (dailySnap) => {
       try {
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+        setDailySalesData(dailyData);
         
-        // 1. Fetch all master inventory items to ensure none are missed
         const inventorySnapshot = await getDocs(collection(db, 'inventory'));
         const masterInventory = new Map<string, any>();
         inventorySnapshot.forEach(doc => {
             masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
         });
 
-        // 2. Fetch yesterday's data for accurate prevStock
         const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
         const yesterdayDocSnap = await getDoc(yesterdayDocRef);
         const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
 
         const items: InventoryItem[] = [];
 
-        // 3. Iterate over the complete master list
         masterInventory.forEach((masterItem) => {
             const id = masterItem.id;
             const dailyItem = dailyData[id];
             
-            // Use yesterday's closing if available, otherwise fall back to master prevStock
             const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
 
             if (dailyItem) {
-                // Item has activity today, merge with master and use correct prevStock
                 items.push({ ...masterItem, ...dailyItem, prevStock });
             } else {
-                // Item has no activity today, build its state from previous data
                 items.push({
                     ...masterItem,
                     prevStock,
@@ -102,8 +99,20 @@ export default function DashboardPage() {
     });
   }, [inventory]);
 
+  const todaysSales = useMemo(() => {
+    let total = 0;
+    for (const key in dailySalesData) {
+        if (Object.prototype.hasOwnProperty.call(dailySalesData, key)) {
+            const item = dailySalesData[key];
+            if (item.sales && item.price) {
+                 total += item.sales * item.price;
+            }
+        }
+    }
+    return total;
+  }, [dailySalesData]);
+
   const totalStock = processedInventory.reduce((acc, item) => acc + (item.closing ?? 0), 0);
-  const todaysSales = processedInventory.reduce((acc, item) => acc + (item.sales ?? 0) * item.price, 0);
   const lowStockItems = processedInventory.filter(item => (item.closing ?? 0) < 10);
 
   if (loading) {
@@ -119,7 +128,6 @@ export default function DashboardPage() {
     <main className="flex-1 p-4 md:p-8">
       <h1 className="text-2xl font-bold tracking-tight mb-6">Dashboard</h1>
       
-      {/* Overview Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -174,7 +182,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Categories Section */}
       <div>
         <h2 className="text-xl font-bold tracking-tight mb-4">Categories</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

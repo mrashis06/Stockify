@@ -7,11 +7,11 @@ import {
   doc,
   getDoc,
   writeBatch,
-  setDoc,
   getDocs,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, addDays } from 'date-fns';
+import type { OnBarItem } from './use-onbar-inventory';
 
 export function useEndOfDay() {
   const [isEndingDay, setIsEndingDay] = useState(false);
@@ -37,15 +37,44 @@ export function useEndOfDay() {
       const tomorrowDocRef = doc(db, 'dailyInventory', tomorrow);
       const newDailyData: { [key: string]: any } = {};
 
-      // Iterate over the master inventory to ensure all items are carried over
+      // Handle On-Bar Sales
+      const onBarSnap = await getDocs(collection(db, 'onBarInventory'));
+      const onBarSales = new Map<string, number>();
+      let onBarTotalValue = 0;
+
+      onBarSnap.forEach(doc => {
+        const item = doc.data() as OnBarItem;
+        if (item.salesVolume > 0 && item.inventoryId !== 'manual') {
+            const pegValue = (item.price / item.totalVolume) * item.salesVolume;
+            onBarTotalValue += pegValue;
+            
+            // Group on-bar sales by category for reporting
+            const masterItem = masterInventory.get(item.inventoryId);
+            if(masterItem) {
+                const category = masterItem.category || 'Uncategorized';
+                onBarSales.set(category, (onBarSales.get(category) || 0) + pegValue);
+            }
+        }
+        // Reset salesVolume for the next day
+        batch.update(doc.ref, { salesVolume: 0 });
+      });
+
+      // Add On-Bar sales to today's daily doc for historical reporting
+      if (onBarSnap.docs.length > 0) {
+          const onBarSaleLog = {
+              sales: onBarTotalValue,
+              price: 1,
+              category: "On-Bar Sales", // Special category for reports
+          }
+          batch.set(dailyDocRef, { 'on-bar-sales': onBarSaleLog }, { merge: true });
+      }
+
+      // Iterate over the master inventory to carry over bottle stock
       for (const [itemId, masterItem] of masterInventory.entries()) {
           const todayItem = todaysData[itemId];
-          let closingStock = masterItem.prevStock ?? 0;
-
-          if (todayItem) {
-              const opening = (todayItem.prevStock ?? masterItem.prevStock ?? 0) + (todayItem.added ?? 0);
-              closingStock = opening - (todayItem.sales ?? 0);
-          }
+          
+          const opening = (masterItem.prevStock ?? 0) + (todayItem?.added ?? 0);
+          const closingStock = opening - (todayItem?.sales ?? 0);
 
           newDailyData[itemId] = {
             brand: masterItem.brand,
@@ -63,6 +92,7 @@ export function useEndOfDay() {
           batch.update(masterInventoryRef, { prevStock: closingStock });
       }
       
+      // Set the prepared data for tomorrow
       batch.set(tomorrowDocRef, newDailyData);
 
       await batch.commit();

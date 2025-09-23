@@ -79,15 +79,12 @@ export function useInventory() {
             
             const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
 
-            // This is the critical change: ensure added and sales default to 0 if not present.
             const added = dailyItem?.added ?? 0;
             const sales = dailyItem?.sales ?? 0;
 
             if (dailyItem) {
-                // Ensure prevStock from yesterday is correctly assigned and use explicit zero defaults
                 items.push({ ...masterItem, ...dailyItem, prevStock, added, sales });
             } else {
-                // If no record for today, create one based on yesterday or master with zero for added/sales
                 items.push({
                     ...masterItem,
                     prevStock,
@@ -130,10 +127,8 @@ export function useInventory() {
             prevStock: newItemData.prevStock,
         };
 
-        // Use set with merge to create or update the master record
         await setDoc(docRef, masterItemData, { merge: true });
         
-        // Set today's daily record
         const dailyDocRef = doc(db, 'dailyInventory', today);
         const dailyDocSnap = await getDoc(dailyDocRef);
         const dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
@@ -145,7 +140,7 @@ export function useInventory() {
             size: newItemData.size,
             price: newItemData.price,
             category: newItemData.category,
-            prevStock: newItemData.prevStock, // Use the new initial stock
+            prevStock: newItemData.prevStock,
             added: currentDailyItem.added || 0,
             sales: currentDailyItem.sales || 0,
         };
@@ -199,7 +194,6 @@ export function useInventory() {
         if (dailyDocSnap.exists()) {
             const dailyData = dailyDocSnap.data();
             if(dailyData[id]) {
-                // This is a Firestore trick to delete a field within a document
                 const { [id]: _, ...rest } = dailyData;
                 batch.set(dailyDocRef, rest);
             }
@@ -222,7 +216,6 @@ export function useInventory() {
             const dailyDocSnap = await transaction.get(dailyDocRef);
             let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
             
-            // Ensure dailyData for the item exists, creating it if necessary
             if (!dailyData[id]) {
                 const masterRef = doc(db, 'inventory', id);
                 const masterSnap = await transaction.get(masterRef);
@@ -248,7 +241,7 @@ export function useInventory() {
             const diff = newAdded - currentAdded;
 
             if (field === 'added' && diff !== 0) {
-                if (diff > 0) { // Transfer from godown
+                if (diff > 0) {
                     const godownItemsQuery = query(
                         collection(db, 'godownInventory'),
                         where('productId', '==', id)
@@ -281,7 +274,7 @@ export function useInventory() {
                         }
                         remainingToTransfer -= transferAmount;
                     }
-                } else { // Return to godown
+                } else {
                     const masterRef = doc(db, 'inventory', id);
                     const masterSnap = await transaction.get(masterRef);
                     if (!masterSnap.exists()) throw new Error("Cannot return to godown: master item not found.");
@@ -293,7 +286,7 @@ export function useInventory() {
                         size: masterData.size,
                         category: masterData.category,
                         productId: id,
-                        quantity: -diff, // diff is negative, so -diff is positive
+                        quantity: -diff,
                         dateAdded: serverTimestamp(),
                     });
                 }
@@ -306,7 +299,6 @@ export function useInventory() {
                 transaction.update(masterRef, { price: value });
             }
 
-            // Recalculate opening and closing
             dailyData[id].opening = (dailyData[id].prevStock || 0) + (dailyData[id].added || 0);
             dailyData[id].closing = dailyData[id].opening - (dailyData[id].sales || 0);
 
@@ -315,11 +307,9 @@ export function useInventory() {
 
       } catch (error) {
         console.error(`Error updating ${field}:`, error);
-        // Revert local state on error
         if (originalItemState) {
           setInventory(prev => prev.map(item => item.id === id ? originalItemState : item));
         }
-        // Rethrow with a user-friendly message
         throw new Error((error as Error).message || `Failed to update ${field}. Please try again.`);
       } finally {
         setSaving(false);
@@ -334,24 +324,23 @@ export function useInventory() {
             const dailyDocSnap = await transaction.get(dailyDocRef);
             let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
 
-            if (!dailyData[inventoryItemId] || (dailyData[inventoryItemId].opening - (dailyData[inventoryItemId].sales ?? 0)) < 1) {
+            const closingStock = (dailyData[inventoryItemId]?.opening ?? 0) - (dailyData[inventoryItemId]?.sales ?? 0);
+            if (!dailyData[inventoryItemId] || closingStock < 1) {
                 throw new Error("Not enough stock in inventory to open a bottle.");
             }
             
-            // Deduct one bottle from sales (as it's being used internally)
             dailyData[inventoryItemId].sales = (dailyData[inventoryItemId].sales ?? 0) + 1;
             dailyData[inventoryItemId].closing = (dailyData[inventoryItemId].opening ?? 0) - dailyData[inventoryItemId].sales;
 
             transaction.set(dailyDocRef, { [inventoryItemId]: dailyData[inventoryItemId] }, { merge: true });
 
-            // Add the bottle to on-bar inventory
             const masterItemRef = doc(db, 'inventory', inventoryItemId);
             const masterItemSnap = await transaction.get(masterItemRef);
             if (!masterItemSnap.exists()) throw new Error("Master inventory item not found.");
             const masterItem = masterItemSnap.data();
 
             const onBarCollectionRef = collection(db, "onBarInventory");
-            const newOnBarDocRef = doc(onBarCollectionRef); // Create a new doc with a generated ID
+            const newOnBarDocRef = doc(onBarCollectionRef);
             
             transaction.set(newOnBarDocRef, {
                 inventoryId: inventoryItemId,
@@ -359,6 +348,8 @@ export function useInventory() {
                 size: masterItem.size,
                 totalVolume: volume,
                 remainingVolume: volume,
+                salesVolume: 0,
+                price: masterItem.price,
                 openedAt: serverTimestamp(),
             });
         });

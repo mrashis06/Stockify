@@ -13,7 +13,6 @@ import {
   addDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, subDays } from 'date-fns';
 import { useInventory } from './use-inventory'; // To trigger stock updates
 
 export type OnBarItem = {
@@ -23,10 +22,12 @@ export type OnBarItem = {
   size: string;
   totalVolume: number; // e.g., 750 for a 750ml bottle
   remainingVolume: number;
+  salesVolume: number; // Volume sold today in ml
+  price: number; // Price of the full bottle
   openedAt: any; // Firestore Timestamp
 };
 
-export type OnBarManualItem = Omit<OnBarItem, 'id' | 'inventoryId' | 'remainingVolume' | 'openedAt'>;
+export type OnBarManualItem = Omit<OnBarItem, 'id' | 'inventoryId' | 'remainingVolume' | 'salesVolume' | 'price' | 'openedAt'>;
 
 export function useOnBarInventory() {
   const [onBarInventory, setOnBarInventory] = useState<OnBarItem[]>([]);
@@ -70,6 +71,8 @@ export function useOnBarInventory() {
               ...manualItem,
               inventoryId: 'manual', // Mark as a manual entry
               remainingVolume: manualItem.totalVolume,
+              salesVolume: 0,
+              price: 0, // Manual items won't have a price for sales calculation
               openedAt: serverTimestamp(),
           });
       } catch(error) {
@@ -90,12 +93,20 @@ export function useOnBarInventory() {
         if (!itemDoc.exists()) {
           throw new Error("Item not found on bar.");
         }
-        const currentVolume = itemDoc.data().remainingVolume;
+        const itemData = itemDoc.data();
+        const currentVolume = itemData.remainingVolume;
+        
         if (currentVolume < pegSize) {
           throw new Error("Not enough liquor remaining to sell this peg.");
         }
+        
         const newVolume = currentVolume - pegSize;
-        transaction.update(itemRef, { remainingVolume: newVolume });
+        const newSalesVolume = (itemData.salesVolume || 0) + pegSize;
+        
+        transaction.update(itemRef, { 
+            remainingVolume: newVolume,
+            salesVolume: newSalesVolume
+        });
       });
     } catch (error) {
       console.error("Error selling peg: ", error);
