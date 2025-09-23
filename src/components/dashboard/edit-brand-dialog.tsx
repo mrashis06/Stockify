@@ -167,5 +167,3 @@ export default function EditBrandDialog({ isOpen, onOpenChange, brandData, onUpd
     </Dialog>
   );
 }
-
-    
