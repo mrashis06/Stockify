@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
-import { format, addDays } from 'date-fns';
+import { format, eachDayOfInterval, isSameDay } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2 } from 'lucide-react';
 import { DateRange } from "react-day-picker";
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -20,7 +20,7 @@ import {
   ChartContainer,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import type { InventoryItem } from '@/hooks/use-inventory';
+import { toast } from '@/hooks/use-toast';
 
 const chartConfig = {
   sales: {
@@ -29,38 +29,74 @@ const chartConfig = {
   },
 };
 
-// Extend jsPDF with autoTable
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
+
+type DailyLog = { [itemId: string]: { sales: number; price: number; category: string } };
 
 export default function ReportsPage() {
     const [date, setDate] = useState<DateRange | undefined>({
         from: new Date(),
         to: new Date(),
     });
-    const [inventory, setInventory] = useState<InventoryItem[]>([]);
+    const [reportData, setReportData] = useState<DailyLog[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const fetchReportData = useCallback(async (range: DateRange) => {
+        if (!range.from) {
+            toast({ title: "Error", description: "Please select a start date.", variant: "destructive" });
+            return;
+        }
         setLoading(true);
-        const unsubscribe = onSnapshot(collection(db, "inventory"), (snapshot) => {
-            const items: InventoryItem[] = [];
-            snapshot.forEach((doc) => {
-                items.push({ id: doc.id, ...doc.data() } as InventoryItem);
-            });
-            setInventory(items);
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
+        const data: DailyLog[] = [];
+        const interval = {
+            start: range.from,
+            end: range.to || range.from,
+        };
+        const days = eachDayOfInterval(interval);
 
-    const salesData = React.useMemo(() => {
+        try {
+            for (const day of days) {
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const dailyDocRef = doc(db, 'dailyInventory', dateStr);
+                const docSnap = await getDoc(dailyDocRef);
+                if (docSnap.exists()) {
+                    data.push(docSnap.data() as DailyLog);
+                }
+            }
+            setReportData(data);
+        } catch (error) {
+            console.error("Error fetching report data:", error);
+            toast({ title: "Error", description: "Failed to fetch report data.", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+    
+    // Fetch today's data on initial load
+    useEffect(() => {
+        fetchReportData({ from: new Date(), to: new Date() });
+    }, [fetchReportData]);
+
+    const handleFilter = () => {
+        if (date) {
+            fetchReportData(date);
+        } else {
+            toast({ title: "Error", description: "Please select a date range.", variant: "destructive" });
+        }
+    };
+
+
+    const salesData = useMemo(() => {
         const categorySales = new Map<string, number>();
-        inventory.forEach(item => {
-            const saleAmount = (item.sales || 0) * item.price;
-            if (saleAmount > 0) {
-                categorySales.set(item.category, (categorySales.get(item.category) || 0) + saleAmount);
+        reportData.forEach(dailyLog => {
+            for (const itemId in dailyLog) {
+                const item = dailyLog[itemId];
+                if (item.sales && item.price && item.category) {
+                    const saleAmount = item.sales * item.price;
+                    categorySales.set(item.category, (categorySales.get(item.category) || 0) + saleAmount);
+                }
             }
         });
 
@@ -69,7 +105,7 @@ export default function ReportsPage() {
             .sort((a, b) => b.sales - a.sales);
         
         return sortedSales.length > 0 ? sortedSales : [{ category: 'No Sales', sales: 0 }];
-    }, [inventory]);
+    }, [reportData]);
 
     const handleExport = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
@@ -78,6 +114,7 @@ export default function ReportsPage() {
 
         let totalSales = 0;
         salesData.forEach(item => {
+            if (item.category === 'No Sales') return;
             const rowData = [
                 item.category,
                 item.sales.toLocaleString('en-IN')
@@ -86,27 +123,33 @@ export default function ReportsPage() {
             totalSales += item.sales;
         });
 
+        const startDate = date?.from ? format(date.from, 'PPP') : '';
+        const endDate = date?.to ? format(date.to, 'PPP') : startDate;
+        const title = isSameDay(date?.from || 0, date?.to || 1) 
+            ? `Sales Report for ${startDate}`
+            : `Sales Report: ${startDate} to ${endDate}`;
+
         doc.autoTable({
             head: [tableColumn],
             body: tableRows,
             startY: 20,
             didDrawPage: (data) => {
-                // Header
                 doc.setFontSize(20);
                 doc.setTextColor(40);
-                doc.text("Today's Sales Report", data.settings.margin.left, 15);
+                doc.text(title, data.settings.margin.left, 15);
             },
         });
 
-        // Add total
-        const finalY = doc.autoTable.previous.finalY;
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text(
-            `Total Sales: ₹${totalSales.toLocaleString('en-IN')}`,
-            doc.internal.pageSize.getWidth() - doc.getTextWidth(`Total Sales: ₹${totalSales.toLocaleString('en-IN')}`) - 14,
-            finalY + 10
-        );
+        const finalY = (doc as any).autoTable.previous.finalY;
+        if (finalY) {
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(
+                `Total Sales: ₹${totalSales.toLocaleString('en-IN')}`,
+                doc.internal.pageSize.getWidth() - doc.getTextWidth(`Total Sales: ₹${totalSales.toLocaleString('en-IN')}`) - 14,
+                finalY + 10
+            );
+        }
 
         doc.save(`sales_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
@@ -116,7 +159,7 @@ export default function ReportsPage() {
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sales Summary</h1>
-          <p className="text-muted-foreground">Today's sales overview</p>
+          <p className="text-muted-foreground">Historical sales overview</p>
         </div>
         <Button onClick={handleExport} disabled={loading || salesData[0]?.category === 'No Sales'} className="bg-green-600 hover:bg-green-700 text-white">
           <Download className="mr-2 h-4 w-4" />
@@ -164,8 +207,8 @@ export default function ReportsPage() {
                     />
                     </PopoverContent>
                 </Popover>
-                    <Button className="bg-green-600 hover:bg-green-700 text-white">
-                        <Filter className="mr-2 h-4 w-4" />
+                    <Button onClick={handleFilter} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white">
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
                         Filter
                     </Button>
                 </div>
@@ -198,6 +241,7 @@ export default function ReportsPage() {
                                 axisLine={false}
                                 stroke="hsl(var(--muted-foreground))"
                                 width={80}
+                                tick={{fontSize: 12}}
                             />
                             <XAxis type="number" stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${Number(value) / 1000}k`} />
                             <Tooltip
@@ -218,5 +262,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
