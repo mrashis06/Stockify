@@ -83,17 +83,17 @@ export default function OnBarPage() {
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {onBarInventory.map(item => (
-                        <Card key={item.id} className="flex flex-col">
+                        <Card key={item.id} className="flex flex-col h-full">
                             <CardHeader>
-                                <CardTitle className="text-lg">{item.brand} <span className="text-sm font-normal text-muted-foreground">({item.size})</span></CardTitle>
+                                <CardTitle className="text-lg truncate">{item.brand} <span className="text-sm font-normal text-muted-foreground">({item.size})</span></CardTitle>
                             </CardHeader>
-                            <CardContent className="flex-1 flex flex-col justify-between">
-                                <div>
-                                    <div className="text-center mb-4">
-                                        <p className="text-3xl font-bold">{Math.max(0, item.remainingVolume)}<span className="text-lg font-normal text-muted-foreground"> / {item.totalVolume}ml</span></p>
-                                        <p className="text-sm text-muted-foreground">Remaining</p>
-                                    </div>
-                                    <div className="relative h-4 bg-muted rounded-full overflow-hidden mb-6">
+                            <CardContent className="flex-1 flex flex-col justify-between p-6">
+                                <div className="text-center">
+                                    <p className="text-4xl font-bold tracking-tighter">{Math.max(0, item.remainingVolume)}<span className="text-xl font-normal text-muted-foreground">ml</span></p>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Remaining</p>
+                                </div>
+                                <div className="my-6">
+                                     <div className="relative h-2 bg-muted rounded-full overflow-hidden">
                                         <div
                                             className="absolute top-0 left-0 h-full bg-primary transition-all duration-300"
                                             style={{ width: `${(item.remainingVolume / item.totalVolume) * 100}%` }}
@@ -101,14 +101,15 @@ export default function OnBarPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                     <div className="flex justify-around gap-2">
+                                     <div className="flex justify-center gap-2">
                                         <Button
                                             variant="outline"
                                             onClick={() => handleSellPeg(item.id, 30)}
                                             disabled={item.remainingVolume < 30}
                                             className="flex-1"
                                         >
-                                            <Minus className="h-4 w-4 mr-2" /> 30ml
+                                            <Minus className="h-4 w-4 md:mr-2" />
+                                            <span className="hidden md:inline">30ml</span>
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -116,7 +117,8 @@ export default function OnBarPage() {
                                             disabled={item.remainingVolume < 60}
                                             className="flex-1"
                                         >
-                                            <Minus className="h-4 w-4 mr-2" /> 60ml
+                                            <Minus className="h-4 w-4 md:mr-2" />
+                                            <span className="hidden md:inline">60ml</span>
                                         </Button>
                                          <Button
                                             variant="outline"
@@ -124,7 +126,8 @@ export default function OnBarPage() {
                                             disabled={item.remainingVolume < 90}
                                             className="flex-1"
                                         >
-                                            <Minus className="h-4 w-4 mr-2" /> 90ml
+                                            <Minus className="h-4 w-4 md:mr-2" />
+                                            <span className="hidden md:inline">90ml</span>
                                         </Button>
                                     </div>
                                     {item.remainingVolume <= 0 && (
