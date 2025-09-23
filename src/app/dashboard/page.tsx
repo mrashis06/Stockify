@@ -29,7 +29,7 @@ const categories = [
   { name: "IML", imageId: "iml-bottle" },
 ];
 
-export default function DashboardPage() {
+export default function DashboardPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dailySalesData, setDailySalesData] = useState<any>({});
@@ -215,3 +215,5 @@ export default function DashboardPage() {
     </main>
   );
 }
+
+    

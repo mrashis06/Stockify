@@ -5,8 +5,10 @@ import { ThemeProvider } from '@/components/theme-provider';
 
 export default function RootLayout({
   children,
+  searchParams,
 }: Readonly<{
   children: React.ReactNode;
+  searchParams?: { [key: string]: string | string[] | undefined };
 }>) {
 
   const metadata = {
@@ -38,3 +40,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    

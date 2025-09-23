@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-export default function OnBarPage() {
+export default function OnBarPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { onBarInventory, loading, sellPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
     const { inventory: shopInventory } = useInventory();
     const { toast } = useToast();
@@ -181,3 +181,5 @@ export default function OnBarPage() {
         </main>
     );
 }
+
+    

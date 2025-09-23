@@ -12,7 +12,7 @@ import Footer from "@/components/layout/footer";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { useAuth } from "@/hooks/use-auth";
 
-export default function Home() {
+export default function Home({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user, loading } = useAuth();
   const heroImage = PlaceHolderImages.find(p => p.id === 'hero-liquor-bottles');
   const getStartedLink = loading ? '#' : user ? '/dashboard' : '/login';
@@ -71,3 +71,5 @@ export default function Home() {
     </div>
   );
 }
+
+    

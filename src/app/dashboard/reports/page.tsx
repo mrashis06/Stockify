@@ -35,7 +35,7 @@ interface jsPDFWithAutoTable extends jsPDF {
 
 type DailyLog = { [itemId: string]: { sales: number; price: number; category: string } };
 
-export default function ReportsPage() {
+export default function ReportsPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
     const [date, setDate] = useState<DateRange | undefined>({
         from: new Date(),
         to: new Date(),
@@ -297,6 +297,5 @@ export default function ReportsPage() {
     </div>
   );
 }
-
 
     

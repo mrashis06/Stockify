@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function SalesPage() {
+export default function SalesPage({ searchParams }: { searchParams?: { [key: string]: string | string[] | undefined } }) {
     return (
         <div>
             <h1 className="text-2xl font-bold tracking-tight mb-6">Sales</h1>
@@ -15,3 +15,5 @@ export default function SalesPage() {
         </div>
     )
 }
+
+    

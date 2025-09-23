@@ -22,7 +22,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { ThemeToggle } from '@/components/theme-toggle';
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+export default function DashboardLayout({ children, searchParams }: { children: ReactNode, searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -128,3 +128,5 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+    
