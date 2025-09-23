@@ -2,13 +2,10 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { IndianRupee, Plus, Search, Trash2, ListFilter } from 'lucide-react';
+import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -24,7 +21,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-  } from "@/components/ui/table"
+} from "@/components/ui/table"
 import AddBrandDialog from '@/components/dashboard/add-brand-dialog';
 import {
   DropdownMenu,
@@ -34,46 +31,51 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useToast } from '@/hooks/use-toast';
+import { useInventory, InventoryItem } from '@/hooks/use-inventory';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-
-type InventoryItem = {
-    id: number;
-    brand: string;
-    size: string;
-    price: number;
-    prevStock: number;
-    added: number;
-    sales: number;
-    category: string;
-};
-
-const initialInventoryData: InventoryItem[] = [
-  { id: 1, brand: 'Antiquity Blue', size: '750ml', price: 2100, prevStock: 50, added: 0, sales: 0, category: 'Whiskey' },
-  { id: 2, brand: 'Old Monk', size: '180ml', price: 190, prevStock: 30, added: 0, sales: 0, category: 'Rum' },
-  { id: 3, brand: 'Red Label', size: '750ml', price: 2500, prevStock: 40, added: 0, sales: 0, category: 'Whiskey' },
-  { id: 4, brand: 'Kingfisher', size: '650ml', price: 150, prevStock: 60, added: 0, sales: 0, category: 'Beer' },
-];
 
 export default function InventoryPage() {
-    const [inventory, setInventory] = useState(initialInventoryData);
+    const { 
+        inventory,
+        setInventory,
+        loading,
+        saving,
+        addBrand,
+        deleteBrand,
+        saveChanges
+    } = useInventory();
+
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
     const [showOpening, setShowOpening] = useState(true);
     const [showClosing, setShowClosing] = useState(true);
+    const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const { toast } = useToast();
 
-
-    const handleAddBrand = (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales'>) => {
-        const newItem: InventoryItem = {
-            ...newItemData,
-            id: inventory.length > 0 ? Math.max(...inventory.map(i => i.id)) + 1 : 1,
-            added: 0,
-            sales: 0,
-        };
-        setInventory(prev => [...prev, newItem]);
+    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing'>) => {
+        try {
+            await addBrand(newItemData);
+            toast({ title: 'Success', description: 'New brand added successfully.' });
+        } catch (error) {
+            console.error('Error adding brand:', error);
+            toast({ title: 'Error', description: 'Failed to add new brand.', variant: 'destructive' });
+        }
     };
 
-    const handleInputChange = (id: number, field: keyof InventoryItem, value: string) => {
+    const handleInputChange = (id: string, field: keyof InventoryItem, value: string) => {
         setInventory(
             inventory.map(item => {
                 if (item.id === id) {
@@ -81,7 +83,7 @@ export default function InventoryPage() {
                     if (field === 'price' || field === 'prevStock' || field === 'added' || field === 'sales') {
                         processedValue = value === '' ? 0 : parseFloat(value);
                         if (isNaN(processedValue as number)) {
-                            processedValue = item[field]; // Keep old value if parse fails
+                            processedValue = item[field] as number;
                         }
                     }
                     return { ...item, [field]: processedValue };
@@ -91,8 +93,36 @@ export default function InventoryPage() {
         );
     };
 
-    const handleDeleteRow = (id: number) => {
-        setInventory(inventory.filter(item => item.id !== id));
+    const handleDeleteSelected = async () => {
+        try {
+            await Promise.all(Array.from(selectedRows).map(id => deleteBrand(id)));
+            toast({ title: 'Success', description: 'Selected brands removed.' });
+            setSelectedRows(new Set());
+        } catch (error) {
+            console.error('Error removing brands:', error);
+            toast({ title: 'Error', description: 'Failed to remove selected brands.', variant: 'destructive' });
+        }
+        setIsDeleteDialogOpen(false);
+    };
+
+    const handleSaveChanges = async () => {
+        try {
+            await saveChanges();
+            toast({ title: 'Success', description: 'Inventory saved successfully!' });
+        } catch (error) {
+            console.error("Error saving inventory:", error);
+            toast({ title: 'Error', description: 'Failed to save inventory.', variant: 'destructive' });
+        }
+    };
+    
+    const handleRowSelect = (id: string) => {
+        const newSelection = new Set(selectedRows);
+        if (newSelection.has(id)) {
+            newSelection.delete(id);
+        } else {
+            newSelection.add(id);
+        }
+        setSelectedRows(newSelection);
     };
 
     const filteredInventory = useMemo(() => {
@@ -103,6 +133,11 @@ export default function InventoryPage() {
         });
     }, [inventory, searchQuery, categoryFilter]);
 
+    const allCategories = useMemo(() => {
+        const cats = new Set(inventory.map(i => i.category));
+        return ['All Categories', ...Array.from(cats).sort()];
+    }, [inventory]);
+
 
   return (
     <main className="flex-1 p-4 md:p-8">
@@ -111,6 +146,23 @@ export default function InventoryPage() {
             onOpenChange={setIsAddBrandOpen}
             onAddBrand={handleAddBrand}
         />
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will permanently delete the selected brand(s) and all associated data. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive hover:bg-destructive/90">
+                        Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
         <h1 className="text-2xl font-bold tracking-tight mb-6">Daily Inventory</h1>
         <Card>
             <CardContent className="p-4 md:p-6">
@@ -124,16 +176,15 @@ export default function InventoryPage() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                          />
                     </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
                         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                             <SelectTrigger className="w-full md:w-[180px]">
                                 <SelectValue placeholder="All Categories" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="All Categories">All Categories</SelectItem>
-                                <SelectItem value="Whiskey">Whiskey</SelectItem>
-                                <SelectItem value="Rum">Rum</SelectItem>
-                                <SelectItem value="Beer">Beer</SelectItem>
+                                {allCategories.map(cat => (
+                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                         <DropdownMenu>
@@ -163,16 +214,23 @@ export default function InventoryPage() {
                         <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setIsAddBrandOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Brand
                         </Button>
-                        <Button variant="destructive">
-                            <Trash2 className="mr-2 h-4 w-4" /> Remove Brand
+                        <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedRows.size})
                         </Button>
                     </div>
                 </div>
 
                 <div className="overflow-x-auto">
+                    {loading ? (
+                        <div className="flex justify-center items-center h-64">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                            <span className="ml-4 text-muted-foreground">Loading Inventory...</span>
+                        </div>
+                    ) : (
                     <Table>
                         <TableHeader>
                         <TableRow>
+                            <TableHead></TableHead>
                             <TableHead>Brand</TableHead>
                             <TableHead>Size</TableHead>
                             <TableHead>Price</TableHead>
@@ -181,17 +239,28 @@ export default function InventoryPage() {
                             {showOpening && <TableHead>Opening</TableHead>}
                             <TableHead>Sales</TableHead>
                             {showClosing && <TableHead>Closing</TableHead>}
-                            <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
                         {filteredInventory.map(item => {
-                            const opening = item.prevStock + item.added;
-                            const closing = opening - item.sales;
+                            const opening = (item.prevStock ?? 0) + (item.added ?? 0);
+                            const closing = opening - (item.sales ?? 0);
                             const isLowStock = closing < 10;
 
                             return (
-                                <TableRow key={item.id} className={isLowStock ? 'bg-destructive/10 hover:bg-destructive/20' : ''}>
+                                <TableRow 
+                                    key={item.id} 
+                                    className={isLowStock ? 'bg-destructive/10 hover:bg-destructive/20' : ''}
+                                    data-state={selectedRows.has(item.id) ? "selected" : ""}
+                                >
+                                     <TableCell className="text-center">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4"
+                                            checked={selectedRows.has(item.id)}
+                                            onChange={() => handleRowSelect(item.id)}
+                                        />
+                                    </TableCell>
                                     <TableCell className="font-medium">{item.brand}</TableCell>
                                     <TableCell>
                                         <Input
@@ -212,14 +281,7 @@ export default function InventoryPage() {
                                             />
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        <Input
-                                            type="number"
-                                            className="h-8 w-20 bg-card"
-                                            value={item.prevStock}
-                                            onChange={(e) => handleInputChange(item.id, 'prevStock', e.target.value)}
-                                        />
-                                    </TableCell>
+                                    <TableCell>{item.prevStock ?? 0}</TableCell>
                                     <TableCell>
                                         <Input
                                             type="number"
@@ -232,26 +294,25 @@ export default function InventoryPage() {
                                     <TableCell>
                                         <Input
                                             type="number"
-                                            className={`h-8 w-20 bg-card ${isLowStock && item.sales > 0 ? 'bg-destructive/50' : ''}`}
+                                            className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
                                             value={item.sales || ''}
                                             onChange={(e) => handleInputChange(item.id, 'sales', e.target.value)}
                                         />
                                     </TableCell>
                                     {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{closing}</TableCell>}
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" onClick={() => handleDeleteRow(item.id)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
                                 </TableRow>
                             )
                         })}
                         </TableBody>
                     </Table>
+                    )}
                 </div>
 
                 <div className="flex justify-end mt-6">
-                    <Button size="lg" className="bg-green-600 hover:bg-green-700">Save Changes</Button>
+                    <Button size="lg" className="bg-green-600 hover:bg-green-700" onClick={handleSaveChanges} disabled={saving}>
+                         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {saving ? "Saving..." : "Save Changes"}
+                    </Button>
                 </div>
             </CardContent>
         </Card>
