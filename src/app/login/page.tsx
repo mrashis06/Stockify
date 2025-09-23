@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, AuthError } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import React from 'react';
@@ -93,6 +93,11 @@ export default function LoginPage() {
 
       router.push('/dashboard');
     } catch (error) {
+      const authError = error as AuthError;
+      // Don't show an error toast if the user closes the popup
+      if (authError.code === 'auth/popup-closed-by-user') {
+        return;
+      }
       console.error("Error signing in with Google: ", error);
       toast({
         title: "Authentication Error",
