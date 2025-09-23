@@ -18,13 +18,15 @@ import { useInventory } from './use-inventory'; // To trigger stock updates
 
 export type OnBarItem = {
   id: string;
-  inventoryId: string; // The ID from the main inventory collection
+  inventoryId: string; // The ID from the main inventory collection, 'manual' if not tracked
   brand: string;
   size: string;
   totalVolume: number; // e.g., 750 for a 750ml bottle
   remainingVolume: number;
   openedAt: any; // Firestore Timestamp
 };
+
+export type OnBarManualItem = Omit<OnBarItem, 'id' | 'inventoryId' | 'remainingVolume' | 'openedAt'>;
 
 export function useOnBarInventory() {
   const [onBarInventory, setOnBarInventory] = useState<OnBarItem[]>([]);
@@ -55,6 +57,24 @@ export function useOnBarInventory() {
       } catch (error) {
           console.error("Error opening bottle: ", error);
           throw error; // Re-throw to be caught in the component
+      } finally {
+          setSaving(false);
+      }
+  };
+
+  const addOnBarItemManual = async (manualItem: OnBarManualItem) => {
+      if (saving) return;
+      setSaving(true);
+      try {
+          await addDoc(collection(db, "onBarInventory"), {
+              ...manualItem,
+              inventoryId: 'manual', // Mark as a manual entry
+              remainingVolume: manualItem.totalVolume,
+              openedAt: serverTimestamp(),
+          });
+      } catch(error) {
+          console.error("Error adding manual on-bar item:", error);
+          throw error;
       } finally {
           setSaving(false);
       }
@@ -99,5 +119,5 @@ export function useOnBarInventory() {
       }
   }
 
-  return { onBarInventory, loading, saving, addOnBarItem, sellPeg, removeOnBarItem };
+  return { onBarInventory, loading, saving, addOnBarItem, addOnBarItemManual, sellPeg, removeOnBarItem };
 }

@@ -77,7 +77,7 @@ export default function OnBarPage() {
                     <Wine className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-medium">No Open Bottles</h3>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        Click "Open a Bottle" to add an item from your inventory to start tracking peg sales.
+                        Click "Open a Bottle" to add an item from your inventory or manually to start tracking peg sales.
                     </p>
                 </div>
             ) : (
@@ -96,7 +96,7 @@ export default function OnBarPage() {
                                         />
                                     </div>
                                     <div className="text-center mb-6">
-                                        <p className="text-3xl font-bold">{item.remainingVolume}<span className="text-lg font-normal text-muted-foreground"> / {item.totalVolume}ml</span></p>
+                                        <p className="text-3xl font-bold">{Math.max(0, item.remainingVolume)}<span className="text-lg font-normal text-muted-foreground"> / {item.totalVolume}ml</span></p>
                                         <p className="text-sm text-muted-foreground">Remaining</p>
                                     </div>
                                 </div>
@@ -145,4 +145,3 @@ export default function OnBarPage() {
         </main>
     );
 }
-
