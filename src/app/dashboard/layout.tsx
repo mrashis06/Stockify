@@ -21,6 +21,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Badge } from '@/components/ui/badge';
 
 export default function DashboardLayout({ children, params, searchParams }: { children: ReactNode, params: { slug: string }, searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user, loading } = useAuth();
@@ -109,7 +110,10 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>{user.displayName || user.email || 'My Account'}</DropdownMenuLabel>
+              <DropdownMenuLabel className="flex items-center gap-2">
+                {user.displayName || user.email || 'My Account'}
+                {user.role === 'admin' && <Badge variant="destructive">Admin</Badge>}
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <Link href="/dashboard/settings">
                 <DropdownMenuItem>Settings</DropdownMenuItem>
