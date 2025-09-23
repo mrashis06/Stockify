@@ -11,6 +11,7 @@ import {
   addDoc,
   deleteDoc,
   onSnapshot,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
@@ -46,29 +47,25 @@ export function useInventory() {
   const fetchInventoryData = useCallback(async () => {
     setLoading(true);
     try {
-        // 1. Check for today's daily record
+        const inventorySnapshot = await getDocs(collection(db, 'inventory'));
+        const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
+        const yesterdayDocSnap = await getDoc(yesterdayDocRef);
+        const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
+
         const dailyDocRef = doc(db, 'dailyInventory', today);
         const dailyDocSnap = await getDoc(dailyDocRef);
+        const dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : null;
 
-        let items: InventoryItem[] = [];
+        const items: InventoryItem[] = [];
+        inventorySnapshot.forEach(doc => {
+            const data = doc.data();
+            const id = doc.id;
 
-        if (dailyDocSnap.exists()) {
-            // Load from today's record
-            const dailyData = dailyDocSnap.data();
-            for (const id in dailyData) {
-                const item = dailyData[id];
-                items.push({ id, ...item });
-            }
-        } else {
-            // Load from main inventory and yesterday's closing
-            const inventorySnapshot = await getDocs(collection(db, 'inventory'));
-            const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
-            const yesterdayDocSnap = await getDoc(yesterdayDocRef);
-            const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
-
-            inventorySnapshot.forEach(doc => {
-                const data = doc.data();
-                const id = doc.id;
+            if (dailyData && dailyData[id]) {
+                // If today's data exists, use it
+                items.push({ id, ...dailyData[id] });
+            } else {
+                // Otherwise, calculate from yesterday's closing
                 const prevStock = yesterdayData[id]?.closing ?? data.prevStock ?? 0;
                 items.push({
                     ...data,
@@ -77,8 +74,8 @@ export function useInventory() {
                     added: 0,
                     sales: 0,
                 } as InventoryItem);
-            });
-        }
+            }
+        });
          setInventory(items);
 
     } catch (error) {
@@ -89,18 +86,9 @@ export function useInventory() {
   }, [today, yesterday]);
 
   useEffect(() => {
-    fetchInventoryData();
-  }, [fetchInventoryData]);
-
-
-  // Listen for real-time updates on the main inventory to catch new brands
-  useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "inventory"), (snapshot) => {
-        // This is a simple way to refresh if something changed externally
-        // A more sophisticated approach might merge changes
         fetchInventoryData();
     });
-
     return () => unsubscribe();
   }, [fetchInventoryData]);
 
@@ -124,17 +112,7 @@ export function useInventory() {
             closing: newItemData.prevStock
         }
 
-        const batch = writeBatch(db);
-        batch.set(docRef, fullItemData);
-
-        // Also update today's daily record if it exists
-        const dailyDocRef = doc(db, 'dailyInventory', today);
-        batch.set(dailyDocRef, { [id]: fullItemData }, { merge: true });
-
-        await batch.commit();
-
-        // Add to local state
-        setInventory(prev => [...prev, { ...fullItemData, id }]);
+        await setDoc(docRef, fullItemData);
 
     } finally {
         setSaving(false);
@@ -146,14 +124,10 @@ export function useInventory() {
      try {
         const batch = writeBatch(db);
         
-        // Delete from main inventory
         const inventoryDocRef = doc(db, 'inventory', id);
         batch.delete(inventoryDocRef);
 
-        // Remove from today's daily record
         const dailyDocRef = doc(db, 'dailyInventory', today);
-        // Firestore doesn't support deleting nested fields with a specific value in a batch,
-        // so we have to read, modify, and then write.
         const dailyDocSnap = await getDoc(dailyDocRef);
         if (dailyDocSnap.exists()) {
             const dailyData = dailyDocSnap.data();
@@ -163,8 +137,6 @@ export function useInventory() {
         
         await batch.commit();
 
-        // Remove from local state
-        setInventory(prev => prev.filter(item => item.id !== id));
      } finally {
          setSaving(false);
      }
@@ -185,21 +157,12 @@ export function useInventory() {
           opening,
           closing,
         };
-
-        // Prepare data for the 'inventory' collection
-        // Here we persist the latest closing stock as the new prevStock for the next day.
-        const inventoryDocRef = doc(db, 'inventory', item.id);
-        batch.update(inventoryDocRef, { 
-            ...updatedItem,
-            prevStock: closing // IMPORTANT: Today's closing is tomorrow's opening
-        });
-
-        // Prepare data for the 'dailyInventory' collection
+        
         dailyData[item.id] = updatedItem;
       });
 
       const dailyDocRef = doc(db, 'dailyInventory', today);
-      batch.set(dailyDocRef, dailyData);
+      batch.set(dailyDocRef, dailyData, { merge: true });
 
       await batch.commit();
     } catch (error) {
