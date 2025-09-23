@@ -251,9 +251,9 @@ export default function InventoryPage() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                          />
                     </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
+                    <div className="flex w-full md:w-auto justify-end flex-wrap gap-2">
                         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                            <SelectTrigger className="w-full md:w-auto min-w-[180px]">
+                            <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
                                 <SelectValue placeholder="All Categories" />
                             </SelectTrigger>
                             <SelectContent>
@@ -292,13 +292,15 @@ export default function InventoryPage() {
                         <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)}>
                             <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedRows.size})
                         </Button>
-                         <Button onClick={() => setIsEndOfDayDialogOpen(true)} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isEndingDay}>
-                            <LogOut className="mr-2 h-4 w-4" /> End of Day
-                        </Button>
                     </div>
                 </div>
+                 <div className="flex justify-end mt-4">
+                     <Button onClick={() => setIsEndOfDayDialogOpen(true)} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isEndingDay}>
+                        <LogOut className="mr-2 h-4 w-4" /> End of Day
+                    </Button>
+                </div>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto mt-4">
                     {loading ? (
                         <div className="flex justify-center items-center h-64">
                             <Loader2 className="h-8 w-8 animate-spin" />
@@ -391,5 +393,3 @@ export default function InventoryPage() {
     </main>
   );
 }
-
-    
