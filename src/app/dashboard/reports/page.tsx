@@ -24,7 +24,7 @@ import { toast } from '@/hooks/use-toast';
 
 const chartConfig = {
   sales: {
-    label: "Sales (₹)",
+    label: "Sales (INR)",
     color: "hsl(var(--primary))",
   },
 };
@@ -109,7 +109,7 @@ export default function ReportsPage() {
 
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
-        const tableColumn = ["Category", "Sales (₹)"];
+        const tableColumn = ["Category", "Sales (INR)"];
         const tableRows: (string | number)[][] = [];
 
         let totalSales = 0;
@@ -134,7 +134,7 @@ export default function ReportsPage() {
         doc.autoTable({
             head: [tableColumn],
             body: tableRows,
-            foot: [['Total Sales', `₹${totalSales.toLocaleString('en-IN')}`]],
+            foot: [['Total Sales', totalSales.toLocaleString('en-IN')]],
             startY: 20,
             headStyles: {
                 fillColor: [22, 163, 74], // Green background for header
@@ -152,8 +152,9 @@ export default function ReportsPage() {
                 doc.text(title, data.settings.margin.left, 15);
             },
         });
-
-        doc.save(`sales_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+        
+        const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+        doc.save(`sales_report_${fileDate}.pdf`);
     };
 
     const handleExportCSV = () => {
@@ -174,7 +175,9 @@ export default function ReportsPage() {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `sales_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        
+        const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+        link.setAttribute("download", `sales_report_${fileDate}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -295,3 +298,5 @@ export default function ReportsPage() {
   );
 }
 
+
+    
