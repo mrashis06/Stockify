@@ -3,7 +3,7 @@
 
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -75,6 +75,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
              <NavLink href="/dashboard/inventory">
                 <Warehouse className="h-4 w-4" />
                 Inventory
+            </NavLink>
+            <NavLink href="/dashboard/godown">
+                <Archive className="h-4 w-4" />
+                Godown
             </NavLink>
              <NavLink href="/dashboard/reports">
                 <FileText className="h-4 w-4" />
