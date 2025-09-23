@@ -2,13 +2,19 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Minus, Plus, GlassWater, Loader2, Wine, Beer } from 'lucide-react';
+import { Minus, Plus, GlassWater, Loader2, Wine, Beer, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useOnBarInventory, OnBarItem } from '@/hooks/use-onbar-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import { useInventory } from '@/hooks/use-inventory';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function OnBarPage() {
     const { onBarInventory, loading, sellPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
@@ -43,7 +49,8 @@ export default function OnBarPage() {
         try {
             await refillPeg(id, volume);
             toast({ title: 'Success', description: `${volume}ml refilled.` });
-        } catch (error) {
+        } catch (error)
+        {
             console.error('Error refilling item:', error);
             const errorMessage = (error as Error).message || 'Failed to refill item.';
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
@@ -99,11 +106,9 @@ export default function OnBarPage() {
                                 <CardTitle className="text-lg truncate">{item.brand} <span className="text-sm font-normal text-muted-foreground">({item.size})</span></CardTitle>
                             </CardHeader>
                              <CardContent className="flex-1 flex flex-col justify-between p-6">
-                                <div>
-                                    <div className="text-center">
-                                        <p className="text-4xl font-bold tracking-tighter">{Math.max(0, item.remainingVolume)}<span className="text-xl font-normal text-muted-foreground">ml</span></p>
-                                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Remaining</p>
-                                    </div>
+                                <div className="text-center flex-1 flex flex-col justify-center">
+                                    <p className="text-5xl font-bold tracking-tighter">{Math.max(0, item.remainingVolume)}<span className="text-xl font-normal text-muted-foreground">ml</span></p>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1">Remaining</p>
                                     <div className="my-6">
                                         <div className="relative h-2 bg-muted rounded-full overflow-hidden">
                                             <div
@@ -113,6 +118,7 @@ export default function OnBarPage() {
                                         </div>
                                     </div>
                                 </div>
+                                
                                 <div className="space-y-2">
                                      {item.category === 'Beer' ? (
                                         <Button
@@ -125,33 +131,27 @@ export default function OnBarPage() {
                                         </Button>
                                      ) : (
                                         <div className="flex justify-center items-center gap-2">
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => handleSell(item.id, 30)}
-                                                disabled={item.remainingVolume < 30}
-                                                className="flex-1"
-                                            >
-                                                <Minus className="h-4 w-4 mr-1" />
-                                                <span>30ml</span>
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => handleSell(item.id, 60)}
-                                                disabled={item.remainingVolume < 60}
-                                                className="flex-1"
-                                            >
-                                                <Minus className="h-4 w-4 mr-1" />
-                                                <span>60ml</span>
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => handleSell(item.id, 90)}
-                                                disabled={item.remainingVolume < 90}
-                                                className="flex-1"
-                                            >
-                                                <Minus className="h-4 w-4 mr-1" />
-                                                <span>90ml</span>
-                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="outline" className="flex-1" disabled={item.remainingVolume <= 0}>
+                                                        <Minus className="mr-2 h-4 w-4" />
+                                                        Sell Peg
+                                                        <ChevronDown className="ml-auto h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="center" className="w-56">
+                                                    <DropdownMenuItem onClick={() => handleSell(item.id, 30)} disabled={item.remainingVolume < 30}>
+                                                        Sell 30ml
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleSell(item.id, 60)} disabled={item.remainingVolume < 60}>
+                                                        Sell 60ml
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleSell(item.id, 90)} disabled={item.remainingVolume < 90}>
+                                                        Sell 90ml
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                            
                                             <Button
                                                 variant="outline"
                                                 size="icon"
@@ -181,3 +181,5 @@ export default function OnBarPage() {
         </main>
     );
 }
+
+    
