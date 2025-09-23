@@ -27,10 +27,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <span className="font-bold text-xl">Inventory Manager</span>
           </Link>
           <div className="hidden md:flex items-center gap-4">
-             <NavLink href="/dashboard" Icon={LayoutDashboard}>Dashboard</NavLink>
-             <NavLink href="/dashboard/inventory" Icon={Warehouse}>Inventory</NavLink>
-             <NavLink href="#" Icon={FileText}>Reports</NavLink>
-             <NavLink href="#" Icon={Settings}>Settings</NavLink>
+             <NavLink href="/dashboard">
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
+            </NavLink>
+             <NavLink href="/dashboard/inventory">
+                <Warehouse className="h-4 w-4" />
+                Inventory
+            </NavLink>
+             <NavLink href="#">
+                <FileText className="h-4 w-4" />
+                Reports
+            </NavLink>
+             <NavLink href="#">
+                <Settings className="h-4 w-4" />
+                Settings
+            </NavLink>
           </div>
         </nav>
         <div className="flex items-center gap-4">

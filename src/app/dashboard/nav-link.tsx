@@ -7,10 +7,9 @@ import { cn } from "@/lib/utils";
 type NavLinkProps = {
     href: string;
     children: React.ReactNode;
-    Icon: React.ElementType;
 }
 
-export default function NavLink({ href, children, Icon }: NavLinkProps) {
+export default function NavLink({ href, children }: NavLinkProps) {
     const pathname = usePathname();
     const isActive = pathname === href;
 
@@ -22,7 +21,6 @@ export default function NavLink({ href, children, Icon }: NavLinkProps) {
                 isActive ? "text-primary" : "text-muted-foreground"
             )}
         >
-            <Icon className="h-4 w-4" />
             {children}
         </Link>
     )
