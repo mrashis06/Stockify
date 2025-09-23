@@ -88,16 +88,16 @@ export default function OnBarPage() {
                                 <CardTitle className="text-lg">{item.brand} <span className="text-sm font-normal text-muted-foreground">({item.size})</span></CardTitle>
                             </CardHeader>
                             <CardContent className="flex-1 flex flex-col justify-between">
-                                <div>
-                                    <div className="relative h-4 bg-muted rounded-full overflow-hidden mb-4">
+                                <div className="flex-1">
+                                    <div className="text-center mb-4">
+                                        <p className="text-3xl font-bold">{Math.max(0, item.remainingVolume)}<span className="text-lg font-normal text-muted-foreground"> / {item.totalVolume}ml</span></p>
+                                        <p className="text-sm text-muted-foreground">Remaining</p>
+                                    </div>
+                                    <div className="relative h-4 bg-muted rounded-full overflow-hidden mb-6">
                                         <div
                                             className="absolute top-0 left-0 h-full bg-primary transition-all duration-300"
                                             style={{ width: `${(item.remainingVolume / item.totalVolume) * 100}%` }}
                                         />
-                                    </div>
-                                    <div className="text-center mb-6">
-                                        <p className="text-3xl font-bold">{Math.max(0, item.remainingVolume)}<span className="text-lg font-normal text-muted-foreground"> / {item.totalVolume}ml</span></p>
-                                        <p className="text-sm text-muted-foreground">Remaining</p>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
