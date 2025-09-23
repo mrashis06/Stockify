@@ -12,6 +12,7 @@ import {
   updateDoc,
   deleteDoc,
   onSnapshot,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
@@ -172,33 +173,77 @@ export function useInventory() {
   const saveChanges = async () => {
     setSaving(true);
     try {
-      const batch = writeBatch(db);
-      const dailyData: { [key: string]: any } = {};
+        await runTransaction(db, async (transaction) => {
+            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const dailyDocSnap = await transaction.get(dailyDocRef);
+            const persistedDailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
+            const godownUpdateMap: Map<string, number> = new Map();
 
-      inventory.forEach(item => {
-        const opening = (item.prevStock ?? 0) + (item.added ?? 0);
-        const closing = opening - (item.sales ?? 0);
-        
-        // This is a snapshot of the item's state at the time of saving
-        const savedItemState = {
-          brand: item.brand,
-          size: item.size,
-          price: item.price,
-          category: item.category,
-          prevStock: item.prevStock,
-          added: item.added,
-          sales: item.sales,
-          opening,
-          closing,
-        };
-        
-        dailyData[item.id] = savedItemState;
-      });
+            // Prepare daily data and calculate godown updates
+            const newDailyData: { [key: string]: any } = {};
+            for (const item of inventory) {
+                const persistedAdded = persistedDailyData[item.id]?.added ?? 0;
+                const newAdded = item.added ?? 0;
+                const addedDifference = newAdded - persistedAdded;
 
-      const dailyDocRef = doc(db, 'dailyInventory', today);
-      batch.set(dailyDocRef, dailyData); // Using set to overwrite the whole day's data for consistency
+                if (addedDifference !== 0) {
+                    godownUpdateMap.set(item.id, addedDifference);
+                }
 
-      await batch.commit();
+                const opening = (item.prevStock ?? 0) + (item.added ?? 0);
+                const closing = opening - (item.sales ?? 0);
+                
+                newDailyData[item.id] = {
+                    brand: item.brand,
+                    size: item.size,
+                    price: item.price,
+                    category: item.category,
+                    prevStock: item.prevStock,
+                    added: item.added,
+                    sales: item.sales,
+                    opening,
+                    closing,
+                };
+            }
+
+            // Read godown items that need updating
+            for (const [id, difference] of godownUpdateMap.entries()) {
+                const godownItemRef = doc(db, 'godownInventory', id);
+                const godownItemDoc = await transaction.get(godownItemRef);
+
+                if (!godownItemDoc.exists() && difference > 0) {
+                    throw new Error(`Item ${id} not found in godown, but trying to decrease stock.`);
+                }
+                
+                const currentQuantity = godownItemDoc.exists() ? godownItemDoc.data().quantity : 0;
+                const newQuantity = currentQuantity - difference;
+
+                if (newQuantity < 0) {
+                    throw new Error(`Not enough stock in godown for ${id}. Available: ${currentQuantity}, Tried to transfer: ${difference}.`);
+                }
+                // The actual update is done in the next loop to keep reads and writes separate
+            }
+
+            // Perform all writes
+            // 1. Update godown inventory
+            for (const [id, difference] of godownUpdateMap.entries()) {
+                const godownItemRef = doc(db, 'godownInventory', id);
+                 const godownItemDoc = await transaction.get(godownItemRef); // re-get for safety, though not strictly needed here.
+                 const currentQuantity = godownItemDoc.exists() ? godownItemDoc.data().quantity : 0;
+                 const newQuantity = currentQuantity - difference;
+                 
+                if (godownItemDoc.exists()) {
+                    transaction.update(godownItemRef, { quantity: newQuantity });
+                } else {
+                    // This case should ideally not be hit if we only allow adding from godown transfer
+                    // But as a fallback, we can create it. Let's assume brand/size/cat would need to be known.
+                    // For now, we'll rely on the error thrown above.
+                }
+            }
+            
+            // 2. Update daily inventory
+            transaction.set(dailyDocRef, newDailyData);
+        });
     } catch (error) {
       console.error("Error saving inventory changes: ", error);
       throw error;
@@ -209,6 +254,3 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, saveChanges };
 }
-
-    
-    
