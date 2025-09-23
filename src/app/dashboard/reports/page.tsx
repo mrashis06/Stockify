@@ -18,12 +18,12 @@ import {
 
 
 const salesData = [
-  { category: 'Whiskey', sales: 45000 },
-  { category: 'Rum', sales: 62000 },
-  { category: 'Vodka', sales: 51000 },
-  { category: 'Gin', sales: 38000 },
-  { category: 'Tequila', sales: 32000 },
-  { category: 'Beer', sales: 58000 },
+  { category: 'Whiskey', sales: 0 },
+  { category: 'Rum', sales: 0 },
+  { category: 'Vodka', sales: 0 },
+  { category: 'Gin', sales: 0 },
+  { category: 'Tequila', sales: 0 },
+  { category: 'Beer', sales: 0 },
 ];
 
 const chartConfig = {

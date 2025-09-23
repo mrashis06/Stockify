@@ -1,4 +1,4 @@
-import { ArrowUp, IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
+import { IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 
@@ -21,11 +21,7 @@ const categories = [
   { name: "IML", imageId: "iml-bottle" },
 ];
 
-const lowStockItems = [
-    { name: "Blanton's Original Single Barrel", units: 2 },
-    { name: "Captain Morgan Spiced Rum", units: 5 },
-    { name: "Grey Goose Vodka", units: 3 },
-];
+const lowStockItems: { name: string, units: number }[] = [];
 
 export default function DashboardPage() {
   return (
@@ -40,10 +36,9 @@ export default function DashboardPage() {
             <PackageCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,250 Units</div>
-            <p className="text-xs text-green-500 flex items-center">
-              <ArrowUp className="h-3 w-3 mr-1" />
-              +10% from last month
+            <div className="text-2xl font-bold">0 Units</div>
+            <p className="text-xs text-muted-foreground">
+              No data available
             </p>
           </CardContent>
         </Card>
@@ -53,10 +48,9 @@ export default function DashboardPage() {
             <IndianRupee className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹3,450</div>
-            <p className="text-xs text-green-500 flex items-center">
-              <ArrowUp className="h-3 w-3 mr-1" />
-              +5% from yesterday
+            <div className="text-2xl font-bold">₹0</div>
+            <p className="text-xs text-muted-foreground">
+              No sales recorded today
             </p>
           </CardContent>
         </Card>
@@ -66,18 +60,22 @@ export default function DashboardPage() {
             <TriangleAlert className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">15 Items</div>
+            <div className="text-2xl font-bold text-destructive">0 Items</div>
             <div className="mt-2 text-xs">
-                {lowStockItems.map(item => (
+                {lowStockItems.length > 0 ? lowStockItems.map(item => (
                     <div key={item.name} className="flex justify-between">
                         <span>{item.name}</span>
                         <span className="font-semibold text-destructive">{item.units} units left</span>
                     </div>
-                ))}
+                )) : (
+                    <p className="text-xs text-muted-foreground">No items are low on stock.</p>
+                )}
             </div>
-            <Link href="#" className="text-xs text-destructive/80 hover:underline mt-2 block text-right">
-                View all
-            </Link>
+            {lowStockItems.length > 0 && 
+                <Link href="#" className="text-xs text-destructive/80 hover:underline mt-2 block text-right">
+                    View all
+                </Link>
+            }
           </CardContent>
         </Card>
       </div>
