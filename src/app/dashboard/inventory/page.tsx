@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { IndianRupee, Plus, Search, Trash2 } from 'lucide-react';
+import { IndianRupee, Plus, Search, Trash2, ListFilter } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +26,14 @@ import {
     TableRow,
   } from "@/components/ui/table"
 import AddBrandDialog from '@/components/dashboard/add-brand-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 
 type InventoryItem = {
@@ -51,6 +59,8 @@ export default function InventoryPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
+    const [showOpening, setShowOpening] = useState(true);
+    const [showClosing, setShowClosing] = useState(true);
 
 
     const handleAddBrand = (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales'>) => {
@@ -126,6 +136,30 @@ export default function InventoryPage() {
                                 <SelectItem value="Beer">Beer</SelectItem>
                             </SelectContent>
                         </Select>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="ml-auto">
+                                    <ListFilter className="mr-2 h-4 w-4" />
+                                    Columns
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuCheckboxItem
+                                    checked={showOpening}
+                                    onCheckedChange={setShowOpening}
+                                >
+                                    Opening Stock
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
+                                    checked={showClosing}
+                                    onCheckedChange={setShowClosing}
+                                >
+                                    Closing Stock
+                                </DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setIsAddBrandOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Brand
                         </Button>
@@ -144,9 +178,9 @@ export default function InventoryPage() {
                             <TableHead>Price</TableHead>
                             <TableHead>Prev. Stock</TableHead>
                             <TableHead>Added</TableHead>
-                            <TableHead>Opening</TableHead>
+                            {showOpening && <TableHead>Opening</TableHead>}
                             <TableHead>Sales</TableHead>
-                            <TableHead>Closing</TableHead>
+                            {showClosing && <TableHead>Closing</TableHead>}
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
@@ -194,7 +228,7 @@ export default function InventoryPage() {
                                             onChange={(e) => handleInputChange(item.id, 'added', e.target.value)}
                                         />
                                     </TableCell>
-                                    <TableCell>{opening}</TableCell>
+                                    {showOpening && <TableCell>{opening}</TableCell>}
                                     <TableCell>
                                         <Input
                                             type="number"
@@ -203,7 +237,7 @@ export default function InventoryPage() {
                                             onChange={(e) => handleInputChange(item.id, 'sales', e.target.value)}
                                         />
                                     </TableCell>
-                                    <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{closing}</TableCell>
+                                    {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{closing}</TableCell>}
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="icon" onClick={() => handleDeleteRow(item.id)}>
                                             <Trash2 className="h-4 w-4" />
