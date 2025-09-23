@@ -5,9 +5,9 @@ import { IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useEffect, useState, useMemo } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 
 import {
   Card,
@@ -35,20 +35,56 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     const dailyDocRef = doc(db, 'dailyInventory', today);
 
-    const unsubscribe = onSnapshot(dailyDocRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const dailyData = snapshot.data();
-        const items: InventoryItem[] = Object.entries(dailyData).map(([id, data]) => {
-          return { id, ...(data as Omit<InventoryItem, 'id'>) };
+    const unsubscribe = onSnapshot(dailyDocRef, async (dailySnap) => {
+      try {
+        const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+        
+        // 1. Fetch all master inventory items to ensure none are missed
+        const inventorySnapshot = await getDocs(collection(db, 'inventory'));
+        const masterInventory = new Map<string, any>();
+        inventorySnapshot.forEach(doc => {
+            masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
         });
+
+        // 2. Fetch yesterday's data for accurate prevStock
+        const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
+        const yesterdayDocSnap = await getDoc(yesterdayDocRef);
+        const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
+
+        const items: InventoryItem[] = [];
+
+        // 3. Iterate over the complete master list
+        masterInventory.forEach((masterItem) => {
+            const id = masterItem.id;
+            const dailyItem = dailyData[id];
+            
+            // Use yesterday's closing if available, otherwise fall back to master prevStock
+            const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
+
+            if (dailyItem) {
+                // Item has activity today, merge with master and use correct prevStock
+                items.push({ ...masterItem, ...dailyItem, prevStock });
+            } else {
+                // Item has no activity today, build its state from previous data
+                items.push({
+                    ...masterItem,
+                    prevStock,
+                    added: 0,
+                    sales: 0,
+                });
+            }
+        });
+        
         setInventory(items);
-      } else {
-        // If today's doc doesn't exist, inventory is empty for the dashboard stats
-        setInventory([]);
+
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
