@@ -54,7 +54,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <Package className="h-6 w-6 text-primary" />
             <span className="font-bold text-xl">Stockify</span>
           </Link>
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-6">
              <NavLink href="/">
                 <Home className="h-4 w-4" />
                 Home
