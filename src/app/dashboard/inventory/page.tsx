@@ -176,9 +176,9 @@ export default function InventoryPage() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                          />
                     </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+                    <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
                         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                            <SelectTrigger className="w-full md:w-[180px]">
+                            <SelectTrigger className="w-full md:w-auto min-w-[180px]">
                                 <SelectValue placeholder="All Categories" />
                             </SelectTrigger>
                             <SelectContent>
@@ -189,7 +189,7 @@ export default function InventoryPage() {
                         </Select>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="ml-auto">
+                                <Button variant="outline">
                                     <ListFilter className="mr-2 h-4 w-4" />
                                     Columns
                                 </Button>
