@@ -326,6 +326,50 @@ export function useInventory() {
       }
   };
 
+  const openBottleForOnBar = async (inventoryItemId: string, volume: number) => {
+    setSaving(true);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const dailyDocSnap = await transaction.get(dailyDocRef);
+            let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
 
-  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField };
+            if (!dailyData[inventoryItemId] || (dailyData[inventoryItemId].opening - (dailyData[inventoryItemId].sales ?? 0)) < 1) {
+                throw new Error("Not enough stock in inventory to open a bottle.");
+            }
+            
+            // Deduct one bottle from sales (as it's being used internally)
+            dailyData[inventoryItemId].sales = (dailyData[inventoryItemId].sales ?? 0) + 1;
+            dailyData[inventoryItemId].closing = (dailyData[inventoryItemId].opening ?? 0) - dailyData[inventoryItemId].sales;
+
+            transaction.set(dailyDocRef, { [inventoryItemId]: dailyData[inventoryItemId] }, { merge: true });
+
+            // Add the bottle to on-bar inventory
+            const masterItemRef = doc(db, 'inventory', inventoryItemId);
+            const masterItemSnap = await transaction.get(masterItemRef);
+            if (!masterItemSnap.exists()) throw new Error("Master inventory item not found.");
+            const masterItem = masterItemSnap.data();
+
+            const onBarCollectionRef = collection(db, "onBarInventory");
+            const newOnBarDocRef = doc(onBarCollectionRef); // Create a new doc with a generated ID
+            
+            transaction.set(newOnBarDocRef, {
+                inventoryId: inventoryItemId,
+                brand: masterItem.brand,
+                size: masterItem.size,
+                totalVolume: volume,
+                remainingVolume: volume,
+                openedAt: serverTimestamp(),
+            });
+        });
+    } catch (error) {
+        console.error("Error opening bottle for OnBar: ", error);
+        throw error;
+    } finally {
+        setSaving(false);
+    }
+  };
+
+
+  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, openBottleForOnBar };
 }
