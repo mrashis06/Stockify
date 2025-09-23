@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -24,6 +25,8 @@ import {
     TableHeader,
     TableRow,
   } from "@/components/ui/table"
+import AddBrandDialog from '@/components/dashboard/add-brand-dialog';
+
 
 type InventoryItem = {
     id: number;
@@ -47,6 +50,18 @@ export default function InventoryPage() {
     const [inventory, setInventory] = useState(initialInventoryData);
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
+    const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
+
+
+    const handleAddBrand = (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales'>) => {
+        const newItem: InventoryItem = {
+            ...newItemData,
+            id: inventory.length > 0 ? Math.max(...inventory.map(i => i.id)) + 1 : 1,
+            added: 0,
+            sales: 0,
+        };
+        setInventory(prev => [...prev, newItem]);
+    };
 
     const handleInputChange = (id: number, field: keyof InventoryItem, value: string) => {
         setInventory(
@@ -81,6 +96,11 @@ export default function InventoryPage() {
 
   return (
     <main className="flex-1 p-4 md:p-8">
+        <AddBrandDialog
+            isOpen={isAddBrandOpen}
+            onOpenChange={setIsAddBrandOpen}
+            onAddBrand={handleAddBrand}
+        />
         <h1 className="text-2xl font-bold tracking-tight mb-6">Daily Inventory</h1>
         <Card>
             <CardContent className="p-4 md:p-6">
@@ -106,7 +126,7 @@ export default function InventoryPage() {
                                 <SelectItem value="Beer">Beer</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white">
+                        <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setIsAddBrandOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Brand
                         </Button>
                         <Button variant="destructive">
