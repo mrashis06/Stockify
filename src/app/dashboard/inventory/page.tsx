@@ -127,7 +127,7 @@ export default function InventoryPage() {
 
     const filteredInventory = useMemo(() => {
         return inventory.filter(item => {
-            const matchesSearch = item.brand.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
             return matchesSearch && matchesCategory;
         });
