@@ -58,7 +58,7 @@ export default function SignupPage() {
         createdAt: serverTimestamp(),
       });
 
-      router.push('/dashboard');
+      // The useAuth hook will handle the redirect
     } catch (error) {
       console.error("Error signing up with email and password: ", error);
       toast({
