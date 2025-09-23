@@ -5,8 +5,9 @@ import { IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useEffect, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { format } from 'date-fns';
 
 import {
   Card,
@@ -33,16 +34,34 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "inventory"), (snapshot) => {
-      const items: InventoryItem[] = [];
-      snapshot.forEach((doc) => {
-        items.push({ id: doc.id, ...doc.data() } as InventoryItem);
-      });
-      setInventory(items);
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const dailyDocRef = doc(db, 'dailyInventory', today);
+
+    const unsubscribe = onSnapshot(dailyDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const dailyData = snapshot.data();
+        const items: InventoryItem[] = Object.entries(dailyData).map(([id, data]) => {
+          const itemData = data as Omit<InventoryItem, 'id'>;
+          const opening = (itemData.prevStock || 0) + (itemData.added || 0);
+          const closing = opening - (itemData.sales || 0);
+          return {
+            id,
+            ...itemData,
+            opening,
+            closing,
+          };
+        });
+        setInventory(items);
+      } else {
+        // If today's doc doesn't exist, inventory is empty for the dashboard stats
+        setInventory([]);
+      }
       setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
+
 
   const totalStock = inventory.reduce((acc, item) => acc + (item.closing ?? 0), 0);
   const todaysSales = inventory.reduce((acc, item) => acc + (item.sales ?? 0) * item.price, 0);
