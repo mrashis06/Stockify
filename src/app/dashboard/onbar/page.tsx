@@ -103,7 +103,7 @@ export default function OnBarPage() {
                     {onBarInventory.map(item => (
                         <Card key={item.id} className="flex flex-col h-full">
                             <CardHeader>
-                                <CardTitle className="text-lg truncate">{item.brand} <span className="text-sm font-normal text-muted-foreground">({item.size})</span></CardTitle>
+                                <CardTitle className="text-lg truncate">{item.brand}</CardTitle>
                             </CardHeader>
                              <CardContent className="flex-1 flex flex-col justify-between p-6">
                                 <div className="text-center flex-1 flex flex-col justify-center">
@@ -181,5 +181,3 @@ export default function OnBarPage() {
         </main>
     );
 }
-
-    
