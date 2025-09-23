@@ -49,13 +49,11 @@ import {
 export default function InventoryPage() {
     const { 
         inventory,
-        setInventory,
         loading,
-        saving,
         addBrand,
         deleteBrand,
         updateBrand,
-        saveChanges
+        updateItemField,
     } = useInventory();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -94,24 +92,31 @@ export default function InventoryPage() {
             toast({ title: 'Error', description: 'Failed to update brand.', variant: 'destructive' });
         }
     };
+    
+    const handleFieldChange = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: string | number) => {
+        const originalItem = inventory.find(item => item.id === id);
+        if (!originalItem) return;
 
-    const handleInputChange = (id: string, field: keyof InventoryItem, value: string) => {
-        setInventory(
-            inventory.map(item => {
-                if (item.id === id) {
-                    let processedValue: string | number = value;
-                    if (field === 'price' || field === 'prevStock' || field === 'added' || field === 'sales') {
-                        processedValue = value === '' ? 0 : parseFloat(value);
-                        if (isNaN(processedValue as number)) {
-                            processedValue = item[field] as number;
-                        }
-                    }
-                    return { ...item, [field]: processedValue };
-                }
-                return item;
-            })
-        );
+        let processedValue: number | string = value;
+        if (field === 'added' || field === 'sales' || field === 'price') {
+             processedValue = Number(value);
+             if (isNaN(processedValue) || processedValue < 0) {
+                 toast({ title: 'Invalid Input', description: 'Please enter a valid non-negative number.', variant: 'destructive'});
+                 // Re-render will reset to original value from state
+                 return;
+             }
+        }
+       
+        try {
+            await updateItemField(id, field, processedValue);
+            toast({ title: 'Success', description: `Item ${field} updated.`});
+        } catch (error) {
+            console.error(`Error updating ${field}:`, error);
+            const errorMessage = (error as Error).message || `Failed to update ${field}.`;
+            toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
+        }
     };
+
 
     const handleDeleteSelected = async () => {
         try {
@@ -123,16 +128,6 @@ export default function InventoryPage() {
             toast({ title: 'Error', description: 'Failed to remove selected brands.', variant: 'destructive' });
         }
         setIsDeleteDialogOpen(false);
-    };
-
-    const handleSaveChanges = async () => {
-        try {
-            await saveChanges();
-            toast({ title: 'Success', description: 'Inventory saved successfully!' });
-        } catch (error) {
-            console.error("Error saving inventory:", error);
-            toast({ title: 'Error', description: 'Failed to save inventory.', variant: 'destructive' });
-        }
     };
     
     const handleRowSelect = (id: string) => {
@@ -306,12 +301,7 @@ export default function InventoryPage() {
                                         </Button>
                                     </TableCell>
                                     <TableCell>
-                                        <Input
-                                            type="text"
-                                            className="h-8 w-24 bg-card"
-                                            value={item.size}
-                                            onChange={(e) => handleInputChange(item.id, 'size', e.target.value)}
-                                        />
+                                       {item.size}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center">
@@ -319,8 +309,9 @@ export default function InventoryPage() {
                                             <Input
                                                 type="number"
                                                 className="h-8 w-24 bg-card"
-                                                value={item.price}
-                                                onChange={(e) => handleInputChange(item.id, 'price', e.target.value)}
+                                                defaultValue={item.price}
+                                                onBlur={(e) => handleFieldChange(item.id, 'price', e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                             />
                                         </div>
                                     </TableCell>
@@ -329,8 +320,9 @@ export default function InventoryPage() {
                                         <Input
                                             type="number"
                                             className="h-8 w-20 bg-card"
-                                            value={item.added || ''}
-                                            onChange={(e) => handleInputChange(item.id, 'added', e.target.value)}
+                                            defaultValue={item.added || 0}
+                                            onBlur={(e) => handleFieldChange(item.id, 'added', e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                         />
                                     </TableCell>
                                     {showOpening && <TableCell>{item.opening}</TableCell>}
@@ -338,8 +330,9 @@ export default function InventoryPage() {
                                         <Input
                                             type="number"
                                             className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
-                                            value={item.sales || ''}
-                                            onChange={(e) => handleInputChange(item.id, 'sales', e.target.value)}
+                                            defaultValue={item.sales || 0}
+                                            onBlur={(e) => handleFieldChange(item.id, 'sales', e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                         />
                                     </TableCell>
                                     {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{item.closing}</TableCell>}
@@ -349,13 +342,6 @@ export default function InventoryPage() {
                         </TableBody>
                     </Table>
                     )}
-                </div>
-
-                <div className="flex justify-end mt-6">
-                    <Button size="lg" className="bg-green-600 hover:bg-green-700" onClick={handleSaveChanges} disabled={saving}>
-                         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {saving ? "Saving..." : "Save Changes"}
-                    </Button>
                 </div>
             </CardContent>
         </Card>
