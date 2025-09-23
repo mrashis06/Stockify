@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { ADMIN_UID } from '@/lib/constants';
 
 export default function SignupPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const router = useRouter();
@@ -50,11 +51,13 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
+      const role = user.uid === ADMIN_UID ? 'admin' : 'staff';
+
       // Create user document in Firestore
       await setDoc(doc(db, "users", user.uid), {
         name: name,
         email: email,
-        role: 'staff',
+        role: role,
         createdAt: serverTimestamp(),
       });
 

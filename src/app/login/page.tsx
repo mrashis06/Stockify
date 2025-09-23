@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { ADMIN_UID } from '@/lib/constants';
 
 function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -87,10 +88,11 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
       const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
+        const role = user.uid === ADMIN_UID ? 'admin' : 'staff';
         await setDoc(userDocRef, {
           name: user.displayName,
           email: user.email,
-          role: 'staff',
+          role: role,
           createdAt: serverTimestamp(),
         });
       }
