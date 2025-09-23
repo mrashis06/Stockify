@@ -19,7 +19,7 @@ const Navbar = () => {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <Package className="h-6 w-6 text-primary" />
-          <span className="font-headline text-xl font-bold">StockSmart</span>
+          <span className="font-headline text-xl font-bold">Stockify</span>
         </Link>
         <div className="hidden items-center gap-4 md:flex">
           <Button variant="ghost" asChild>
@@ -42,7 +42,7 @@ const Navbar = () => {
                 <div className="flex items-center justify-between border-b pb-4">
                   <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
                     <Package className="h-6 w-6 text-primary" />
-                    <span className="font-headline text-xl font-bold">StockSmart</span>
+                    <span className="font-headline text-xl font-bold">Stockify</span>
                   </Link>
                    <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
                       <X className="h-6 w-6" />

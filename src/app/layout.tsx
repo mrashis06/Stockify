@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'StockSmart - Liquor Store Inventory Management',
+  title: 'Stockify - Liquor Store Inventory Management',
   description: 'Smart Inventory Management for Your Liquor Store',
 };
 

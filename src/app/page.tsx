@@ -53,7 +53,7 @@ export default function Home() {
               Ready to Take Control of Your Inventory?
             </h2>
             <p className="mt-4 max-w-2xl text-lg">
-              Join dozens of liquor stores streamlining their operations with StockSmart.
+              Join dozens of liquor stores streamlining their operations with Stockify.
             </p>
             <Button asChild size="lg" variant="secondary" className="mt-8 transition-transform hover:scale-105">
               <Link href="/login">Get Started Now</Link>
