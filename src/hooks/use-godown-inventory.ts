@@ -113,8 +113,12 @@ export function useGodownInventory() {
             const shopItemRef = doc(db, 'inventory', itemId);
             const dailyInventoryRef = doc(db, 'dailyInventory', today);
 
-            // 1. Get godown item and check stock
+            // --- READS FIRST ---
             const godownItemDoc = await transaction.get(godownItemRef);
+            const shopItemDoc = await transaction.get(shopItemRef);
+            const dailyDoc = await transaction.get(dailyInventoryRef);
+
+            // --- VALIDATION & PREPARATION ---
             if (!godownItemDoc.exists()) {
                 throw new Error("Item not found in godown.");
             }
@@ -123,10 +127,10 @@ export function useGodownInventory() {
                 throw new Error(`Not enough stock in godown. Available: ${godownItem.quantity}`);
             }
 
-            // 2. Ensure item exists in the main shop inventory
-            const shopItemDoc = await transaction.get(shopItemRef);
+            // --- WRITES LAST ---
+
+            // 1. Ensure item exists in the main shop inventory
             if (!shopItemDoc.exists()) {
-                // If it doesn't exist in the shop inventory, create it.
                 const newItemForShop = {
                     brand: godownItem.brand,
                     size: godownItem.size,
@@ -139,12 +143,11 @@ export function useGodownInventory() {
                 transaction.set(shopItemRef, newItemForShop);
             }
 
-            // 3. Update godown stock
+            // 2. Update godown stock
             const newGodownQuantity = godownItem.quantity - quantity;
             transaction.update(godownItemRef, { quantity: newGodownQuantity });
 
-            // 4. Update today's daily inventory record
-            const dailyDoc = await transaction.get(dailyInventoryRef);
+            // 3. Update today's daily inventory record
             let dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             
             const currentDailyItem = dailyData[itemId] || {
@@ -165,7 +168,7 @@ export function useGodownInventory() {
 
             dailyData[itemId] = currentDailyItem;
 
-            transaction.set(dailyInventoryRef, dailyData);
+            transaction.set(dailyInventoryRef, dailyData, { merge: true });
         });
 
     } catch (error) {
