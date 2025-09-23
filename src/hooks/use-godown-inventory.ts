@@ -66,7 +66,7 @@ export function useGodownInventory() {
             });
         } else {
             // Otherwise, create a new item
-            await setDoc(docRef, newItemData);
+            await setDoc(docRef, { ...newItemData, id });
         }
 
     } catch (error) {
@@ -110,12 +110,12 @@ export function useGodownInventory() {
     
     try {
         await runTransaction(db, async (transaction) => {
+            // --- READS FIRST ---
             const godownItemRef = doc(db, 'godownInventory', itemId);
             const shopItemRef = doc(db, 'inventory', itemId);
             const dailyInventoryRef = doc(db, 'dailyInventory', today);
             const yesterdayInventoryRef = doc(db, 'dailyInventory', yesterday);
 
-            // --- READS FIRST ---
             const godownItemDoc = await transaction.get(godownItemRef);
             const shopItemDoc = await transaction.get(shopItemRef);
             const dailyDoc = await transaction.get(dailyInventoryRef);
@@ -130,7 +130,6 @@ export function useGodownInventory() {
                 throw new Error(`Not enough stock in godown. Available: ${godownItem.quantity}`);
             }
 
-            const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             
             // --- WRITES LAST ---
@@ -156,8 +155,10 @@ export function useGodownInventory() {
             // 3. Update today's daily inventory record
             const shopData = shopItemDoc.exists() ? shopItemDoc.data() : { price: 0 };
             
-            const prevStockFromYesterday = yesterdayData[itemId]?.closing ?? shopData.prevStock ?? 0;
-
+            // Correctly determine previous stock from yesterday's daily record, or the master record.
+            const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
+            const prevStockFromYesterday = yesterdayData[itemId]?.closing ?? shopData?.prevStock ?? 0;
+            
             const currentDailyItem = dailyData[itemId] || {
                  brand: godownItem.brand,
                  size: godownItem.size,
@@ -169,15 +170,13 @@ export function useGodownInventory() {
             };
             
             currentDailyItem.added = (currentDailyItem.added || 0) + quantity;
-            currentDailyItem.prevStock = prevStockFromYesterday;
+            currentDailyItem.prevStock = prevStockFromYesterday; // Ensure this is always set
 
             // Recalculate opening and closing stock
-            currentDailyItem.opening = (currentDailyItem.prevStock || 0) + currentDailyItem.added;
+            currentDailyItem.opening = currentDailyItem.prevStock + currentDailyItem.added;
             currentDailyItem.closing = currentDailyItem.opening - (currentDailyItem.sales || 0);
             
-            dailyData[itemId] = currentDailyItem;
-
-            transaction.set(dailyInventoryRef, dailyData, { merge: true });
+            transaction.set(dailyInventoryRef, { [itemId]: currentDailyItem }, { merge: true });
         });
 
     } catch (error) {
