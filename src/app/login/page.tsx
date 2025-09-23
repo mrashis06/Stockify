@@ -1,9 +1,11 @@
+
 "use client";
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import React from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -64,7 +66,23 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if user exists in Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (!userDoc.exists()) {
+        // Create user in Firestore
+        await setDoc(userDocRef, {
+          name: user.displayName,
+          email: user.email,
+          role: 'staff',
+          createdAt: serverTimestamp(),
+        });
+      }
+
       router.push('/dashboard');
     } catch (error) {
       console.error("Error signing in with Google: ", error);

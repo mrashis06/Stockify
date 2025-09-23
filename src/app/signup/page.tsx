@@ -1,9 +1,11 @@
+
 "use client";
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import React from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -21,12 +23,21 @@ import { useToast } from '@/hooks/use-toast';
 export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name) {
+      toast({
+        title: "Name is required",
+        description: "Please enter your name.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (password !== confirmPassword) {
       toast({
         title: "Password Mismatch",
@@ -36,7 +47,17 @@ export default function SignupPage() {
       return;
     }
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Create user document in Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        name: name,
+        email: email,
+        role: 'staff',
+        createdAt: serverTimestamp(),
+      });
+
       router.push('/dashboard');
     } catch (error) {
       console.error("Error signing up with email and password: ", error);
@@ -59,6 +80,10 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleEmailSignUp} className="grid gap-4">
+            <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" type="text" placeholder="John Doe" required className="bg-input" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email address</Label>
               <Input
