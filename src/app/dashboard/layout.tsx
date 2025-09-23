@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Settings, Warehouse } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Settings, Warehouse, Home } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <span className="font-bold text-xl">Stockify</span>
           </Link>
           <div className="hidden md:flex items-center gap-4">
+             <NavLink href="/">
+                <Home className="h-4 w-4" />
+                Home
+            </NavLink>
              <NavLink href="/dashboard">
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
