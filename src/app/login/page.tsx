@@ -94,7 +94,8 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           createdAt: serverTimestamp(),
         });
       }
-      // The useAuth hook will handle the redirect.
+      // The useAuth hook will now reliably handle the redirect to /dashboard
+      // after the auth state has changed.
     } catch (error: any) {
       // Don't show an error toast if the user closes the popup
       if (error.code === 'auth/popup-closed-by-user') {
