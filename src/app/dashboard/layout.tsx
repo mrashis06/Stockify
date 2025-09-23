@@ -40,7 +40,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    return null; // The useAuth hook will handle the redirect
+    if (typeof window !== 'undefined') {
+        router.push('/login');
+    }
+    return null;
   }
   
   return (
@@ -70,10 +73,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
              <NavLink href="/dashboard/reports">
                 <FileText className="h-4 w-4" />
                 Reports
-            </NavLink>
-             <NavLink href="/dashboard/settings">
-                <Settings className="h-4 w-4" />
-                Settings
             </NavLink>
           </div>
         </nav>
