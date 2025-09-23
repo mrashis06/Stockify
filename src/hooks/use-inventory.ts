@@ -99,8 +99,14 @@ export function useInventory() {
              const closing = opening - (item.sales ?? 0);
              return { ...item, opening, closing };
         });
+        
+        // Filter out items that have 0 closing stock, 0 prev stock and 0 added stock
+        const finalInventory = processedInventory.filter(item => {
+            return (item.closing ?? 0) > 0 || (item.prevStock ?? 0) > 0 || (item.added ?? 0) > 0 || (item.sales ?? 0) > 0;
+        });
 
-        setInventory(processedInventory.sort((a, b) => a.brand.localeCompare(b.brand)));
+
+        setInventory(finalInventory.sort((a, b) => a.brand.localeCompare(b.brand)));
       } catch (error) {
         console.error("Error fetching inventory data: ", error);
         toast({ title: 'Error', description: 'Failed to load inventory data.', variant: 'destructive' });
@@ -364,3 +370,5 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, openBottleForOnBar };
 }
+
+    
