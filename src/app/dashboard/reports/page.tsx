@@ -213,16 +213,16 @@ export default function ReportsPage() {
                     >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {date?.from ? (
-                        date.to ? (
-                            <>
-                            {format(date.from, "LLL dd, y")} -{" "}
-                            {format(date.to, "LLL dd, y")}
-                            </>
+                            date.to && !isSameDay(date.from, date.to) ? (
+                                <>
+                                {format(date.from, "LLL dd, y")} -{" "}
+                                {format(date.to, "LLL dd, y")}
+                                </>
+                            ) : (
+                                format(date.from, "LLL dd, y")
+                            )
                         ) : (
-                            format(date.from, "LLL dd, y")
-                        )
-                        ) : (
-                        <span>Pick a date</span>
+                            <span>Pick a date</span>
                         )}
                     </Button>
                     </PopoverTrigger>
