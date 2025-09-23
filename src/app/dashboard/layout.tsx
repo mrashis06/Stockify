@@ -3,7 +3,7 @@
 
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Settings, Warehouse, Home, LogOut } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -33,16 +33,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
-        <div>Loading...</div>
-      </div>
+        <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
+            <div>Loading...</div>
+        </div>
     );
   }
 
   if (!user) {
-    if (typeof window !== 'undefined' && !['/login', '/signup', '/'].includes(window.location.pathname)) {
-        router.push('/login');
-    }
+    // This check is primarily for client-side routing.
+    // The useAuth hook handles the initial redirect.
     return (
          <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
             <div>Loading...</div>
@@ -61,7 +60,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <Package className="h-6 w-6 text-primary" />
             <span className="font-bold text-xl">Stockify</span>
           </Link>
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-4">
+             <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                <ArrowLeft className="h-4 w-4" />
+             </Button>
              <NavLink href="/">
                 <Home className="h-4 w-4" />
                 Home
