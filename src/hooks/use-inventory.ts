@@ -14,6 +14,10 @@ import {
   onSnapshot,
   runTransaction,
   serverTimestamp,
+  addDoc,
+  query,
+  where,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
@@ -199,7 +203,7 @@ export function useInventory() {
      }
   };
   
-  const updateItemField = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => {
+ const updateItemField = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => {
       setSaving(true);
       const originalItemState = inventory.find(item => item.id === id);
 
@@ -230,6 +234,62 @@ export function useInventory() {
                 };
             }
 
+            const currentAdded = dailyData[id].added || 0;
+            const newAdded = field === 'added' ? (value as number) : currentAdded;
+            const diff = newAdded - currentAdded;
+
+            if (field === 'added' && diff !== 0) {
+                if (diff > 0) { // Transfer from godown
+                    const godownItemsQuery = query(
+                        collection(db, 'godownInventory'),
+                        where('productId', '==', id)
+                    );
+                    const godownItemsSnapshot = await getDocs(godownItemsQuery);
+                    const godownBatches = godownItemsSnapshot.docs
+                      .map(d => ({ id: d.id, ...d.data() }))
+                      .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());
+
+                    const totalGodownStock = godownBatches.reduce((sum, batch) => sum + batch.quantity, 0);
+
+                    if (totalGodownStock < diff) {
+                        throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
+                    }
+                    
+                    let remainingToTransfer = diff;
+                    for (const batch of godownBatches) {
+                        if (remainingToTransfer <= 0) break;
+
+                        const batchRef = doc(db, 'godownInventory', batch.id);
+                        const transferAmount = Math.min(batch.quantity, remainingToTransfer);
+                        
+                        if (batch.quantity - transferAmount <= 0) {
+                            transaction.delete(batchRef);
+                        } else {
+                            transaction.update(batchRef, { 
+                                quantity: batch.quantity - transferAmount,
+                                dateTransferred: serverTimestamp() 
+                            });
+                        }
+                        remainingToTransfer -= transferAmount;
+                    }
+                } else { // Return to godown
+                    const masterRef = doc(db, 'inventory', id);
+                    const masterSnap = await transaction.get(masterRef);
+                    if (!masterSnap.exists()) throw new Error("Cannot return to godown: master item not found.");
+                    const masterData = masterSnap.data();
+                    
+                    const newGodownBatchRef = doc(collection(db, 'godownInventory'));
+                    transaction.set(newGodownBatchRef, {
+                        brand: masterData.brand,
+                        size: masterData.size,
+                        category: masterData.category,
+                        productId: id,
+                        quantity: -diff, // diff is negative, so -diff is positive
+                        dateAdded: serverTimestamp(),
+                    });
+                }
+            }
+            
             dailyData[id][field] = value;
 
              if (field === 'price') {
@@ -251,7 +311,7 @@ export function useInventory() {
           setInventory(prev => prev.map(item => item.id === id ? originalItemState : item));
         }
         // Rethrow with a user-friendly message
-        throw new Error(`Failed to update ${field}. Please try again.`);
+        throw new Error((error as Error).message || `Failed to update ${field}. Please try again.`);
       } finally {
         setSaving(false);
       }
@@ -260,3 +320,5 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField };
 }
+
+    
