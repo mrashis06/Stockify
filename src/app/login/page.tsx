@@ -95,13 +95,18 @@ export default function LoginPage() {
         });
       }
       // The useAuth hook will handle the redirect.
-    } catch (error) {
-      console.error("Error with Google sign-in: ", error);
-      toast({
-        title: "Authentication Error",
-        description: "Failed to sign in with Google. Please try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      // Don't show an error toast if the user closes the popup
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.log("Google sign-in popup closed by user.");
+      } else {
+        console.error("Error with Google sign-in: ", error);
+        toast({
+          title: "Authentication Error",
+          description: "Failed to sign in with Google. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setGoogleLoading(false);
     }
