@@ -23,34 +23,6 @@ export default function RootLayout({
   const isAuthPage = ['/login', '/signup'].includes(pathname);
   const isProtectedPage = !isAuthPage && pathname !== '/';
 
-  if (loading && isProtectedPage) {
-    return (
-        <html lang="en" suppressHydrationWarning>
-            <head>
-                <meta charSet="utf-8" />
-                <title>{metadata.title}</title>
-                <meta name="description" content={metadata.description} />
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-            </head>
-            <body className="font-body antialiased">
-                 <ThemeProvider
-                    attribute="class"
-                    defaultTheme="dark"
-                    enableSystem
-                    disableTransitionOnChange
-                >
-                    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
-                        <div>Loading...</div>
-                    </div>
-                    <Toaster />
-                </ThemeProvider>
-            </body>
-        </html>
-    );
-  }
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -68,7 +40,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          {loading && isProtectedPage ? (
+            <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
+                <div>Loading...</div>
+            </div>
+          ) : (
+            children
+          )}
           <Toaster />
         </ThemeProvider>
       </body>
