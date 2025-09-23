@@ -5,6 +5,42 @@
       "description": "A collection of liquor bottles on a shelf in a bar",
       "imageUrl": "https://images.unsplash.com/photo-1560074152-1f41e1015a1f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxsaXF1b3IlMjBib3R0bGVzfGVufDB8fHx8MTc1ODYxODEwNHww&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "liquor bottles"
+    },
+    {
+      "id": "whiskey-bottle",
+      "description": "A bottle of whiskey on a plain background",
+      "imageUrl": "https://images.unsplash.com/photo-1681040900989-645cecfd8ea4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3aGlza2V5JTIwYm90dGxlfGVufDB8fHx8MTc1ODYxODE1Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "whiskey bottle"
+    },
+    {
+      "id": "rum-bottle",
+      "description": "A bottle of rum on a plain background",
+      "imageUrl": "https://images.unsplash.com/photo-1584474891920-82ecfc9f8868?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxydW0lMjBib3R0bGV8ZW58MHx8fHwxNzU4NjE4MTUyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "rum bottle"
+    },
+    {
+      "id": "vodka-bottle",
+      "description": "A bottle of vodka on a plain background",
+      "imageUrl": "https://images.unsplash.com/photo-1676105797668-458c2c007d05?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHx2b2RrYSUyMGJvdHRsZXxlbnwwfHx8fDE3NTg2MTgxNTJ8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "vodka bottle"
+    },
+    {
+      "id": "beer-bottle",
+      "description": "A bottle of beer on a plain background",
+      "imageUrl": "https://images.unsplash.com/photo-1585620384249-5cf9442c87f3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxiZWVyJTIwYm90dGxlfGVufDB8fHx8MTc1ODYxOTU4OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beer bottle"
+    },
+    {
+      "id": "wine-bottle",
+      "description": "A bottle of wine on a plain background",
+      "imageUrl": "https://images.unsplash.com/photo-1619810490925-e27ba7623459?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHx3aW5lJTIwYm90dGxlfGVufDB8fHx8MTc1ODYxMzE2NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "wine bottle"
+    },
+    {
+      "id": "iml-bottle",
+      "description": "A bottle of Indian-made foreign liquor on a plain background",
+      "imageUrl": "https://images.unsplash.com/photo-1608797084417-d4effbd5fe60?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxsaXF1b3IlMjBib3R0bGV8ZW58MHx8fHwxNzU4NjE5NTg5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "liquor bottle"
     }
   ]
 }
