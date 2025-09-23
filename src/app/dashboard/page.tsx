@@ -4,7 +4,7 @@
 import { IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { format } from 'date-fns';
@@ -41,15 +41,7 @@ export default function DashboardPage() {
       if (snapshot.exists()) {
         const dailyData = snapshot.data();
         const items: InventoryItem[] = Object.entries(dailyData).map(([id, data]) => {
-          const itemData = data as Omit<InventoryItem, 'id'>;
-          const opening = (itemData.prevStock || 0) + (itemData.added || 0);
-          const closing = opening - (itemData.sales || 0);
-          return {
-            id,
-            ...itemData,
-            opening,
-            closing,
-          };
+          return { id, ...(data as Omit<InventoryItem, 'id'>) };
         });
         setInventory(items);
       } else {
@@ -62,10 +54,21 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
+  const processedInventory = useMemo(() => {
+    return inventory.map(item => {
+      const opening = (item.prevStock ?? 0) + (item.added ?? 0);
+      const closing = opening - (item.sales ?? 0);
+      return {
+        ...item,
+        opening,
+        closing,
+      };
+    });
+  }, [inventory]);
 
-  const totalStock = inventory.reduce((acc, item) => acc + (item.closing ?? 0), 0);
-  const todaysSales = inventory.reduce((acc, item) => acc + (item.sales ?? 0) * item.price, 0);
-  const lowStockItems = inventory.filter(item => (item.closing ?? 0) < 10);
+  const totalStock = processedInventory.reduce((acc, item) => acc + (item.closing ?? 0), 0);
+  const todaysSales = processedInventory.reduce((acc, item) => acc + (item.sales ?? 0) * item.price, 0);
+  const lowStockItems = processedInventory.filter(item => (item.closing ?? 0) < 10);
 
   if (loading) {
       return (
