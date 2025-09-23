@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 import { format, eachDayOfInterval, isSameDay } from 'date-fns';
-import { Calendar as CalendarIcon, Download, Filter, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -107,7 +107,7 @@ export default function ReportsPage() {
         return sortedSales.length > 0 ? sortedSales : [{ category: 'No Sales', sales: 0 }];
     }, [reportData]);
 
-    const handleExport = () => {
+    const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
         const tableColumn = ["Category", "Sales (₹)"];
         const tableRows: (string | number)[][] = [];
@@ -154,6 +154,30 @@ export default function ReportsPage() {
         doc.save(`sales_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
 
+    const handleExportCSV = () => {
+        const header = ["Category", "Sales (INR)"];
+        let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
+        
+        let totalSales = 0;
+        salesData.forEach(item => {
+            if (item.category === 'No Sales') return;
+            const row = [item.category, item.sales].join(",");
+            csvContent += row + "\n";
+            totalSales += item.sales;
+        });
+
+        csvContent += "\n";
+        csvContent += `Total Sales,${totalSales}\n`;
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `sales_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -161,10 +185,16 @@ export default function ReportsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Sales Summary</h1>
           <p className="text-muted-foreground">Historical sales overview</p>
         </div>
-        <Button onClick={handleExport} disabled={loading || salesData[0]?.category === 'No Sales'} className="bg-green-600 hover:bg-green-700 text-white">
-          <Download className="mr-2 h-4 w-4" />
-          Export to PDF
-        </Button>
+        <div className="flex gap-2">
+            <Button onClick={handleExportPDF} disabled={loading || salesData[0]?.category === 'No Sales'} className="bg-green-600 hover:bg-green-700 text-white">
+                <Download className="mr-2 h-4 w-4" />
+                Export to PDF
+            </Button>
+             <Button onClick={handleExportCSV} disabled={loading || salesData[0]?.category === 'No Sales'} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Export to CSV
+            </Button>
+        </div>
       </header>
       
       <Card>
