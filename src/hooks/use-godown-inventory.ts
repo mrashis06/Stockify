@@ -15,7 +15,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 
 export type GodownItem = {
   id: string;
@@ -106,17 +106,20 @@ export function useGodownInventory() {
   const transferToShop = async (itemId: string, quantity: number) => {
     setSaving(true);
     const today = format(new Date(), 'yyyy-MM-dd');
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     
     try {
         await runTransaction(db, async (transaction) => {
             const godownItemRef = doc(db, 'godownInventory', itemId);
             const shopItemRef = doc(db, 'inventory', itemId);
             const dailyInventoryRef = doc(db, 'dailyInventory', today);
+            const yesterdayInventoryRef = doc(db, 'dailyInventory', yesterday);
 
             // --- READS FIRST ---
             const godownItemDoc = await transaction.get(godownItemRef);
             const shopItemDoc = await transaction.get(shopItemRef);
             const dailyDoc = await transaction.get(dailyInventoryRef);
+            const yesterdayDoc = await transaction.get(yesterdayInventoryRef);
 
             // --- VALIDATION & PREPARATION ---
             if (!godownItemDoc.exists()) {
@@ -127,6 +130,9 @@ export function useGodownInventory() {
                 throw new Error(`Not enough stock in godown. Available: ${godownItem.quantity}`);
             }
 
+            const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
+            const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+            
             // --- WRITES LAST ---
 
             // 1. Ensure item exists in the main shop inventory
@@ -142,30 +148,33 @@ export function useGodownInventory() {
                 };
                 transaction.set(shopItemRef, newItemForShop);
             }
-
+            
             // 2. Update godown stock
             const newGodownQuantity = godownItem.quantity - quantity;
             transaction.update(godownItemRef, { quantity: newGodownQuantity });
 
             // 3. Update today's daily inventory record
-            let dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+            const shopData = shopItemDoc.exists() ? shopItemDoc.data() : { price: 0 };
             
+            const prevStockFromYesterday = yesterdayData[itemId]?.closing ?? shopData.prevStock ?? 0;
+
             const currentDailyItem = dailyData[itemId] || {
                  brand: godownItem.brand,
                  size: godownItem.size,
                  category: godownItem.category,
-                 price: shopItemDoc.exists() ? shopItemDoc.data().price : 0,
-                 prevStock: 0,
+                 price: shopData.price,
+                 prevStock: prevStockFromYesterday,
                  added: 0,
                  sales: 0
             };
             
             currentDailyItem.added = (currentDailyItem.added || 0) + quantity;
+            currentDailyItem.prevStock = prevStockFromYesterday;
 
             // Recalculate opening and closing stock
             currentDailyItem.opening = (currentDailyItem.prevStock || 0) + currentDailyItem.added;
             currentDailyItem.closing = currentDailyItem.opening - (currentDailyItem.sales || 0);
-
+            
             dailyData[itemId] = currentDailyItem;
 
             transaction.set(dailyInventoryRef, dailyData, { merge: true });

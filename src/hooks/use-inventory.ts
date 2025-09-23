@@ -87,11 +87,23 @@ export function useInventory() {
   }, [today, yesterday]);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "inventory"), (snapshot) => {
+    // We listen to changes in daily inventory to reflect transfers from godown immediately
+    const dailyDocRef = doc(db, 'dailyInventory', today);
+    const unsubscribe = onSnapshot(dailyDocRef, (doc) => {
         fetchInventoryData();
     });
-    return () => unsubscribe();
-  }, [fetchInventoryData]);
+    
+    // Also listen to master inventory for new brands being added
+    const inventoryCollectionRef = collection(db, "inventory");
+    const unsubscribeInventory = onSnapshot(inventoryCollectionRef, (snapshot) => {
+        fetchInventoryData();
+    });
+    
+    return () => {
+        unsubscribe();
+        unsubscribeInventory();
+    };
+  }, [fetchInventoryData, today]);
 
 
   const addBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing'>) => {
@@ -177,17 +189,18 @@ export function useInventory() {
             const dailyDocRef = doc(db, 'dailyInventory', today);
             const dailyDocSnap = await transaction.get(dailyDocRef);
             const persistedDailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
-            const godownUpdateMap: Map<string, number> = new Map();
+            const godownRefs: { ref: any, difference: number, id: string }[] = [];
 
-            // Prepare daily data and calculate godown updates
+            // --- Pass 1: Prepare daily data and identify necessary godown reads ---
             const newDailyData: { [key: string]: any } = {};
             for (const item of inventory) {
+                const localAdded = item.added ?? 0;
                 const persistedAdded = persistedDailyData[item.id]?.added ?? 0;
-                const newAdded = item.added ?? 0;
-                const addedDifference = newAdded - persistedAdded;
+                const addedDifference = localAdded - persistedAdded;
 
                 if (addedDifference !== 0) {
-                    godownUpdateMap.set(item.id, addedDifference);
+                    const godownItemRef = doc(db, 'godownInventory', item.id);
+                    godownRefs.push({ ref: godownItemRef, difference: addedDifference, id: item.id });
                 }
 
                 const opening = (item.prevStock ?? 0) + (item.added ?? 0);
@@ -205,39 +218,44 @@ export function useInventory() {
                     closing,
                 };
             }
+            
+            // --- Pass 2: Read from godown within the transaction ---
+            const godownDocs = godownRefs.length > 0 
+                ? await Promise.all(godownRefs.map(gRef => transaction.get(gRef.ref)))
+                : [];
 
-            // Read godown items that need updating
-            for (const [id, difference] of godownUpdateMap.entries()) {
-                const godownItemRef = doc(db, 'godownInventory', id);
-                const godownItemDoc = await transaction.get(godownItemRef);
+            // --- Pass 3: Perform all writes ---
+            // 1. Update godown inventory
+            for (let i = 0; i < godownRefs.length; i++) {
+                const godownDoc = godownDocs[i];
+                const { ref, difference, id } = godownRefs[i];
+                
+                const currentQuantity = godownDoc.exists() ? godownDoc.data().quantity : 0;
+                const newGodownQuantity = currentQuantity - difference;
+                
+                // For items added to shop from godown, check if godown exists first
+                 if (difference > 0 && !godownDoc.exists()) {
+                     throw new Error(`Item ${id} does not exist in godown to be transferred from.`);
+                 }
 
-                if (!godownItemDoc.exists() && difference > 0) {
-                    throw new Error(`Item ${id} not found in godown, but trying to decrease stock.`);
+                if (newGodownQuantity < 0) {
+                    throw new Error(`Not enough stock in godown for ${id}. Available: ${currentQuantity}, Tried to use: ${difference}.`);
                 }
                 
-                const currentQuantity = godownItemDoc.exists() ? godownItemDoc.data().quantity : 0;
-                const newQuantity = currentQuantity - difference;
-
-                if (newQuantity < 0) {
-                    throw new Error(`Not enough stock in godown for ${id}. Available: ${currentQuantity}, Tried to transfer: ${difference}.`);
-                }
-                // The actual update is done in the next loop to keep reads and writes separate
-            }
-
-            // Perform all writes
-            // 1. Update godown inventory
-            for (const [id, difference] of godownUpdateMap.entries()) {
-                const godownItemRef = doc(db, 'godownInventory', id);
-                 const godownItemDoc = await transaction.get(godownItemRef); // re-get for safety, though not strictly needed here.
-                 const currentQuantity = godownItemDoc.exists() ? godownItemDoc.data().quantity : 0;
-                 const newQuantity = currentQuantity - difference;
-                 
-                if (godownItemDoc.exists()) {
-                    transaction.update(godownItemRef, { quantity: newQuantity });
+                 if (godownDoc.exists()) {
+                    transaction.update(ref, { quantity: newGodownQuantity });
                 } else {
-                    // This case should ideally not be hit if we only allow adding from godown transfer
-                    // But as a fallback, we can create it. Let's assume brand/size/cat would need to be known.
-                    // For now, we'll rely on the error thrown above.
+                    // This case should ideally not be hit if we are returning stock,
+                    // but as a failsafe we create it.
+                    const inventoryItem = inventory.find(inv => inv.id === id);
+                    if (inventoryItem) {
+                         transaction.set(ref, { 
+                            brand: inventoryItem.brand,
+                            size: inventoryItem.size,
+                            category: inventoryItem.category,
+                            quantity: newGodownQuantity 
+                        });
+                    }
                 }
             }
             
