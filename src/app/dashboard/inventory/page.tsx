@@ -190,7 +190,7 @@ export default function InventoryPage() {
     }, [inventory]);
 
     const totalAmount = useMemo(() => {
-        return filteredInventory.reduce((total, item) => total + (item.closing ?? 0) * item.price, 0);
+        return filteredInventory.reduce((total, item) => total + (item.sales ?? 0) * item.price, 0);
     }, [filteredInventory]);
 
 
@@ -324,13 +324,13 @@ export default function InventoryPage() {
                             {showOpening && <TableHead className="font-bold text-foreground">Opening</TableHead>}
                             <TableHead className="font-bold text-foreground">Sales</TableHead>
                             {showClosing && <TableHead className="font-bold text-foreground">Closing</TableHead>}
-                            {showClosing && <TableHead className="font-bold text-foreground">Amount</TableHead>}
+                            <TableHead className="font-bold text-foreground">Amount</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
                         {filteredInventory.map(item => {
                             const isLowStock = (item.closing ?? 0) < 10;
-                            const amount = (item.closing ?? 0) * item.price;
+                            const amount = (item.sales ?? 0) * item.price;
 
                             return (
                                 <TableRow 
@@ -388,29 +388,25 @@ export default function InventoryPage() {
                                         />
                                     </TableCell>
                                     {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{item.closing}</TableCell>}
-                                    {showClosing && (
-                                        <TableCell>
-                                            <div className="flex items-center">
-                                                <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                                {amount.toLocaleString('en-IN')}
-                                            </div>
-                                        </TableCell>
-                                    )}
+                                    <TableCell>
+                                        <div className="flex items-center">
+                                            <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                            {amount.toLocaleString('en-IN')}
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             )
                         })}
                         </TableBody>
                          <TableFooter>
                             <TableRow>
-                                <TableCell colSpan={showClosing ? 9 : 8} className="text-right font-bold text-lg">Total Amount</TableCell>
-                                {showClosing && (
+                                <TableCell colSpan={9} className="text-right font-bold text-lg">Total Sales Amount</TableCell>
                                 <TableCell colSpan={2} className="font-bold text-lg">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-5 w-5 mr-1 shrink-0" />
                                         {totalAmount.toLocaleString('en-IN')}
                                     </div>
                                 </TableCell>
-                                )}
                             </TableRow>
                         </TableFooter>
                     </Table>
@@ -422,3 +418,6 @@ export default function InventoryPage() {
   );
 }
 
+
+
+    
