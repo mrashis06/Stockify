@@ -134,7 +134,7 @@ export default function InventoryPage() {
     }, [inventory, searchQuery, categoryFilter]);
 
     const allCategories = useMemo(() => {
-        const cats = new Set(inventory.map(i => i.category));
+        const cats = new Set(inventory.map(i => i.category).filter(Boolean));
         return ['All Categories', ...Array.from(cats).sort()];
     }, [inventory]);
 
