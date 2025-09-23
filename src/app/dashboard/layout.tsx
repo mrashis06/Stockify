@@ -39,7 +39,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <BarChartHorizontal className="h-4 w-4" />
                 Sales
             </NavLink>
-             <NavLink href="#">
+             <NavLink href="/dashboard/reports">
                 <FileText className="h-4 w-4" />
                 Reports
             </NavLink>
