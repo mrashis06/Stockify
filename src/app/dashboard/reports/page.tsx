@@ -1,10 +1,15 @@
+
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 import { format, addDays } from 'date-fns';
-import { Calendar as CalendarIcon, Download, Filter } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Filter, Loader2 } from 'lucide-react';
 import { DateRange } from "react-day-picker";
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,16 +20,7 @@ import {
   ChartContainer,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-
-
-const salesData = [
-  { category: 'Whiskey', sales: 0 },
-  { category: 'Rum', sales: 0 },
-  { category: 'Vodka', sales: 0 },
-  { category: 'Gin', sales: 0 },
-  { category: 'Tequila', sales: 0 },
-  { category: 'Beer', sales: 0 },
-];
+import type { InventoryItem } from '@/hooks/use-inventory';
 
 const chartConfig = {
   sales: {
@@ -33,22 +29,98 @@ const chartConfig = {
   },
 };
 
+// Extend jsPDF with autoTable
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
+
 export default function ReportsPage() {
-    const [date, setDate] = React.useState<DateRange | undefined>({
+    const [date, setDate] = useState<DateRange | undefined>({
         from: new Date(),
-        to: addDays(new Date(), 7),
+        to: new Date(),
     });
+    const [inventory, setInventory] = useState<InventoryItem[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        setLoading(true);
+        const unsubscribe = onSnapshot(collection(db, "inventory"), (snapshot) => {
+            const items: InventoryItem[] = [];
+            snapshot.forEach((doc) => {
+                items.push({ id: doc.id, ...doc.data() } as InventoryItem);
+            });
+            setInventory(items);
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const salesData = React.useMemo(() => {
+        const categorySales = new Map<string, number>();
+        inventory.forEach(item => {
+            const saleAmount = (item.sales || 0) * item.price;
+            if (saleAmount > 0) {
+                categorySales.set(item.category, (categorySales.get(item.category) || 0) + saleAmount);
+            }
+        });
+
+        const sortedSales = Array.from(categorySales.entries())
+            .map(([category, sales]) => ({ category, sales }))
+            .sort((a, b) => b.sales - a.sales);
+        
+        return sortedSales.length > 0 ? sortedSales : [{ category: 'No Sales', sales: 0 }];
+    }, [inventory]);
+
+    const handleExport = () => {
+        const doc = new jsPDF() as jsPDFWithAutoTable;
+        const tableColumn = ["Category", "Sales (₹)"];
+        const tableRows: (string | number)[][] = [];
+
+        let totalSales = 0;
+        salesData.forEach(item => {
+            const rowData = [
+                item.category,
+                item.sales.toLocaleString('en-IN')
+            ];
+            tableRows.push(rowData);
+            totalSales += item.sales;
+        });
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 20,
+            didDrawPage: (data) => {
+                // Header
+                doc.setFontSize(20);
+                doc.setTextColor(40);
+                doc.text("Today's Sales Report", data.settings.margin.left, 15);
+            },
+        });
+
+        // Add total
+        const finalY = doc.autoTable.previous.finalY;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(
+            `Total Sales: ₹${totalSales.toLocaleString('en-IN')}`,
+            doc.internal.pageSize.getWidth() - doc.getTextWidth(`Total Sales: ₹${totalSales.toLocaleString('en-IN')}`) - 14,
+            finalY + 10
+        );
+
+        doc.save(`sales_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    };
 
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sales Summary</h1>
-          <p className="text-muted-foreground">Daily and monthly sales overview</p>
+          <p className="text-muted-foreground">Today's sales overview</p>
         </div>
-        <Button className="bg-green-600 hover:bg-green-700 text-white">
+        <Button onClick={handleExport} disabled={loading || salesData[0]?.category === 'No Sales'} className="bg-green-600 hover:bg-green-700 text-white">
           <Download className="mr-2 h-4 w-4" />
-          Export to PDF/Excel
+          Export to PDF
         </Button>
       </header>
       
@@ -100,6 +172,12 @@ export default function ReportsPage() {
             </div>
         </CardHeader>
         <CardContent>
+             {loading ? (
+                <div className="flex justify-center items-center h-[400px]">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-4 text-muted-foreground">Loading Report Data...</span>
+                </div>
+            ) : (
             <Card>
                 <CardHeader>
                     <CardTitle>Sales by Category</CardTitle>
@@ -119,6 +197,7 @@ export default function ReportsPage() {
                                 tickLine={false}
                                 axisLine={false}
                                 stroke="hsl(var(--muted-foreground))"
+                                width={80}
                             />
                             <XAxis type="number" stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${Number(value) / 1000}k`} />
                             <Tooltip
@@ -133,8 +212,11 @@ export default function ReportsPage() {
                     </ChartContainer>
                 </CardContent>
             </Card>
+            )}
         </CardContent>
       </Card>
     </div>
   );
 }
+
+    
