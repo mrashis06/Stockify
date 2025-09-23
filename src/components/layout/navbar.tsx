@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -10,10 +11,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const menuItems = [
-    { name: "Features", href: "#features" },
-    { name: "Pricing", href: "#" },
-    { name: "Support", href: "#" },
+  const menuItems: { name: string, href: string }[] = [
   ];
 
   return (
@@ -23,17 +21,6 @@ const Navbar = () => {
           <Package className="h-6 w-6 text-primary" />
           <span className="font-headline text-xl font-bold">StockSmart</span>
         </Link>
-        <nav className="hidden items-center gap-6 md:flex">
-          {menuItems.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {item.name}
-            </Link>
-          ))}
-        </nav>
         <div className="hidden items-center gap-4 md:flex">
           <Button variant="ghost" asChild>
             <Link href="/login">Log In</Link>
@@ -62,18 +49,6 @@ const Navbar = () => {
                       <span className="sr-only">Close menu</span>
                    </Button>
                 </div>
-                <nav className="mt-8 flex flex-col gap-6">
-                  {menuItems.map((item) => (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className="text-lg font-medium text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      {item.name}
-                    </Link>
-                  ))}
-                </nav>
                 <div className="mt-auto flex flex-col gap-4 border-t pt-6">
                   <Button variant="ghost" asChild>
                     <Link href="/login" onClick={() => setIsOpen(false)}>Log In</Link>
