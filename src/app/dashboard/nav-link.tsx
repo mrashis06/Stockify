@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -18,7 +19,7 @@ export default function NavLink({ href, children }: NavLinkProps) {
             href={href}
             className={cn(
                 "flex items-center gap-2 text-sm font-medium transition-colors hover:text-primary",
-                isActive ? "text-primary" : "text-muted-foreground"
+                isActive ? "text-primary" : "text-foreground/80"
             )}
         >
             {children}
