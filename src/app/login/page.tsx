@@ -60,6 +60,7 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // The useAuth hook will handle the redirect.
     } catch (error) {
       console.error("Error signing in with email and password: ", error);
       toast({
@@ -89,6 +90,7 @@ export default function LoginPage() {
           createdAt: serverTimestamp(),
         });
       }
+      // The useAuth hook will handle the redirect.
     } catch (error) {
       const authError = error as AuthError;
       // Don't show an error toast if the user closes the popup
