@@ -66,7 +66,7 @@ export default function GodownPage() {
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const { toast } = useToast();
 
-    const handleAddItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded'>) => {
+    const handleAddItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'dateTransferred'>) => {
         try {
             await addGodownItem(newItemData);
             toast({ title: 'Success', description: 'New batch added to godown.' });
@@ -178,7 +178,8 @@ export default function GodownPage() {
                     // The dialog expects a GodownItem-like structure with quantity
                     // We'll pass the grouped item but the dialog only uses productId and totalQuantity
                     id: transferringItem.productId, 
-                    quantity: transferringItem.totalQuantity
+                    quantity: transferringItem.totalQuantity,
+                    dateAdded: new Date(), // Dummy value, not used in dialog
                 }}
                 onTransfer={handleTransferToShop}
             />
@@ -263,6 +264,7 @@ export default function GodownPage() {
                                                     <TableHeader>
                                                         <TableRow>
                                                             <TableHead className="text-foreground">Date Added</TableHead>
+                                                            <TableHead className="text-foreground">Last Transferred</TableHead>
                                                             <TableHead className="text-foreground w-40">Quantity</TableHead>
                                                             <TableHead className="text-foreground w-24 text-right">Actions</TableHead>
                                                         </TableRow>
@@ -271,6 +273,7 @@ export default function GodownPage() {
                                                         {item.batches.map(batch => (
                                                             <TableRow key={batch.id}>
                                                                 <TableCell>{batch.dateAdded ? format(batch.dateAdded.toDate(), 'PPP') : 'N/A'}</TableCell>
+                                                                <TableCell>{batch.dateTransferred ? format(batch.dateTransferred.toDate(), 'PPP') : 'N/A'}</TableCell>
                                                                 <TableCell>
                                                                     <Input
                                                                         type="number"

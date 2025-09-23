@@ -31,6 +31,7 @@ export type GodownItem = {
   category: string;
   quantity: number;
   dateAdded: Timestamp;
+  dateTransferred?: Timestamp;
 };
 
 // Generates a Firestore-safe ID from brand and size for grouping
@@ -60,7 +61,7 @@ export function useGodownInventory() {
   }, []);
 
 
-  const addGodownItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded'>) => {
+  const addGodownItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'dateTransferred'>) => {
     setSaving(true);
     try {
         const productId = generateProductId(newItemData.brand, newItemData.size);
@@ -115,12 +116,13 @@ export function useGodownInventory() {
         await runTransaction(db, async (transaction) => {
             const godownItemsQuery = query(
                 collection(db, 'godownInventory'),
-                where('productId', '==', productId),
-                orderBy('dateAdded', 'asc')
+                where('productId', '==', productId)
             );
             
             const godownItemsSnapshot = await getDocs(godownItemsQuery);
-            const godownBatches = godownItemsSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as GodownItem));
+            const godownBatches = godownItemsSnapshot.docs
+              .map(d => ({ id: d.id, ...d.data() } as GodownItem))
+              .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());
 
             const totalGodownStock = godownBatches.reduce((sum, batch) => sum + batch.quantity, 0);
 
@@ -149,10 +151,15 @@ export function useGodownInventory() {
                 const batchRef = doc(db, 'godownInventory', batch.id);
                 const transferAmount = Math.min(batch.quantity, remainingToTransfer);
 
+                const updateData: {quantity?: number, dateTransferred: Timestamp} = {
+                    dateTransferred: Timestamp.now()
+                };
+
                 if (batch.quantity - transferAmount <= 0) {
                     transaction.delete(batchRef);
                 } else {
-                    transaction.update(batchRef, { quantity: batch.quantity - transferAmount });
+                    updateData.quantity = batch.quantity - transferAmount;
+                    transaction.update(batchRef, updateData);
                 }
 
                 remainingToTransfer -= transferAmount;
@@ -170,13 +177,14 @@ export function useGodownInventory() {
                  price: shopItemData.price,
                  prevStock: prevStockFromYesterday,
                  added: 0,
-                 sales: 0
+                 sales: 0,
+                 transferred: 0,
             };
             
-            currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
+            currentDailyItem.transferred = (currentDailyItem.transferred || 0) + quantityToTransfer;
             currentDailyItem.prevStock = prevStockFromYesterday; 
 
-            currentDailyItem.opening = currentDailyItem.prevStock + currentDailyItem.added;
+            currentDailyItem.opening = currentDailyItem.prevStock + (currentDailyItem.added || 0) + (currentDailyItem.transferred || 0);
             currentDailyItem.closing = currentDailyItem.opening - (currentDailyItem.sales || 0);
             
             transaction.set(dailyInventoryRef, { [productId]: currentDailyItem }, { merge: true });

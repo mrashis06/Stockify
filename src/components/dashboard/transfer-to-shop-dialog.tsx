@@ -55,8 +55,12 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
 
   // Reset form when item changes
   useEffect(() => {
-    form.reset({ quantity: 1 });
-  }, [item, form]);
+    if (isOpen) {
+      form.reset({ quantity: 1 });
+      // Update validation schema based on the new item's max quantity
+      form.trigger(); 
+    }
+  }, [isOpen, item, form]);
 
 
   const onSubmit = (data: TransferFormValues) => {
