@@ -81,7 +81,7 @@ export function useInventory() {
 
             if (dailyItem) {
                 // Ensure prevStock from yesterday is correctly assigned
-                items.push({ ...masterItem, ...dailyItem, prevStock });
+                items.push({ ...masterItem, ...dailyItem, prevStock, added: dailyItem.added || 0, sales: dailyItem.sales || 0 });
             } else {
                 // If no record for today, create one based on yesterday or master
                 items.push({

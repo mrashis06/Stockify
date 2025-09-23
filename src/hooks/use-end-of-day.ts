@@ -8,6 +8,7 @@ import {
   getDoc,
   writeBatch,
   setDoc,
+  getDocs,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, addDays } from 'date-fns';
@@ -24,51 +25,51 @@ export function useEndOfDay() {
       const dailyDocRef = doc(db, 'dailyInventory', today);
       const dailyDocSnap = await getDoc(dailyDocRef);
       
-      if (!dailyDocSnap.exists()) {
-        throw new Error("Today's inventory data not found. Cannot proceed.");
-      }
+      const masterInventorySnap = await getDocs(collection(db, 'inventory'));
+      const masterInventory = new Map<string, any>();
+      masterInventorySnap.forEach(doc => {
+          masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
+      });
 
-      const todaysData = dailyDocSnap.data();
+      const todaysData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
       const batch = writeBatch(db);
       
-      // Prepare tomorrow's inventory document
       const tomorrowDocRef = doc(db, 'dailyInventory', tomorrow);
       const newDailyData: { [key: string]: any } = {};
 
-      for (const itemId in todaysData) {
-        if (Object.prototype.hasOwnProperty.call(todaysData, itemId)) {
-          const item = todaysData[itemId];
-          
-          // Use the final, pre-calculated closing stock from today's document.
-          // This is more reliable than recalculating it here.
-          const closingStock = item.closing ?? ((item.prevStock || 0) + (item.added || 0) - (item.sales || 0));
+      // Iterate over the master inventory to ensure all items are carried over
+      for (const [itemId, masterItem] of masterInventory.entries()) {
+          const todayItem = todaysData[itemId];
+          let closingStock = masterItem.prevStock ?? 0;
+
+          if (todayItem) {
+              const opening = (todayItem.prevStock ?? masterItem.prevStock ?? 0) + (todayItem.added ?? 0);
+              closingStock = opening - (todayItem.sales ?? 0);
+          }
 
           newDailyData[itemId] = {
-            brand: item.brand,
-            size: item.size,
-            category: item.category,
-            price: item.price,
-            prevStock: closingStock, // Today's closing is tomorrow's previous
-            added: 0,
+            brand: masterItem.brand,
+            size: masterItem.size,
+            category: masterItem.category,
+            price: masterItem.price,
+            prevStock: closingStock,
+            added: 0, 
             sales: 0,
-            opening: closingStock, // Initially opening is the same as prevStock
-            closing: closingStock, // Initially closing is the same as opening
+            opening: closingStock,
+            closing: closingStock,
           };
           
-          // Also update the master inventory's prevStock for resilience
           const masterInventoryRef = doc(db, 'inventory', itemId);
           batch.update(masterInventoryRef, { prevStock: closingStock });
-        }
       }
       
-      // Set the entire document for tomorrow
       batch.set(tomorrowDocRef, newDailyData);
 
       await batch.commit();
 
     } catch (error) {
       console.error("Error during end of day process: ", error);
-      throw error; // Rethrow to be caught by the component
+      throw error;
     } finally {
       setIsEndingDay(false);
     }
@@ -76,5 +77,3 @@ export function useEndOfDay() {
 
   return { isEndingDay, endOfDayProcess };
 }
-
-    
