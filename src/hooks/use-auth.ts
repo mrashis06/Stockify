@@ -29,6 +29,8 @@ export function useAuth() {
               const userData = userDoc.data();
               setUser({ 
                 ...authUser, 
+                // Explicitly use displayName from Firebase Auth as a fallback for the name from Firestore.
+                displayName: userData.name || authUser.displayName,
                 role: userData.role,
                 name: userData.name || authUser.displayName,
                 dob: userData.dob,
@@ -58,6 +60,18 @@ export function useAuth() {
     const userDocRef = doc(db, 'users', uid);
     await updateDoc(userDocRef, data);
     // The onSnapshot listener will now automatically update the state.
+    // We can also optimistically update the local state for a faster UI response.
+    setUser(currentUser => {
+        if (currentUser && currentUser.uid === uid) {
+            return {
+                ...currentUser,
+                displayName: data.name,
+                name: data.name,
+                dob: data.dob
+            };
+        }
+        return currentUser;
+    });
   };
 
   return { user, loading, updateUser };

@@ -103,7 +103,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
                 <Avatar>
                   <AvatarImage src={user.photoURL || "https://picsum.photos/seed/user-avatar/40/40"} data-ai-hint="male avatar" alt="User" />
                   <AvatarFallback>
-                    {user.email ? user.email.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
+                    {user.displayName ? user.displayName.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
                   </AvatarFallback>
                 </Avatar>
                 <span className="sr-only">Toggle user menu</span>
