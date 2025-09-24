@@ -27,6 +27,7 @@ import { Loader2, Package } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLoading } from '@/hooks/use-loading';
 
 // Define LoginForm as a standalone component outside of LoginPage
 const LoginForm = ({
@@ -95,6 +96,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [activeTab, setActiveTab] = useState('admin');
+  const { showLoader } = useLoading();
 
   useEffect(() => {
     const errorType = searchParams.get('error');
@@ -129,8 +131,8 @@ export default function LoginPage() {
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
         if (userData.role === role) {
-          // Role matches the login panel, proceed
-          router.push('/dashboard');
+          // Role matches the login panel, proceed and show loader
+          showLoader('Dashboard', '/dashboard');
         } else {
           // Role mismatch, sign out and show error toast
           await signOut(auth);
