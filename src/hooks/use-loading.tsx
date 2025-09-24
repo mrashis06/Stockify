@@ -36,32 +36,47 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
 
     const interval = setInterval(() => {
       set(state => {
-          const newProgress = state.progress + 5;
-          if (newProgress >= 100) {
-              clearInterval(interval);
-              // If data is also ready, hide the loader. Otherwise, wait.
-              if (get().dataReady) {
-                  get().hideLoader();
-              }
-              return { progress: 100 };
-          }
-          return { progress: newProgress };
+        // Increment progress, but don't exceed 99 until we know data is ready
+        const newProgress = Math.min(state.progress + 5, 99);
+        
+        // If the page's data is ready, we can complete the animation to 100%
+        if (state.dataReady) {
+            clearInterval(interval);
+            // Animate the final step to 100%
+            set({ progress: 100 });
+            // Then hide the loader after a short delay for the animation to finish
+            setTimeout(() => {
+                get().hideLoader();
+            }, 300);
+        }
+        
+        return { progress: newProgress };
       });
-    }, 80); // ~1.6 seconds to get to 100%
+    }, 80); // ~1.6 seconds to get to 99%
 
     set({ _interval: interval });
   },
   hideLoader: () => {
-    // This is now called internally when conditions are met
-    setTimeout(() => {
-      set({ isLoading: false });
-    }, 300); // Small delay for fade-out
+    // Clear any existing interval to prevent conflicts
+    if (get()._interval) {
+        clearInterval(get()._interval as NodeJS.Timeout);
+    }
+    set({ isLoading: false, progress: 0, _interval: null });
   },
   setDataReady: (isReady) => {
-    set({ dataReady: isReady });
-    // If the animation has already finished, and we just got data, hide loader.
-    if (isReady && get().progress === 100) {
-      get().hideLoader();
+    if (isReady && !get().dataReady) {
+        set({ dataReady: true });
+        
+        // This is the key part: if the animation is already near completion,
+        // and we just received data, we trigger the final step.
+        const currentState = get();
+        if (currentState._interval && currentState.progress >= 90) {
+            clearInterval(currentState._interval);
+            set({ progress: 100 });
+            setTimeout(() => {
+                get().hideLoader();
+            }, 300);
+        }
     }
   },
 }));
@@ -115,7 +130,10 @@ export const usePageLoading = (pageIsLoading: boolean) => {
         }
          // Reset dataReady state when the component unmounts or page starts loading again
         return () => {
-            setDataReady(false);
+            // Important: don't set to false if we are no longer in a loading state
+            if (useLoadingStore.getState().isLoading) {
+                 setDataReady(false);
+            }
         };
     }, [pageIsLoading, isLoading, setDataReady]);
 };
