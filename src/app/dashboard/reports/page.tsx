@@ -319,8 +319,11 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         });
 
 
-        const grandTotalRow = ["Grand Total", '', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)].join(",");
-        csvContent += grandTotalRow + "\n";
+        if (Object.keys(salesByDateForExport).length > 1) {
+            const grandTotalRow = ["Grand Total", "", "", "", "", grandTotalUnits, grandTotalAmount.toFixed(2)].join(",");
+            csvContent += grandTotalRow + "\n";
+        }
+
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
