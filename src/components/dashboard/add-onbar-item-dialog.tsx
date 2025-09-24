@@ -194,21 +194,24 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
     const { addOnBarItemManual } = useOnBarInventory();
 
     const category = form.watch('category');
-    const size = form.watch('size');
-    const quantity = form.watch('quantity');
     const isBeer = category === 'Beer';
 
     useEffect(() => {
-        if (isBeer) {
-            const sizeMl = parseInt(size.match(/(\d+)/)?.[0] || '0', 10);
-            const numQuantity = Number(quantity) || 0;
-            if (sizeMl > 0 && numQuantity > 0) {
-                form.setValue('totalVolume', sizeMl * numQuantity, { shouldValidate: true });
-            } else if (sizeMl > 0) {
-                 form.setValue('totalVolume', sizeMl, { shouldValidate: true });
+        const subscription = form.watch((value, { name, type }) => {
+            if (name === 'category' && value.category === 'Beer') {
+                const sizeMl = parseInt(value.size?.match(/(\d+)/)?.[0] || '0', 10);
+                if (sizeMl > 0) {
+                    form.setValue('totalVolume', sizeMl, { shouldValidate: true });
+                }
+            } else if (name === 'size' && form.getValues('category') === 'Beer') {
+                const sizeMl = parseInt(value.size?.match(/(\d+)/)?.[0] || '0', 10);
+                 if (sizeMl > 0) {
+                    form.setValue('totalVolume', sizeMl, { shouldValidate: true });
+                }
             }
-        }
-    }, [size, quantity, isBeer, form.setValue]);
+        });
+        return () => subscription.unsubscribe();
+    }, [form]);
 
 
     const onSubmit = async (data: ManualFormValues) => {
@@ -306,7 +309,7 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
                     name="totalVolume"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Total Volume (ml)</FormLabel>
+                        <FormLabel>Volume per unit (ml)</FormLabel>
                         <FormControl>
                             <Input type="number" placeholder="e.g., 750" {...field} disabled={isBeer} />
                         </FormControl>

@@ -31,7 +31,9 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const handleSell = async (id: string, volume: number, price: number) => {
         try {
             await sellCustomPeg(id, volume, price);
-            toast({ title: 'Success', description: `${volume}ml sold for ₹${price}.` });
+            const item = onBarInventory.find(i => i.id === id);
+            const message = item?.category === 'Beer' ? `1 unit sold for ₹${item.price}.` : `${volume}ml sold for ₹${price}.`;
+            toast({ title: 'Success', description: message });
             setIsSellItemOpen(false);
         } catch (error) {
             console.error('Error selling item:', error);
@@ -42,9 +44,11 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
 
     const handleRefill = async (id: string, amount: number) => {
         try {
-            // Refilling a standard 30ml peg for simplicity
-            await refillPeg(id, 30); 
-            toast({ title: 'Success', description: `Last sale of 30ml cancelled.` });
+            const item = onBarInventory.find(i => i.id === id);
+            const refillAmount = item?.category === 'Beer' ? 1 : 30; // Refill 1 unit for beer, 30ml for liquor
+            await refillPeg(id, refillAmount); 
+            const message = item?.category === 'Beer' ? 'Last beer sale cancelled.' : `Last sale of 30ml cancelled.`;
+            toast({ title: 'Success', description: message });
         } catch (error) {
             console.error('Error refilling item:', error);
             const errorMessage = (error as Error).message || 'Failed to refill item.';
@@ -99,7 +103,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
              <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
                 <CardHeader>
                     <CardTitle className="text-lg font-medium text-primary">Today's On-Bar Sales</CardTitle>
-                    <CardDescription>Total value of pegs sold from open bottles today.</CardDescription>
+                    <CardDescription>Total value of pegs and bottles sold from open inventory today.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-3xl font-bold text-foreground flex items-center">
@@ -114,12 +118,18 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     <Wine className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-medium">No Open Bottles</h3>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        Click "Open a Bottle" to add an item from your inventory or manually to start tracking peg sales.
+                        Click "Open a Bottle" to add an item from your inventory or manually to start tracking sales.
                     </p>
                 </div>
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {onBarInventory.map(item => (
+                    {onBarInventory.map(item => {
+                        const isBeer = item.category === 'Beer';
+                        const remaining = item.remainingVolume;
+                        const total = isBeer ? (item.totalQuantity || 1) : item.totalVolume;
+                        const unitLabel = isBeer ? 'units' : 'ml';
+
+                        return (
                         <Card key={item.id} className="flex flex-col h-full relative">
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle className="text-lg truncate pr-8">{item.brand}</CardTitle>
@@ -129,24 +139,24 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                             </CardHeader>
                              <CardContent className="flex-1 flex flex-col justify-between p-6">
                                 <div className="text-center flex-1 flex flex-col justify-center">
-                                    <p className="text-5xl font-bold tracking-tighter">{Math.max(0, item.remainingVolume)}<span className="text-xl font-normal text-muted-foreground">ml</span></p>
+                                    <p className="text-5xl font-bold tracking-tighter">{Math.max(0, remaining)}<span className="text-xl font-normal text-muted-foreground">{unitLabel}</span></p>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1">Remaining</p>
                                     <div className="my-6">
                                         <div className="relative h-2 bg-muted rounded-full overflow-hidden">
                                             <div
                                                 className="absolute top-0 left-0 h-full bg-primary transition-all duration-300"
-                                                style={{ width: `${(item.remainingVolume / item.totalVolume) * 100}%` }}
+                                                style={{ width: `${(remaining / total) * 100}%` }}
                                             />
                                         </div>
                                     </div>
                                 </div>
                                 
                                 <div className="space-y-2">
-                                     {item.category === 'Beer' ? (
+                                     {isBeer ? (
                                         <Button
                                             variant="outline"
-                                            onClick={() => handleSell(item.id, item.totalVolume, item.price)}
-                                            disabled={item.remainingVolume <= 0}
+                                            onClick={() => handleSell(item.id, 1, item.price)}
+                                            disabled={remaining <= 0}
                                             className="w-full"
                                         >
                                             <Beer className="mr-2 h-4 w-4" /> Sell Bottle (₹{item.price})
@@ -156,41 +166,40 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                              <Button
                                                 variant="outline"
                                                 className="flex-1"
-                                                disabled={item.remainingVolume <= 0}
+                                                disabled={remaining <= 0}
                                                 onClick={() => handleOpenSellDialog(item)}
                                             >
                                                 <Minus className="mr-2 h-4 w-4" />
                                                 Sell Peg
                                             </Button>
-                                            
-                                            <Button
-                                                variant="outline"
-                                                size="icon"
-                                                onClick={() => handleRefill(item.id, 30)}
-                                                disabled={item.remainingVolume >= item.totalVolume || (item.salesVolume || 0) < 30}
-                                                className="shrink-0"
-                                            >
-                                                <Plus className="h-4 w-4" />
-                                            </Button>
                                         </div>
                                      )}
-                                    {item.remainingVolume <= 0 && item.category !== 'Beer' && (
+
+                                     <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => handleRefill(item.id, 30)}
+                                        disabled={remaining >= total || (item.salesVolume || 0) < (isBeer ? 1 : 30)}
+                                        className="shrink-0 absolute bottom-6 right-6"
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                    
+                                    {remaining <= 0 && (
                                         <Button
                                             variant="destructive"
                                             className="w-full"
                                             onClick={() => handleRemove(item.id)}
                                         >
-                                           Remove Empty Bottle
+                                           Remove Empty Item(s)
                                         </Button>
                                     )}
                                 </div>
                             </CardContent>
                         </Card>
-                    ))}
+                    )})}
                 </div>
             )}
         </main>
     );
 }
-
-    

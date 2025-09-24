@@ -23,8 +23,9 @@ export type OnBarItem = {
   brand: string;
   size: string;
   category: string;
-  totalVolume: number; // e.g., 750 for a 750ml bottle
-  remainingVolume: number;
+  totalVolume: number; // e.g., 750 for a 750ml bottle, or the volume of one beer bottle
+  remainingVolume: number; // remaining ml for liquor, or remaining *units* for beer
+  totalQuantity?: number; // Total units for grouped items like beer
   salesVolume: number; // Volume sold today in ml
   salesValue: number; // Monetary value of sales today
   price: number; // Price of the full bottle
@@ -106,25 +107,38 @@ export function useOnBarInventory() {
       setSaving(true);
       try {
           const onBarCollectionRef = collection(db, "onBarInventory");
-          const batch = writeBatch(db);
-          const quantity = manualItem.category === 'Beer' ? manualItem.quantity : 1;
-
-          for (let i = 0; i < quantity; i++) {
-            const newOnBarDocRef = doc(onBarCollectionRef);
-            batch.set(newOnBarDocRef, {
-              brand: manualItem.brand,
-              size: manualItem.size,
-              category: manualItem.category,
-              totalVolume: manualItem.totalVolume,
-              price: manualItem.price || 0,
-              inventoryId: 'manual',
-              remainingVolume: manualItem.totalVolume,
-              salesVolume: 0,
-              salesValue: 0,
-              openedAt: serverTimestamp(),
-            });
+          
+          if (manualItem.category === 'Beer') {
+              // Create a single item for a group of beers
+              await addDoc(onBarCollectionRef, {
+                  brand: manualItem.brand,
+                  size: manualItem.size,
+                  category: manualItem.category,
+                  totalVolume: manualItem.totalVolume, // This is the volume of ONE bottle
+                  price: manualItem.price || 0,
+                  inventoryId: 'manual',
+                  remainingVolume: manualItem.quantity, // remainingVolume tracks UNITS for beer
+                  totalQuantity: manualItem.quantity,   // totalQuantity tracks total UNITS
+                  salesVolume: 0, // salesVolume will track units sold
+                  salesValue: 0,
+                  openedAt: serverTimestamp(),
+              });
+          } else {
+              // Create a single item for one bottle of liquor
+              await addDoc(onBarCollectionRef, {
+                  brand: manualItem.brand,
+                  size: manualItem.size,
+                  category: manualItem.category,
+                  totalVolume: manualItem.totalVolume,
+                  price: manualItem.price || 0,
+                  inventoryId: 'manual',
+                  remainingVolume: manualItem.totalVolume,
+                  salesVolume: 0,
+                  salesValue: 0,
+                  openedAt: serverTimestamp(),
+              });
           }
-          await batch.commit();
+
       } catch(error) {
           console.error("Error adding manual on-bar item:", error);
           throw error;
@@ -144,20 +158,38 @@ export function useOnBarInventory() {
           throw new Error("Item not found on bar.");
         }
         const itemData = itemDoc.data() as OnBarItem;
-        
-        if (itemData.remainingVolume < volume) {
-          throw new Error("Not enough liquor remaining to sell this peg.");
+
+        if (itemData.category === 'Beer') {
+            // Selling a beer decrements remainingVolume (which is units) by 1
+            if (itemData.remainingVolume < 1) {
+                throw new Error("No more bottles to sell.");
+            }
+            const newRemainingUnits = itemData.remainingVolume - 1;
+            const newSalesUnits = (itemData.salesVolume || 0) + 1;
+            const newSalesValue = (itemData.salesValue || 0) + itemData.price; // Use the stored price per bottle
+            
+            transaction.update(itemRef, {
+                remainingVolume: newRemainingUnits,
+                salesVolume: newSalesUnits,
+                salesValue: newSalesValue,
+            });
+
+        } else {
+            // Selling a liquor peg
+            if (itemData.remainingVolume < volume) {
+              throw new Error("Not enough liquor remaining to sell this peg.");
+            }
+            
+            const newRemainingVolume = itemData.remainingVolume - volume;
+            const newSalesVolume = (itemData.salesVolume || 0) + volume;
+            const newSalesValue = (itemData.salesValue || 0) + price;
+            
+            transaction.update(itemRef, { 
+                remainingVolume: newRemainingVolume,
+                salesVolume: newSalesVolume,
+                salesValue: newSalesValue,
+            });
         }
-        
-        const newRemainingVolume = itemData.remainingVolume - volume;
-        const newSalesVolume = (itemData.salesVolume || 0) + volume;
-        const newSalesValue = (itemData.salesValue || 0) + price;
-        
-        transaction.update(itemRef, { 
-            remainingVolume: newRemainingVolume,
-            salesVolume: newSalesVolume,
-            salesValue: newSalesValue,
-        });
       });
     } catch (error) {
       console.error("Error selling custom peg: ", error);
@@ -185,17 +217,15 @@ export function useOnBarInventory() {
             }
 
             const newRemainingVolume = itemData.remainingVolume + amount;
-            if (newRemainingVolume > itemData.totalVolume) {
-                // This case should ideally not happen if salesVolume is tracked correctly
+            if (newRemainingVolume > (itemData.category === 'Beer' ? (itemData.totalQuantity || 0) : itemData.totalVolume)) {
                 throw new Error("Refill amount exceeds bottle capacity.");
             }
             
-            // This is a simplification. A more robust implementation would need to know
-            // the value of the specific sale being reversed. For now, we reduce by average cost.
-            const averagePricePerMl = (itemData.salesValue || 0) / (itemData.salesVolume || 1);
-            const valueToRefund = averagePricePerMl * amount;
+            const valueToRefund = itemData.category === 'Beer' 
+                ? itemData.price // Refunding one beer bottle
+                : ((itemData.salesValue || 0) / (itemData.salesVolume || 1)) * amount; // Avg price for liquor
             
-            const newSalesVolume = (itemData.salesVolume || 0) - amount;
+            const newSalesVolume = (itemData.salesVolume || 0) - (itemData.category === 'Beer' ? 1 : amount);
             const newSalesValue = (itemData.salesValue || 0) - valueToRefund;
 
             transaction.update(itemRef, {
@@ -219,16 +249,18 @@ export function useOnBarInventory() {
           const itemRef = doc(db, 'onBarInventory', id);
           const itemSnap = await getDoc(itemRef);
           if (!itemSnap.exists()) throw new Error("On-bar item not found");
-          const onBarItemData = itemSnap.data();
+          const onBarItemData = itemSnap.data() as OnBarItem;
           const inventoryId = onBarItemData.inventoryId;
 
-          // If the item was tracked from main inventory and it's not empty, "return" it to stock
-          if (inventoryId && inventoryId !== 'manual' && onBarItemData.remainingVolume >= onBarItemData.totalVolume) {
+          if (inventoryId && inventoryId !== 'manual') {
               const itemInShop = inventory.find(item => item.id === inventoryId);
               if (itemInShop) {
                   const currentSales = itemInShop.sales || 0;
-                  // Decrementing sales by 1 effectively returns one bottle to stock.
-                  await updateItemField(inventoryId, 'sales', Math.max(0, currentSales - 1));
+                  const quantityToReturn = onBarItemData.category === 'Beer' ? onBarItemData.remainingVolume : 1;
+                  
+                  if (onBarItemData.remainingVolume > 0) {
+                    await updateItemField(inventoryId, 'sales', Math.max(0, currentSales - quantityToReturn));
+                  }
               }
           }
           
@@ -244,5 +276,3 @@ export function useOnBarInventory() {
 
   return { onBarInventory, loading, saving, addOnBarItem, addOnBarItemManual, sellCustomPeg, refillPeg, removeOnBarItem };
 }
-
-    
