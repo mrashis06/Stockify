@@ -200,7 +200,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         doc.text(title, 14, startY);
         startY += 10;
         
-        Object.keys(salesByDateForExport).sort().forEach((saleDate) => {
+        Object.keys(salesByDateForExport).sort().forEach((saleDate, index) => {
             const items = salesByDateForExport[saleDate];
             const tableRows: (string | number)[][] = [];
             let dailyTotalUnits = 0;
@@ -225,13 +225,15 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             
             const dateObj = parse(saleDate, 'yyyy-MM-dd', new Date());
 
+            const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : startY;
+
             doc.autoTable({
                 head: [tableColumn],
                 body: tableRows,
                 foot: [
                     ['Daily Total', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)]
                 ],
-                startY: (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : startY,
+                startY: finalY + (index > 0 ? 15 : 0),
                 headStyles: {
                     fillColor: [40, 40, 40], 
                     textColor: [255, 255, 255],
@@ -243,39 +245,44 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     fontStyle: 'bold',
                 },
                 didDrawPage: (data) => {
-                    if (data.pageNumber > 1 && data.cursor?.y) {
-                         doc.setFontSize(12);
-                         doc.setFont('helvetica', 'bold');
-                         doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, data.cursor.y - 5);
-                         data.cursor.y += 2;
-                    }
+                     // This hook is better for adding content after the table is drawn on the page.
                 },
                 willDrawPage: (data) => {
+                    // This hook runs before the page content is drawn.
+                    // We add the date title here.
                      doc.setFontSize(12);
                      doc.setFont('helvetica', 'bold');
+                     // Position the text slightly above where the table will start.
                      doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, data.cursor ? data.cursor.y - 5 : startY - 5);
                      if (data.cursor) {
-                       data.cursor.y += 2;
+                       data.cursor.y += 2; // Add some space after the title
                      }
                 }
             });
         });
 
+        // Use a separate autoTable call for the grand total to ensure clean styling
         if (Object.keys(salesByDateForExport).length > 0) {
+            const finalY = (doc as any).lastAutoTable.finalY + 10;
             doc.autoTable({
-                startY: (doc as any).lastAutoTable.finalY + 10,
-                head: [["", "", "", "", "", ""]], // Empty head to align columns
-                body: [], // No body content
-                foot: [
-                    ['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]
-                ],
-                showHead: false, // Hide the empty header
+                startY: finalY,
+                head: [["", "", "", "", "", ""]], // Dummy head
+                body: [],
+                foot: [['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]],
+                showHead: false,
                 footStyles: {
                     fillColor: [22, 163, 74], // green-600
                     textColor: [255, 255, 255],
                     fontStyle: 'bold',
-                    fontSize: 12
+                    fontSize: 12,
+                    halign: 'right'
                 },
+                // Align the grand total values correctly
+                columnStyles: {
+                    0: { halign: 'left', fontStyle: 'bold' },
+                    4: { halign: 'right' },
+                    5: { halign: 'right' }
+                }
             });
         }
         
@@ -285,7 +292,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
 
     const handleExportCSV = () => {
         const header = ["Date", "Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
-        let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
+        let csvContent = "data:text/csv;charset=utf-t," + header.join(",") + "\n";
         
         let grandTotalUnits = 0;
         let grandTotalAmount = 0;
@@ -298,7 +305,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             items.forEach(item => {
                 const row = [
                     item.date,
-                    item.brand,
+                    item.brand.replace(/,/g, ''), // remove commas from brand name
                     `"${item.size}"`,
                     item.category,
                     item.price.toFixed(2),
@@ -311,7 +318,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                 dailyTotalAmount += item.totalAmount;
             });
 
-            // Add daily total row
+            // Add daily total row with proper alignment
             const dailyTotalRow = [`Daily Total for ${saleDate}`, '', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)].join(",");
             csvContent += dailyTotalRow + "\n\n"; // Add extra newline for spacing
 
@@ -320,7 +327,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         });
 
 
-        // Add grand total at the very end
+        // Add grand total at the very end with proper alignment
         const grandTotalRow = ["Grand Total", '', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)].join(",");
         csvContent += grandTotalRow + "\n";
 
@@ -465,3 +472,4 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
+
