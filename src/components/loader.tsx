@@ -49,7 +49,7 @@ const BottleIcon = ({ progress, pageName, dynamicText }: { progress: number; pag
                     {`
                         @keyframes wave {
                             0% { transform: translateX(0) translateY(0); }
-                            50% { transform: translateX(-5px) translateY(-2px); }
+                            50% { transform: translateX(-5px) translateY(0); }
                             100% { transform: translateX(0) translateY(0); }
                         }
                     `}
