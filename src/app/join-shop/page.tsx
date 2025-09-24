@@ -119,6 +119,7 @@ export default function JoinShopPage() {
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/login');
+        router.refresh();
     };
 
     if (authLoading) {

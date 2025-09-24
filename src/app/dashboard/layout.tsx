@@ -40,7 +40,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         router.push('/join-shop');
       } else if (user.role === 'staff' && !isStaffActive) {
           // If staff is blocked, log them out and show an error.
-          signOut(auth).then(() => router.push('/login?error=blocked'));
+          signOut(auth).then(() => {
+            router.push('/login?error=blocked');
+            router.refresh();
+          });
       }
     }
   }, [user, authLoading, router, shopId, isStaffActive]);
@@ -48,6 +51,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const handleLogout = async () => {
     await signOut(auth);
     router.push('/login');
+    router.refresh();
   };
   
   const handleNav = (path: string, pageName: string) => {
