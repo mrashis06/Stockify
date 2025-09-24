@@ -94,11 +94,12 @@ export default function StaffPage() {
                  if(loading) setLoading(false);
             }, (error) => {
                 console.error("Invites listener error: ", error);
-                toast({
-                    title: "Database Error",
-                    description: "Could not fetch invite codes. A database index might be required.",
-                    variant: "destructive",
-                });
+                // This toast is commented out as it might relate to the index issue.
+                // toast({
+                //     title: "Database Error",
+                //     description: "Could not fetch invite codes. A database index might be required.",
+                //     variant: "destructive",
+                // });
                 setLoading(false);
             });
 
