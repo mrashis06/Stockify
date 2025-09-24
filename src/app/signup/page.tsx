@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, AuthError } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import React, { useState } from 'react';
@@ -69,9 +69,18 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
       router.push('/dashboard');
     } catch (error) {
       console.error("Error signing up with email and password: ", error);
+      const authError = error as AuthError;
+      
+      let description = "Failed to sign up. Please try again.";
+      if (authError.code === 'auth/email-already-in-use') {
+        description = "This email is already registered. Please log in instead.";
+      } else if (authError.code === 'auth/weak-password') {
+        description = "The password is too weak. Please choose a stronger password.";
+      }
+
       toast({
-        title: "Authentication Error",
-        description: "Failed to sign up. Please try again.",
+        title: "Signup Error",
+        description: description,
         variant: "destructive",
       });
       setLoading(false);
