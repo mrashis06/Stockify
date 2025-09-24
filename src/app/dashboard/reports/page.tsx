@@ -285,7 +285,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
 
     const handleExportCSV = () => {
         const header = ["Date", "Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
-        let csvContent = "data:text/csv;charset=utf-t," + header.join(",") + "\n";
+        let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
         
         let grandTotalUnits = 0;
         let grandTotalAmount = 0;
@@ -298,7 +298,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             items.forEach(item => {
                 const row = [
                     item.date,
-                    item.brand.replace(/,/g, ''), // remove commas from brand name
+                    `"${item.brand.replace(/"/g, '""')}"`,
                     `"${item.size}"`,
                     item.category,
                     item.price.toFixed(2),
@@ -311,7 +311,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                 dailyTotalAmount += item.totalAmount;
             });
 
-            const dailyTotalRow = [`,,,,Daily Total for ${saleDate}`, dailyTotalUnits, dailyTotalAmount.toFixed(2)].join(",");
+            const dailyTotalRow = [`Daily Total for ${saleDate}`, '', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)].join(",");
             csvContent += dailyTotalRow + "\n\n";
 
             grandTotalUnits += dailyTotalUnits;
@@ -319,7 +319,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         });
 
 
-        const grandTotalRow = [`,,,,Grand Total`, grandTotalUnits, grandTotalAmount.toFixed(2)].join(",");
+        const grandTotalRow = ["Grand Total", '', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)].join(",");
         csvContent += grandTotalRow + "\n";
 
         const encodedUri = encodeURI(csvContent);
