@@ -54,7 +54,7 @@ type InviteCode = {
 const CODE_EXPIRATION_DAYS = 7;
 
 export default function StaffPage() {
-    const { user, deleteUserAccount } = useAuth();
+    const { user, updateUser } = useAuth();
     const { toast } = useToast();
     const [staffList, setStaffList] = useState<StaffMember[]>([]);
     const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
@@ -145,8 +145,7 @@ export default function StaffPage() {
     const handleToggleStatus = async (staff: StaffMember) => {
         const newStatus = staff.status === 'active' ? 'blocked' : 'active';
         try {
-            const staffDocRef = doc(db, "users", staff.id);
-            await updateDoc(staffDocRef, { status: newStatus });
+            await updateUser(staff.id, { status: newStatus });
             toast({ title: "Success", description: `${staff.name}'s status has been updated to ${newStatus}.` });
         } catch (error) {
             console.error("Error updating status:", error);
@@ -179,11 +178,11 @@ export default function StaffPage() {
     };
 
     const handleRemoveStaff = async () => {
-        if (!selectedStaff || !deleteUserAccount) return;
+        if (!selectedStaff || !updateUser) return;
         try {
-            // This will delete the user's doc and disable their auth account.
-            await deleteUserAccount(selectedStaff.id);
-            toast({ title: "Success", description: `${selectedStaff.name} has been permanently removed.` });
+             // "Removing" a staff member is now just blocking them and clearing their shopId
+            await updateUser(selectedStaff.id, { status: 'blocked', shopId: null });
+            toast({ title: "Success", description: `${selectedStaff.name} has been removed from the shop.` });
         } catch(error) {
             console.error("Error removing staff:", error);
             toast({ title: "Error", description: "Failed to remove staff member.", variant: "destructive" });
@@ -265,7 +264,7 @@ export default function StaffPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Remove {selectedStaff?.name}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                           This will permanently remove the staff member's data and disable their login. They will have to sign up again to regain access. Are you sure? This action cannot be undone.
+                           This will block the staff member's access and remove them from your shop. They will need to contact you to be re-instated. Are you sure?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -416,3 +415,5 @@ export default function StaffPage() {
         </main>
     );
 }
+
+    

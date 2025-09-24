@@ -105,7 +105,7 @@ export default function SignupPage() {
       
       let description = "Failed to sign up. Please try again.";
       if (authError.code === 'auth/email-already-in-use') {
-        description = "This email is already registered. Please log in instead.";
+        description = "This email is already registered. If this is you, please log in. If you were removed as staff, you cannot sign up again with this email.";
       } else if (authError.code === 'auth/weak-password') {
         description = "The password is too weak. Please choose a stronger password.";
       }
@@ -188,3 +188,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    
