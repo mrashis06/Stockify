@@ -111,7 +111,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel className="flex items-center gap-2">
-                {user.displayName || user.email || 'My Account'}
+                {user.displayName || 'My Account'}
                 {user.role === 'admin' && <Badge variant="destructive">Admin</Badge>}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
