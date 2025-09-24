@@ -10,7 +10,7 @@ import { db } from '@/lib/firebase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -437,3 +437,6 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
 }
 
 
+
+
+    
