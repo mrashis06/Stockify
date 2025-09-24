@@ -105,7 +105,6 @@ const AnimatedGlass = () => {
                 </g>
 
                 {/* Highlights */}
-                <path d="M 38,15 C 38,40 42,80 38,120" fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.3"/>
                 <path d="M 32,138 Q 50,142 68,138" fill="none" stroke="white" strokeWidth="0.7" strokeOpacity="0.2"/>
             </svg>
             <div className="absolute inset-0 bg-amber-500/10 dark:bg-amber-400/20 rounded-full blur-2xl -z-10 animate-[pulse-glow_5s_ease-in-out_infinite]" />
