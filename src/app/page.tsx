@@ -4,6 +4,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BarChart3, BellRing, PackageSearch } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +12,27 @@ import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { useAuth } from "@/hooks/use-auth";
+import { useLoading } from "@/hooks/use-loading";
 
 export default function Home({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { showLoader } = useLoading();
+  const router = useRouter();
+  
   const heroImage = PlaceHolderImages.find(p => p.id === 'hero-liquor-bottles');
-  const getStartedLink = loading ? '#' : user ? '/dashboard' : '/login';
+  const getStartedLink = authLoading ? '#' : user ? '/dashboard' : '/login';
+
+  const handleGetStarted = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (authLoading) return;
+
+    if (getStartedLink === '/dashboard') {
+      showLoader('Dashboard', getStartedLink);
+    } else {
+      router.push(getStartedLink);
+    }
+  };
+
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -43,7 +60,7 @@ export default function Home({ params, searchParams }: { params: { slug: string 
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button asChild size="lg" className="transition-transform hover:scale-105">
-                <Link href={getStartedLink}>Get Started</Link>
+                <Link href={getStartedLink} onClick={handleGetStarted}>Get Started</Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="border-2 border-primary-foreground bg-transparent text-primary-foreground transition-transform hover:scale-105 hover:bg-primary-foreground/10">
                 <Link href="#">Learn More</Link>
@@ -62,7 +79,7 @@ export default function Home({ params, searchParams }: { params: { slug: string 
               Join dozens of liquor stores streamlining their operations with Stockify.
             </p>
             <Button asChild size="lg" variant="secondary" className="mt-8 transition-transform hover:scale-105">
-              <Link href={getStartedLink}>Get Started Now</Link>
+              <Link href={getStartedLink} onClick={handleGetStarted}>Get Started Now</Link>
             </Button>
           </div>
         </section>
