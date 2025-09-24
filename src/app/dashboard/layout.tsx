@@ -58,46 +58,46 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
       <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
-        <nav className="flex-1 flex items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 text-lg font-semibold md:text-base"
-            >
-              <Package className="h-6 w-6 text-primary" />
-              <span className="font-bold text-xl">Stockify</span>
-            </Link>
-          </div>
-          <div className="hidden md:flex items-center gap-6">
-             <Button variant="ghost" size="icon" onClick={() => router.back()}>
-                <ArrowLeft className="h-4 w-4" />
-             </Button>
-             <NavLink href="/" pageName='Home' onNavigate={handleNav}>
-                <Home className="h-4 w-4" />
-                Home
-            </NavLink>
-             <NavLink href="/dashboard" pageName='Dashboard' onNavigate={handleNav}>
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboard
-            </NavLink>
-             <NavLink href="/dashboard/inventory" pageName='Inventory' onNavigate={handleNav}>
-                <Warehouse className="h-4 w-4" />
-                Inventory
-            </NavLink>
-            <NavLink href="/dashboard/godown" pageName='Godown' onNavigate={handleNav}>
-                <Archive className="h-4 w-4" />
-                Godown
-            </NavLink>
-            <NavLink href="/dashboard/onbar" pageName='OnBar' onNavigate={handleNav}>
-                <GlassWater className="h-4 w-4" />
-                OnBar
-            </NavLink>
-             <NavLink href="/dashboard/reports" pageName='Reports' onNavigate={handleNav}>
-                <FileText className="h-4 w-4" />
-                Reports
-            </NavLink>
-          </div>
+        <div className="flex items-center gap-6">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 text-lg font-semibold"
+          >
+            <Package className="h-6 w-6 text-primary" />
+            <span className="font-bold text-xl">Stockify</span>
+          </Link>
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="hidden md:flex">
+              <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <nav className="hidden md:flex flex-1 items-center justify-center gap-6">
+           <NavLink href="/" pageName='Home' onNavigate={handleNav}>
+              <Home className="h-4 w-4" />
+              Home
+          </NavLink>
+           <NavLink href="/dashboard" pageName='Dashboard' onNavigate={handleNav}>
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+          </NavLink>
+           <NavLink href="/dashboard/inventory" pageName='Inventory' onNavigate={handleNav}>
+              <Warehouse className="h-4 w-4" />
+              Inventory
+          </NavLink>
+          <NavLink href="/dashboard/godown" pageName='Godown' onNavigate={handleNav}>
+              <Archive className="h-4 w-4" />
+              Godown
+          </NavLink>
+          <NavLink href="/dashboard/onbar" pageName='OnBar' onNavigate={handleNav}>
+              <GlassWater className="h-4 w-4" />
+              OnBar
+          </NavLink>
+           <NavLink href="/dashboard/reports" pageName='Reports' onNavigate={handleNav}>
+              <FileText className="h-4 w-4" />
+              Reports
+          </NavLink>
         </nav>
+        
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <Button variant="ghost" size="icon" className="rounded-full">
