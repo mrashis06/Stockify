@@ -221,7 +221,7 @@ function LoginContent() {
                     setPassword={setPassword}
                     loading={loading && activeTab === 'admin'}
                     handleEmailSignIn={handleEmailSignIn}
-                    authError={authError}
+                    authError={activeTab === 'admin' ? authError : ''}
                     role="admin"
                 />
             </TabsContent>
@@ -233,7 +233,7 @@ function LoginContent() {
                     setPassword={setPassword}
                     loading={loading && activeTab === 'staff'}
                     handleEmailSignIn={handleEmailSignIn}
-                    authError={authError}
+                    authError={activeTab === 'staff' ? authError : ''}
                     role="staff"
                 />
             </TabsContent>
