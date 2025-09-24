@@ -3,12 +3,13 @@
 
 import { create } from 'zustand';
 import { useRouter, usePathname } from 'next/navigation';
-import React, { useEffect, createContext, useContext } from 'react';
+import React, { useEffect, createContext, useContext, useRef } from 'react';
 
 type LoadingStore = {
   isLoading: boolean;
   progress: number;
   pageName: string;
+  dataReady: boolean;
   _interval: NodeJS.Timeout | null;
   _path: string | null;
 };
@@ -16,13 +17,14 @@ type LoadingStore = {
 type LoadingActions = {
     showLoader: (pageName: string, path: string) => void;
     hideLoader: () => void;
-    setProgress: (progress: number) => void;
+    setDataReady: (isReady: boolean) => void;
 };
 
 const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
   isLoading: false,
   progress: 0,
   pageName: '',
+  dataReady: false,
   _interval: null,
   _path: null,
   showLoader: (pageName, path) => {
@@ -30,36 +32,38 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
       clearInterval(get()._interval as NodeJS.Timeout);
     }
 
-    set({ isLoading: true, progress: 0, pageName, _path: path });
+    set({ isLoading: true, progress: 0, pageName, _path: path, dataReady: false });
 
     const interval = setInterval(() => {
       set(state => {
-          // Quickly ramp up to 90%
-          const newProgress = state.progress + Math.floor(Math.random() * 15) + 5;
-          if (newProgress >= 90) {
+          const newProgress = state.progress + 5;
+          if (newProgress >= 100) {
               clearInterval(interval);
-              return { progress: 90 };
+              // If data is also ready, hide the loader. Otherwise, wait.
+              if (get().dataReady) {
+                  get().hideLoader();
+              }
+              return { progress: 100 };
           }
           return { progress: newProgress };
       });
-    }, 150); // Faster interval for a quicker ramp-up
+    }, 80); // ~1.6 seconds to get to 100%
 
     set({ _interval: interval });
   },
   hideLoader: () => {
-    const state = get();
-    if (state._interval) {
-      clearInterval(state._interval);
-    }
-    // Animate from 90 to 100
-    set({ progress: 100 });
-    
-    // Wait for the final animation and a small delay, then hide
+    // This is now called internally when conditions are met
     setTimeout(() => {
       set({ isLoading: false });
-    }, 700); // This delay includes the animation to 100% + fade-out time
+    }, 300); // Small delay for fade-out
   },
-  setProgress: (progress) => set({ progress }),
+  setDataReady: (isReady) => {
+    set({ dataReady: isReady });
+    // If the animation has already finished, and we just got data, hide loader.
+    if (isReady && get().progress === 100) {
+      get().hideLoader();
+    }
+  },
 }));
 
 
@@ -69,7 +73,6 @@ const LoadingContext = createContext<{
     progress: number;
     pageName: string;
     showLoader: (pageName: string, path: string) => void;
-    hideLoader: () => void;
 } | undefined>(undefined);
 
 
@@ -86,15 +89,6 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
         }
     };
     
-    // This effect will run when the route changes, but after the page component starts rendering.
-    useEffect(() => {
-        // If the loader was shown for a path, and now we are on that path,
-        // we let the page's own loading state take over.
-        if (store.isLoading && store._path === pathname) {
-            // The `usePageLoading` hook will call `hideLoader` when the page is ready.
-        }
-    }, [pathname, store.isLoading, store._path]);
-
     return (
         <LoadingContext.Provider value={{ ...store, showLoader }}>
             {children}
@@ -113,11 +107,15 @@ export const useLoading = () => {
 
 // This hook is for pages to signal when they are done loading data
 export const usePageLoading = (pageIsLoading: boolean) => {
-    const { hideLoader, isLoading } = useLoadingStore();
+    const { setDataReady, isLoading } = useLoadingStore();
     
     useEffect(() => {
         if (!pageIsLoading && isLoading) {
-            hideLoader();
+            setDataReady(true);
         }
-    }, [pageIsLoading, isLoading, hideLoader]);
+         // Reset dataReady state when the component unmounts or page starts loading again
+        return () => {
+            setDataReady(false);
+        };
+    }, [pageIsLoading, isLoading, setDataReady]);
 };
