@@ -53,9 +53,7 @@ export default function StaffPage() {
     const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
-    const [isDeleteAlertOpen, setDeleteAlertOpen] = useState(false);
     const [isDeleteCodeAlertOpen, setDeleteCodeAlertOpen] = useState(false);
-    const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
     const [selectedCode, setSelectedCode] = useState<InviteCode | null>(null);
 
     // Fetch staff list for the admin's shop
@@ -145,27 +143,6 @@ export default function StaffPage() {
         }
     };
 
-    const confirmRemoveStaff = (staff: StaffMember) => {
-        setSelectedStaff(staff);
-        setDeleteAlertOpen(true);
-    };
-
-    const handleRemoveStaff = async () => {
-        if (!selectedStaff) return;
-        try {
-            const staffDocRef = doc(db, "users", selectedStaff.id);
-            await updateDoc(staffDocRef, { shopId: null });
-
-            toast({ title: "Success", description: `${selectedStaff.name} has been removed from the shop.` });
-        } catch (error) {
-            console.error("Error removing staff:", error);
-            toast({ title: "Error", description: "Failed to remove staff.", variant: "destructive" });
-        } finally {
-            setDeleteAlertOpen(false);
-            setSelectedStaff(null);
-        }
-    };
-
     const confirmDeleteCode = (code: InviteCode) => {
         setSelectedCode(code);
         setDeleteCodeAlertOpen(true);
@@ -215,22 +192,6 @@ export default function StaffPage() {
 
     return (
         <main className="flex-1 p-4 md:p-8">
-             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will remove {selectedStaff?.name} from your shop. They will lose all access. They can rejoin later if you provide a new code.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRemoveStaff} className="bg-destructive hover:bg-destructive/90">
-                            Remove Staff
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
             <AlertDialog open={isDeleteCodeAlertOpen} onOpenChange={setDeleteCodeAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -321,13 +282,9 @@ export default function StaffPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(staff)}>
+                                            <Button variant="outline" size="sm" onClick={() => handleToggleStatus(staff)}>
                                                 {staff.status === 'active' ? <ShieldOff className="mr-2 h-4 w-4" /> : <Shield className="mr-2 h-4 w-4" />}
                                                 {staff.status === 'active' ? 'Block' : 'Unblock'}
-                                            </Button>
-                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => confirmRemoveStaff(staff)}>
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Remove
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -346,5 +303,3 @@ export default function StaffPage() {
         </main>
     );
 }
-
-    

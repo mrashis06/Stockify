@@ -39,9 +39,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         // If staff has no shopId, redirect them to join a shop
         router.push('/join-shop');
       } else if (user.role === 'staff' && !isStaffActive) {
-          // If staff is blocked, show an appropriate message or redirect
-          // For now, redirecting to a simple blocked page (to be created)
-          // Or just log them out
+          // If staff is blocked, log them out and show an error.
           signOut(auth).then(() => router.push('/login?error=blocked'));
       }
     }
@@ -60,7 +58,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isAdmin = user?.role === 'admin';
 
   // While loading auth state or if there's no user (and we are about to redirect), show a loader.
-  if (authLoading || !user || (user.role === 'staff' && !shopId)) {
+  if (authLoading || !user || (user.role === 'staff' && !shopId) || (user.role === 'staff' && !isStaffActive)) {
     return (
         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
             <div>Loading...</div>

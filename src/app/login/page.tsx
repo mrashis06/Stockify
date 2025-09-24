@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   signInWithEmailAndPassword, 
   AuthError
@@ -23,14 +23,28 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-export default function LoginPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
+
+  useEffect(() => {
+    const errorType = searchParams.get('error');
+    if (errorType === 'blocked') {
+        toast({
+            title: "Access Denied",
+            description: "Your account has been blocked by the administrator.",
+            variant: "destructive",
+        });
+    }
+  }, [searchParams, toast]);
 
   useEffect(() => {
     // If the user is already logged in, redirect them to the dashboard.
@@ -42,6 +56,7 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setAuthError('');
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/dashboard');
@@ -51,11 +66,7 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
       if ((error as AuthError).code === 'auth/invalid-credential') {
           description = "Invalid credentials. Please check your email and password and try again.";
       }
-      toast({
-        title: "Authentication Error",
-        description: description,
-        variant: "destructive",
-      });
+      setAuthError(description);
       setLoading(false);
     }
   };
@@ -78,6 +89,11 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {authError && (
+              <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+          )}
           <form onSubmit={handleEmailSignIn} className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">Email address</Label>
