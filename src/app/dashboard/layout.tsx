@@ -101,7 +101,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  <AvatarImage src={"https://picsum.photos/seed/user-avatar/40/40"} data-ai-hint="male avatar" alt="User" />
+                  
                   <AvatarFallback>
                     {user.displayName ? user.displayName.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
                   </AvatarFallback>
