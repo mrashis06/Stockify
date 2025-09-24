@@ -56,6 +56,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         from: new Date(),
         to: new Date(),
     });
+    const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
     usePageLoading(loading);
