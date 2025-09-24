@@ -81,7 +81,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: user?.name || '',
-      dob: user?.dob ? parseISO(user.dob) : undefined,
+      dob: user?.dob ? parseISO(user.dob) : new Date(),
     },
   });
 
@@ -89,7 +89,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
     if (user) {
       form.reset({
         name: user.name || '',
-        dob: user.dob ? parseISO(user.dob) : undefined,
+        dob: user.dob ? parseISO(user.dob) : new Date(),
       });
     }
   }, [user, form]);
@@ -111,8 +111,8 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
 
   const handleLogout = async () => {
     await signOut(auth);
-    router.push('/login');
     router.refresh();
+    router.push('/login');
   };
 
   return (

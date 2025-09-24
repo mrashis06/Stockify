@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, orderBy, Timestamp } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, XCircle, ClipboardCopy } from 'lucide-react';
+import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, XCircle, ChevronDown, ChevronUp, Phone, Cake, FileText, User } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { differenceInDays, formatDistanceToNow } from 'date-fns';
+import { differenceInDays, format, parseISO } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -37,6 +37,10 @@ type StaffMember = {
     id: string;
     name: string;
     email: string;
+    phone: string;
+    dob: string;
+    aadhaar: string;
+    pan: string;
     status: 'active' | 'blocked';
 }
 
@@ -61,8 +65,8 @@ export default function StaffPage() {
     const [lastGeneratedCode, setLastGeneratedCode] = useState<string | null>(null);
     const [isRemoveStaffAlertOpen, setIsRemoveStaffAlertOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-    // Fetch staff list and invite codes for the admin's shop
     useEffect(() => {
         if (user && user.shopId) {
             setLoading(true);
@@ -92,7 +96,7 @@ export default function StaffPage() {
                 console.error("Invites listener error: ", error);
                 toast({
                     title: "Database Error",
-                    description: "Could not fetch invite codes. A database index might be required. Please follow the instructions in the browser console.",
+                    description: "Could not fetch invite codes. A database index might be required.",
                     variant: "destructive",
                 });
                 setLoading(false);
@@ -177,7 +181,6 @@ export default function StaffPage() {
     const handleRemoveStaff = async () => {
         if (!selectedStaff) return;
         try {
-            // This is a "soft delete" - the user's auth record remains but they are removed from the shop.
             await updateDoc(doc(db, "users", selectedStaff.id), {
                 shopId: null,
                 status: 'blocked'
@@ -202,6 +205,16 @@ export default function StaffPage() {
         if (daysLeft <= 0) return { text: 'Expired', isExpired: true, badgeColor: 'bg-red-500' };
         if (daysLeft <= 2) return { text: `Expires in ${daysLeft} days`, isExpired: false, badgeColor: 'bg-yellow-500 text-yellow-900' };
         return { text: `Expires in ${daysLeft} days`, isExpired: false, badgeColor: 'bg-yellow-300 text-yellow-800' };
+    };
+    
+    const toggleRowExpansion = (staffId: string) => {
+        const newSet = new Set(expandedRows);
+        if (newSet.has(staffId)) {
+            newSet.delete(staffId);
+        } else {
+            newSet.add(staffId);
+        }
+        setExpandedRows(newSet);
     };
 
 
@@ -233,7 +246,6 @@ export default function StaffPage() {
 
     return (
         <main className="flex-1 p-4 md:p-8 max-w-4xl mx-auto">
-            {/* Delete Invite Code Alert */}
             <AlertDialog open={isDeleteCodeAlertOpen} onOpenChange={setDeleteCodeAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -250,7 +262,6 @@ export default function StaffPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            {/* Remove Staff Alert */}
             <AlertDialog open={isRemoveStaffAlertOpen} onOpenChange={setIsRemoveStaffAlertOpen}>
                  <AlertDialogContent>
                     <AlertDialogHeader>
@@ -329,6 +340,7 @@ export default function StaffPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-12"></TableHead>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Email</TableHead>
                                     <TableHead>Status</TableHead>
@@ -338,27 +350,62 @@ export default function StaffPage() {
                             <TableBody>
                                 {staffList.length > 0 ? (
                                     staffList.map(staff => (
-                                        <TableRow key={staff.id}>
-                                            <TableCell className="font-medium">{staff.name}</TableCell>
-                                            <TableCell>{staff.email}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                                                    {staff.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right space-x-4">
-                                                <Button variant="link" size="sm" className="p-0 h-auto font-medium text-blue-600" onClick={() => handleToggleStatus(staff)}>
-                                                    {staff.status === 'active' ? 'Block' : 'Unblock'}
-                                                </Button>
-                                                <Button variant="link" size="sm" className="p-0 h-auto font-medium text-destructive" onClick={() => confirmRemoveStaff(staff)}>
-                                                    Remove
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
+                                       <React.Fragment key={staff.id}>
+                                            <TableRow>
+                                                <TableCell>
+                                                    <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(staff.id)} className="h-8 w-8">
+                                                        {expandedRows.has(staff.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell className="font-medium">{staff.name}</TableCell>
+                                                <TableCell>{staff.email}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                                        {staff.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right space-x-4">
+                                                    <Button variant="link" size="sm" className="p-0 h-auto font-medium text-blue-600" onClick={() => handleToggleStatus(staff)}>
+                                                        {staff.status === 'active' ? 'Block' : 'Unblock'}
+                                                    </Button>
+                                                    <Button variant="link" size="sm" className="p-0 h-auto font-medium text-destructive" onClick={() => confirmRemoveStaff(staff)}>
+                                                        Remove
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                            {expandedRows.has(staff.id) && (
+                                                 <TableRow key={`${staff.id}-details`} className="bg-muted/50 hover:bg-muted/50">
+                                                    <TableCell colSpan={5} className="p-4">
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                             <div className="flex items-center gap-2 text-sm">
+                                                                <Phone className="h-4 w-4 text-muted-foreground" />
+                                                                <strong>Phone:</strong>
+                                                                <span>{staff.phone || 'N/A'}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-sm">
+                                                                <Cake className="h-4 w-4 text-muted-foreground" />
+                                                                <strong>DOB:</strong>
+                                                                <span>{staff.dob ? format(parseISO(staff.dob), 'PPP') : 'N/A'}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-sm">
+                                                                <User className="h-4 w-4 text-muted-foreground" />
+                                                                <strong>Aadhaar:</strong>
+                                                                <span>{staff.aadhaar || 'N/A'}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-sm">
+                                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                                <strong>PAN:</strong>
+                                                                <span>{staff.pan || 'N/A'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                 </TableRow>
+                                            )}
+                                        </React.Fragment>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
+                                        <TableCell colSpan={5} className="h-24 text-center">
                                             No staff have joined your shop yet.
                                         </TableCell>
                                     </TableRow>
@@ -371,5 +418,3 @@ export default function StaffPage() {
         </main>
     );
 }
-
-    
