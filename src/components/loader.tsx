@@ -106,7 +106,7 @@ export default function Loader() {
         <div className="absolute inset-0 w-full h-full pointer-events-none">
              <div className="absolute inset-0 bg-background-gradient" />
              <div className="absolute inset-0 bg-spotlight-gradient" />
-            <div className="absolute bottom-0 left-0 right-0 h-2/3 flex justify-between items-end px-4 md:px-16 text-foreground/5 dark:text-foreground/10 dark:drop-shadow-[0_0_15px_hsl(var(--foreground)/0.15)]">
+            <div className="absolute bottom-0 left-0 right-0 h-2/3 flex justify-between items-end px-4 md:px-16 text-foreground/10 dark:text-foreground/15 dark:drop-shadow-[0_0_15px_hsl(var(--foreground)/0.15)]">
                 <div className="flex items-end gap-2 md:gap-4">
                      <svg width="40" height="100" viewBox="0 0 40 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-7 md:w-8 -ml-4"><path d="M10 100 V 45 C 8 40, 12 35, 20 35 C 28 35, 32 40, 30 45 V 100 H 10 Z" fill="currentColor" /><path d="M15 35 V 5 H 25 V 35 H 15 Z" fill="currentColor" /></svg>
                      <svg width="70" height="130" viewBox="0 0 70 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-12 md:w-14 -mx-2"><path d="M15 130 V 50 C 15 35, 20 25, 35 25 C 50 25, 55 35, 55 50 V 130 H 15 Z" fill="currentColor"/><path d="M30 25 V 10 H 40 V 25 H 30 Z" fill="currentColor" /></svg>
