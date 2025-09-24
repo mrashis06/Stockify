@@ -70,10 +70,10 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             if (range?.from && date?.from) {
                 // If the new date is before the start date, start a new selection
                 if (isAfter(date.from, range.from)) {
-                     setDate({ from: range.from, to: range.from });
+                     setDate({ from: range.from, to: undefined }); // Start a new range
                      setIsSelectingFirstDay(false);
                 } else {
-                    setDate({ from: date.from, to: range.from });
+                    setDate({ from: date.from, to: range.from }); // Complete the range
                     setIsSelectingFirstDay(true);
                 }
             }
@@ -120,9 +120,10 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     }, [fetchReportData, date]);
 
     const handleFilter = () => {
-        if (date) {
+        if (date?.from) {
+            // Close the popover by resetting the selection state
+            setIsSelectingFirstDay(true); 
             fetchReportData(date);
-            setIsSelectingFirstDay(true); // Reset selection logic after generating
         } else {
             toast({ title: "Error", description: "Please select a date range.", variant: "destructive" });
         }
@@ -282,7 +283,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         });
 
         // Use a separate autoTable call for the grand total to ensure clean styling
-        if (Object.keys(salesByDateForExport).length > 0) {
+        if (Object.keys(salesByDateForExport).length > 1) { // Only show if more than one day
             const finalY = (doc as any).lastAutoTable.finalY;
             doc.autoTable({
                 startY: finalY + 10,
@@ -298,7 +299,16 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     0: { halign: 'left' },
                     4: { halign: 'right' },
                     5: { halign: 'right' }
-                }
+                },
+                foot: [
+                    ['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]
+                ],
+                 footStyles: {
+                    fillColor: [22, 163, 74],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    fontSize: 12,
+                },
             });
         }
         
@@ -488,5 +498,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
+
+    
 
     
