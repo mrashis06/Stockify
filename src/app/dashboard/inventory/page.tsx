@@ -201,6 +201,10 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         return onBarInventory.reduce((total, item) => total + (item.salesValue || 0), 0);
     }, [onBarInventory]);
 
+    const soldOnBarItems = useMemo(() => {
+        return onBarInventory.filter(item => item.salesVolume > 0);
+    }, [onBarInventory]);
+
   if (loading) {
     return null;
   }
@@ -423,6 +427,23 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                     </div>
                                 </TableCell>
                             </TableRow>
+                            {soldOnBarItems.length > 0 && (
+                                <>
+                                    {soldOnBarItems.map(item => (
+                                        <TableRow key={`onbar-${item.id}`} className="text-xs">
+                                            <TableCell colSpan={9} className="text-right italic text-muted-foreground pr-4">
+                                                {item.brand}
+                                            </TableCell>
+                                            <TableCell colSpan={2} className="italic text-muted-foreground">
+                                                {item.category === 'Beer' 
+                                                    ? `${item.salesVolume} units` 
+                                                    : `${item.salesVolume}ml`
+                                                }
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </>
+                            )}
                              <TableRow className="border-t-2 border-primary/50">
                                 <TableCell colSpan={9} className="text-right font-extrabold text-xl text-primary">Grand Total Sales</TableCell>
                                 <TableCell colSpan={2} className="font-extrabold text-xl text-primary">
