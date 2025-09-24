@@ -161,42 +161,15 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                 </div>
                                 
                                 <div className="space-y-2">
-                                     {isBeer ? (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="outline" className="w-full" disabled={remaining <= 0}>
-                                                    <Beer className="mr-2 h-4 w-4" /> Sell Beer
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                <DropdownMenuLabel>Select Quantity</DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                {beerSaleQuantities.map(qty => (
-                                                     <DropdownMenuItem
-                                                        key={qty}
-                                                        disabled={remaining < qty}
-                                                        onClick={() => handleSell(item.id, qty, item.price * qty)}
-                                                        className="flex justify-between"
-                                                     >
-                                                        <span>Sell {qty} Unit(s)</span>
-                                                        <span className="text-muted-foreground">₹{item.price * qty}</span>
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                     ) : (
-                                        <div className="flex justify-center items-center gap-2">
-                                             <Button
-                                                variant="outline"
-                                                className="flex-1"
-                                                disabled={remaining <= 0}
-                                                onClick={() => handleOpenSellDialog(item)}
-                                            >
-                                                <Minus className="mr-2 h-4 w-4" />
-                                                Sell Peg
-                                            </Button>
-                                        </div>
-                                     )}
+                                     <Button
+                                        variant="outline"
+                                        className="w-full"
+                                        disabled={remaining <= 0}
+                                        onClick={() => handleOpenSellDialog(item)}
+                                    >
+                                        {isBeer ? <Beer className="mr-2 h-4 w-4" /> : <Minus className="mr-2 h-4 w-4" />}
+                                        {isBeer ? 'Sell Beer' : 'Sell Peg'}
+                                    </Button>
 
                                      <Button
                                         variant="outline"
