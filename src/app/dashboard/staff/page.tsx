@@ -2,10 +2,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, writeBatch, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield } from 'lucide-react';
+import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, ClipboardCopy } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Separator } from '@/components/ui/separator';
 
 type StaffMember = {
     id: string;
@@ -38,82 +39,84 @@ type StaffMember = {
     status: 'active' | 'blocked';
 }
 
+type InviteCode = {
+    id: string;
+    code: string;
+    status: 'pending' | 'accepted';
+}
+
 export default function StaffPage() {
     const { user } = useAuth();
     const { toast } = useToast();
-    const [shopCode, setShopCode] = useState<string | null>(null);
     const [staffList, setStaffList] = useState<StaffMember[]>([]);
+    const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [isDeleteAlertOpen, setDeleteAlertOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
 
-    // Fetch or create Shop ID for the admin
-    useEffect(() => {
-        if (user && user.role === 'admin') {
-            const fetchShop = async () => {
-                setLoading(true);
-                const q = query(collection(db, "shops"), where("ownerId", "==", user.uid));
-                const querySnapshot = await getDoc(doc(db, "users", user.uid));
-                const userData = querySnapshot.data();
-                
-                if (userData && userData.shopId) {
-                     const shopDoc = await getDoc(doc(db, "shops", userData.shopId));
-                     if(shopDoc.exists()) {
-                         setShopCode(shopDoc.data().shopId);
-                     }
-                }
-                setLoading(false);
-            };
-            fetchShop();
-        }
-    }, [user]);
-    
     // Fetch staff list for the admin's shop
     useEffect(() => {
         if (user && user.shopId) {
-            const q = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
-            const unsubscribe = onSnapshot(q, (snapshot) => {
+            setLoading(true);
+            const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
+            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"));
+
+            const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
                 const staff: StaffMember[] = [];
                 snapshot.forEach(doc => {
                     staff.push({ id: doc.id, ...doc.data() } as StaffMember);
                 });
                 setStaffList(staff);
+                if(loading) setLoading(false);
             });
-            return () => unsubscribe();
+
+            const unsubscribeInvites = onSnapshot(invitesQuery, (snapshot) => {
+                const codes: InviteCode[] = [];
+                snapshot.forEach(doc => {
+                    codes.push({ id: doc.id, ...doc.data() } as InviteCode);
+                });
+                setInviteCodes(codes);
+                 if(loading) setLoading(false);
+            });
+
+            return () => {
+                unsubscribeStaff();
+                unsubscribeInvites();
+            };
+        } else if (user) {
+            setLoading(false);
         }
     }, [user]);
 
     const handleGenerateCode = async () => {
-        if (!user || user.role !== 'admin') return;
+        if (!user || !user.shopId) {
+            toast({ title: "Shop Not Found", description: "You must have a shop to generate invite codes.", variant: "destructive" });
+            return;
+        };
         setGenerating(true);
         try {
             const newCode = uuidv4().substring(0, 8).toUpperCase();
-            const shopDocRef = doc(collection(db, "shops"));
-
-            await setDoc(shopDocRef, {
-                shopId: newCode,
+            await addDoc(collection(db, "invites"), {
+                code: newCode,
+                shopId: user.shopId,
                 ownerId: user.uid,
+                status: 'pending',
+                createdAt: serverTimestamp(),
             });
 
-            // Also update the admin's user doc with their own shopId
-            const userDocRef = doc(db, "users", user.uid);
-            await updateDoc(userDocRef, { shopId: shopDocRef.id });
-
-            setShopCode(newCode);
-            toast({ title: "Success", description: "New shop code generated." });
+            toast({ title: "Success", description: "New invite code generated." });
         } catch (error) {
             console.error("Error generating code:", error);
-            toast({ title: "Error", description: "Failed to generate shop code.", variant: "destructive" });
+            toast({ title: "Error", description: "Failed to generate invite code.", variant: "destructive" });
         } finally {
             setGenerating(false);
         }
     };
     
-    const handleCopyCode = () => {
-        if (!shopCode) return;
-        navigator.clipboard.writeText(shopCode);
-        toast({ title: "Copied!", description: "Shop code copied to clipboard." });
+    const handleCopyCode = (code: string) => {
+        navigator.clipboard.writeText(code);
+        toast({ title: "Copied!", description: "Invite code copied to clipboard." });
     };
 
     const handleToggleStatus = async (staff: StaffMember) => {
@@ -136,7 +139,6 @@ export default function StaffPage() {
     const handleRemoveStaff = async () => {
         if (!selectedStaff) return;
         try {
-            // This will 'remove' the staff by detaching them from the shop
             const staffDocRef = doc(db, "users", selectedStaff.id);
             await updateDoc(staffDocRef, { shopId: null });
 
@@ -158,6 +160,25 @@ export default function StaffPage() {
             </div>
         )
     }
+    
+    if (!user?.shopId) {
+        return (
+             <main className="flex-1 p-4 md:p-8">
+                 <h1 className="text-2xl font-bold tracking-tight mb-6">Staff Management</h1>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary"/> Create Your Shop</CardTitle>
+                        <CardDescription>To invite staff, you first need to create your shop to get a unique Shop ID.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <p className="text-sm text-muted-foreground">This is a one-time process. Once your shop is created, you can start generating invite codes for your staff.</p>
+                       {/* This functionality is handled in the join-shop page for the admin, but we can provide a dummy button for now. */}
+                        <Button className="mt-4" disabled>Create Shop (Handled on first setup)</Button>
+                    </CardContent>
+                 </Card>
+            </main>
+        )
+    }
 
     return (
         <main className="flex-1 p-4 md:p-8">
@@ -166,7 +187,7 @@ export default function StaffPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will remove {selectedStaff?.name} from your shop. They will lose all access. They can rejoin later if you provide the code again.
+                            This will remove {selectedStaff?.name} from your shop. They will lose all access. They can rejoin later if you provide a new code.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -178,25 +199,38 @@ export default function StaffPage() {
                 </AlertDialogContent>
             </AlertDialog>
             <h1 className="text-2xl font-bold tracking-tight mb-6">Staff Management</h1>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary"/> Your Shop Code</CardTitle>
-                        <CardDescription>Share this code with your staff to let them join your shop.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary"/> Invite Staff</CardTitle>
+                        <CardDescription>Generate a unique, single-use code to invite a new staff member.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {shopCode ? (
-                            <div className="flex items-center justify-between gap-4 p-3 border-2 border-dashed rounded-lg">
-                                <span className="text-2xl font-bold tracking-widest font-mono text-center w-full">{shopCode}</span>
-                                <Button variant="ghost" size="icon" onClick={handleCopyCode}>
-                                    <Copy className="h-5 w-5" />
-                                </Button>
-                            </div>
+                        <Button onClick={handleGenerateCode} disabled={generating} className="w-full">
+                            {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                            Generate New Invite Code
+                        </Button>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><ClipboardCopy className="h-5 w-5 text-primary"/> Pending Invite Codes</CardTitle>
+                        <CardDescription>Share these codes with new staff. They are single-use.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {inviteCodes.length > 0 ? (
+                           <div className="space-y-2">
+                                {inviteCodes.map(invite => (
+                                    <div key={invite.id} className="flex items-center justify-between gap-4 p-2 border rounded-lg">
+                                        <span className="font-mono text-sm tracking-widest">{invite.code}</span>
+                                        <Button variant="ghost" size="icon" onClick={() => handleCopyCode(invite.code)}>
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                           </div>
                         ) : (
-                            <Button onClick={handleGenerateCode} disabled={generating} className="w-full">
-                                {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-                                Generate Shop Code
-                            </Button>
+                            <p className="text-sm text-muted-foreground text-center py-4">No pending invites. Generate a new code to invite staff.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -254,4 +288,3 @@ export default function StaffPage() {
         </main>
     );
 }
-

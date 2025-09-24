@@ -68,10 +68,12 @@ export default function SignupPage() {
         createdAt: serverTimestamp(),
       });
       
-      if (role === 'staff') {
+      if (role === 'staff' || (role === 'admin' && user.uid !== ADMIN_UID)) {
           router.push('/join-shop');
       } else {
-          router.push('/dashboard');
+          // This is the main admin, check if they need to setup their shop
+          // The join-shop page will handle the "Create My Shop" flow for the admin
+          router.push('/join-shop');
       }
 
     } catch (error) {

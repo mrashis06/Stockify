@@ -1,13 +1,14 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { doc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
+import { doc, getDocs, collection, query, where, updateDoc, writeBatch, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, LogOut } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,11 +30,20 @@ export default function JoinShopPage() {
     const { toast } = useToast();
     const [shopCode, setShopCode] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isAdminSetup, setIsAdminSetup] = useState(false);
+    
+    // Determine if this is an admin's first setup
+    useEffect(() => {
+        if (user && user.role === 'admin' && !user.shopId) {
+            setIsAdminSetup(true);
+        }
+    }, [user]);
+
 
     const handleJoinShop = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!shopCode) {
-            toast({ title: "Error", description: "Please enter a shop code.", variant: "destructive" });
+            toast({ title: "Error", description: "Please enter an invite code.", variant: "destructive" });
             return;
         }
         if (!user) {
@@ -44,25 +54,28 @@ export default function JoinShopPage() {
         setLoading(true);
 
         try {
-            const shopsRef = collection(db, "shops");
-            const q = query(shopsRef, where("shopId", "==", shopCode));
+            const invitesRef = collection(db, "invites");
+            const q = query(invitesRef, where("code", "==", shopCode), where("status", "==", "pending"));
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
-                toast({ title: "Invalid Code", description: "The shop code you entered is not valid. Please check and try again.", variant: "destructive" });
+                toast({ title: "Invalid Code", description: "This invite code is not valid, has expired, or has already been used.", variant: "destructive" });
                 setLoading(false);
                 return;
             }
+            
+            const batch = writeBatch(db);
 
-            // Assuming shop codes are unique, so we take the first one
-            const shopDoc = querySnapshot.docs[0];
-            const shopId = shopDoc.id;
+            // Mark invite as used
+            const inviteDoc = querySnapshot.docs[0];
+            const inviteData = inviteDoc.data();
+            batch.update(inviteDoc.ref, { status: 'accepted', acceptedBy: user.uid, acceptedAt: serverTimestamp() });
 
-            // Update the user's document with the shopId
+            // Update user's doc with the shopId
             const userDocRef = doc(db, "users", user.uid);
-            await updateDoc(userDocRef, {
-                shopId: shopId,
-            });
+            batch.update(userDocRef, { shopId: inviteData.shopId });
+
+            await batch.commit();
 
             toast({ title: "Success!", description: "You have successfully joined the shop." });
             router.push('/dashboard');
@@ -74,6 +87,35 @@ export default function JoinShopPage() {
         }
     };
     
+    const handleCreateShop = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user || user.role !== 'admin') return;
+        setLoading(true);
+        
+        try {
+            const shopDocRef = doc(collection(db, "shops"));
+            const userDocRef = doc(db, "users", user.uid);
+
+            const batch = writeBatch(db);
+            batch.set(shopDocRef, {
+                ownerId: user.uid,
+                createdAt: serverTimestamp()
+            });
+            batch.update(userDocRef, {
+                shopId: shopDocRef.id
+            });
+            await batch.commit();
+            
+            toast({ title: "Shop Created!", description: "Your shop has been successfully created. You can now manage your staff." });
+            router.push('/dashboard/staff');
+
+        } catch (error) {
+            console.error("Error creating shop: ", error);
+            toast({ title: "Error", description: "Could not create your shop. Please try again.", variant: "destructive" });
+            setLoading(false);
+        }
+    };
+
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/login');
@@ -92,6 +134,35 @@ export default function JoinShopPage() {
         return null;
     }
 
+    if (isAdminSetup) {
+         return (
+            <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+                <Card className="mx-auto w-full max-w-sm">
+                    <CardHeader className="text-center">
+                        <CardTitle className="text-2xl font-bold">Create Your Shop</CardTitle>
+                        <CardDescription>
+                            Welcome, Admin! Complete this one-time step to set up your shop and start managing your inventory and staff.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleCreateShop} className="grid gap-4">
+                            <Button type="submit" className="w-full" disabled={loading}>
+                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Create My Shop
+                            </Button>
+                        </form>
+                         <div className="mt-4 border-t pt-4">
+                            <Button variant="outline" className="w-full" onClick={handleLogout}>
+                                <LogOut className="mr-2 h-4 w-4" />
+                                Log Out
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
 
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
@@ -99,20 +170,20 @@ export default function JoinShopPage() {
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl font-bold">Join a Shop</CardTitle>
                     <CardDescription>
-                        Enter the Shop Code provided by your admin to get access.
+                        Enter the single-use Invite Code provided by your admin.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleJoinShop} className="grid gap-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="shop-code">Shop Code</Label>
+                            <Label htmlFor="shop-code">Invite Code</Label>
                             <Input
                                 id="shop-code"
                                 type="text"
                                 placeholder="Enter code"
                                 required
                                 value={shopCode}
-                                onChange={(e) => setShopCode(e.target.value)}
+                                onChange={(e) => setShopCode(e.target.value.toUpperCase())}
                                 disabled={loading}
                             />
                         </div>
@@ -132,4 +203,3 @@ export default function JoinShopPage() {
         </div>
     );
 }
-
