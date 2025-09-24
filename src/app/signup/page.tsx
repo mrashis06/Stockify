@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ADMIN_UID } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
-export default function SignupPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [name, setName] = React.useState('');
@@ -63,10 +63,17 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
         name: name,
         email: email,
         role: role,
+        status: 'active', // All new users are active by default
+        shopId: null, // Staff will set this in the next step
         createdAt: serverTimestamp(),
       });
+      
+      if (role === 'staff') {
+          router.push('/join-shop');
+      } else {
+          router.push('/dashboard');
+      }
 
-      router.push('/dashboard');
     } catch (error) {
       console.error("Error signing up with email and password: ", error);
       const authError = error as AuthError;

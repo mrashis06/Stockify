@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { ReactNode, useEffect } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -25,21 +25,27 @@ import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/hooks/use-loading';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
-export default function DashboardLayout({ children, params, searchParams }: { children: ReactNode, params: { slug: string }, searchParams?: { [key: string]: string | string[] | undefined } }) {
-  const { user, loading: authLoading } = useAuth();
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-
+  const [isMobileMenuOpen, useState] = useState(false);
+  
   useEffect(() => {
-    // Only perform redirection checks once the initial auth state has been determined.
     if (!authLoading) {
-      // If auth check is complete and there's no user, redirect to login.
       if (!user) {
         router.push('/login');
+      } else if (user.role === 'staff' && !shopId) {
+        // If staff has no shopId, redirect them to join a shop
+        router.push('/join-shop');
+      } else if (user.role === 'staff' && !isStaffActive) {
+          // If staff is blocked, show an appropriate message or redirect
+          // For now, redirecting to a simple blocked page (to be created)
+          // Or just log them out
+          signOut(auth).then(() => router.push('/login?error=blocked'));
       }
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, shopId, isStaffActive]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -47,12 +53,14 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   };
   
   const handleNav = (path: string, pageName: string) => {
-    setIsMobileMenuOpen(false);
+    useState(false);
     showLoader(pageName, path);
   }
+  
+  const isAdmin = user?.role === 'admin';
 
   // While loading auth state or if there's no user (and we are about to redirect), show a loader.
-  if (authLoading || !user) {
+  if (authLoading || !user || (user.role === 'staff' && !shopId)) {
     return (
         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
             <div>Loading...</div>
@@ -60,12 +68,22 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
     );
   }
   
-  // If we have a user, render the dashboard.
+  const navItems = [
+      { href: "/", pageName: 'Home', icon: Home, label: "Home" },
+      { href: "/dashboard", pageName: 'Dashboard', icon: LayoutDashboard, label: "Dashboard" },
+      { href: "/dashboard/inventory", pageName: 'Inventory', icon: Warehouse, label: "Inventory" },
+      { href: "/dashboard/godown", pageName: 'Godown', icon: Archive, label: "Godown" },
+      { href: "/dashboard/onbar", pageName: 'OnBar', icon: GlassWater, label: "OnBar" },
+      ...(isAdmin ? [{ href: "/dashboard/staff", pageName: 'Staff', icon: Users, label: "Staff" }] : []),
+      { href: "/dashboard/reports", pageName: 'Reports', icon: FileText, label: "Reports" },
+  ];
+
+  
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
        <header className="sticky top-0 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6 z-50">
         <div className="flex items-center gap-4">
-           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+           <Sheet open={isMobileMenuOpen} onOpenChange={useState}>
             <SheetTrigger asChild>
               <Button
                 variant="outline"
@@ -82,30 +100,12 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
                     <SheetDescription className="sr-only">Main dashboard navigation</SheetDescription>
                 </SheetHeader>
                 <nav className="grid gap-6 text-lg font-medium mt-8">
-                    <NavLink href="/" pageName='Home' onNavigate={handleNav}>
-                        <Home className="h-5 w-5" />
-                        Home
-                    </NavLink>
-                    <NavLink href="/dashboard" pageName='Dashboard' onNavigate={handleNav}>
-                        <LayoutDashboard className="h-5 w-5" />
-                        Dashboard
-                    </NavLink>
-                    <NavLink href="/dashboard/inventory" pageName='Inventory' onNavigate={handleNav}>
-                        <Warehouse className="h-5 w-5" />
-                        Inventory
-                    </NavLink>
-                    <NavLink href="/dashboard/godown" pageName='Godown' onNavigate={handleNav}>
-                        <Archive className="h-5 w-5" />
-                        Godown
-                    </NavLink>
-                    <NavLink href="/dashboard/onbar" pageName='OnBar' onNavigate={handleNav}>
-                        <GlassWater className="h-5 w-5" />
-                        OnBar
-                    </NavLink>
-                    <NavLink href="/dashboard/reports" pageName='Reports' onNavigate={handleNav}>
-                        <FileText className="h-5 w-5" />
-                        Reports
-                    </NavLink>
+                     {navItems.map(item => (
+                        <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
+                            <item.icon className="h-5 w-5" />
+                            {item.label}
+                        </NavLink>
+                    ))}
                 </nav>
             </SheetContent>
           </Sheet>
@@ -120,30 +120,12 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
         </div>
 
         <nav className="hidden flex-col gap-6 text-sm font-medium md:flex md:flex-row md:items-center md:gap-5 lg:gap-6">
-           <NavLink href="/" pageName='Home' onNavigate={handleNav}>
-              <Home className="h-4 w-4" />
-              Home
-          </NavLink>
-           <NavLink href="/dashboard" pageName='Dashboard' onNavigate={handleNav}>
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-          </NavLink>
-           <NavLink href="/dashboard/inventory" pageName='Inventory' onNavigate={handleNav}>
-              <Warehouse className="h-4 w-4" />
-              Inventory
-          </NavLink>
-          <NavLink href="/dashboard/godown" pageName='Godown' onNavigate={handleNav}>
-              <Archive className="h-4 w-4" />
-              Godown
-          </NavLink>
-          <NavLink href="/dashboard/onbar" pageName='OnBar' onNavigate={handleNav}>
-              <GlassWater className="h-4 w-4" />
-              OnBar
-          </NavLink>
-           <NavLink href="/dashboard/reports" pageName='Reports' onNavigate={handleNav}>
-              <FileText className="h-4 w-4" />
-              Reports
-          </NavLink>
+           {navItems.map(item => (
+              <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+              </NavLink>
+            ))}
         </nav>
         
         <div className="flex items-center gap-2 sm:gap-4">
@@ -170,6 +152,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
               <DropdownMenuLabel className="flex items-center gap-2">
                 {user.displayName || 'My Account'}
                 {user.role === 'admin' && <Badge variant="destructive">Admin</Badge>}
+                {user.role === 'staff' && <Badge variant="secondary">Staff</Badge>}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <Link href="/dashboard/settings">
@@ -189,3 +172,4 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
     </div>
   );
 }
+

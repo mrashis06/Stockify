@@ -10,13 +10,17 @@ export type AppUser = User & {
     role?: string;
     name?: string;
     dob?: string;
+    shopId?: string | null;
+    status?: 'active' | 'blocked';
 };
 
 type AuthContextType = {
     user: AppUser | null;
     loading: boolean;
     updateUser: (uid: string, data: Partial<AppUser>) => Promise<void>;
-}
+    shopId: string | null;
+    isStaffActive: boolean;
+};
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -32,42 +36,46 @@ export function useAuth() {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shopId, setShopId] = useState<string | null>(null);
+  const [isStaffActive, setIsStaffActive] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
         if (authUser) {
             const userDocRef = doc(db, 'users', authUser.uid);
-            // Listen for real-time updates to user data
             const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const userData = docSnap.data();
-                    setUser({
+                    const fullUser: AppUser = {
                         ...authUser,
                         displayName: userData.name || authUser.displayName,
                         role: userData.role,
                         name: userData.name || authUser.displayName,
                         dob: userData.dob,
-                    });
+                        shopId: userData.shopId,
+                        status: userData.status,
+                    };
+                    setUser(fullUser);
+                    setShopId(userData.shopId || null);
+                    setIsStaffActive(userData.status === 'active');
                 } else {
-                    // This case might happen if the Firestore doc is not created yet
                     setUser(authUser);
                 }
                  setLoading(false);
             }, (error) => {
                 console.error("Error fetching user data:", error);
-                setUser(authUser); // Still set the basic auth user on error
+                setUser(authUser);
                 setLoading(false);
             });
-            // Return the firestore listener's cleanup function
             return () => unsubDoc();
         } else {
-            // No authenticated user
             setUser(null);
+            setShopId(null);
+            setIsStaffActive(false);
             setLoading(false);
         }
     });
 
-    // Return the auth listener's cleanup function
     return () => unsubscribe();
   }, []);
   
@@ -76,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await updateDoc(userDocRef, data);
   };
 
-  const value = { user, loading, updateUser };
+  const value = { user, loading, updateUser, shopId, isStaffActive };
 
   return (
     <AuthContext.Provider value={value}>
