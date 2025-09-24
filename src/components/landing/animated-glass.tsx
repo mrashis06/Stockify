@@ -18,7 +18,7 @@ const AnimatedGlass = () => {
     const [bubbles, setBubbles] = useState<Bubble[]>([]);
 
     useEffect(() => {
-        // Generate random values for bubbles only on the client
+        // Generate random values for bubbles only on the client to avoid hydration errors
         const generateBubbles = () => {
             return Array.from({ length: 15 }).map((_, i) => ({
                 id: i,
@@ -36,67 +36,71 @@ const AnimatedGlass = () => {
     return (
         <div className="relative w-48 h-64 flex items-center justify-center">
             <svg viewBox="0 0 100 150" className="w-full h-full overflow-visible">
-                {/* Filters for glow effects */}
                 <defs>
-                    <filter id="liquid-glow" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                    <clipPath id="glass-mask">
+                        <path d="M22 140 C22 145, 78 145, 78 140 L78 20 Q78 5, 50 5 Q22 5, 22 20 Z" />
+                    </clipPath>
+                    <linearGradient id="liquid-gradient" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="#FFA500" />
+                        <stop offset="100%" stopColor="#FFC107" />
+                    </linearGradient>
+                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
                         <feMerge>
                             <feMergeNode in="coloredBlur" />
                             <feMergeNode in="SourceGraphic" />
                         </feMerge>
                     </filter>
-                    <filter id="aura-glow" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="15" result="coloredBlur" />
-                    </filter>
-                     <radialGradient id="liquid-gradient" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stopColor="#FFD700" />
-                        <stop offset="100%" stopColor="#FFA500" />
-                    </radialGradient>
                 </defs>
 
-                {/* Pulsing Aura */}
-                <ellipse cx="50" cy="100" rx="40" ry="50" fill="url(#liquid-gradient)" opacity="0.6" filter="url(#aura-glow)" className="animate-[pulse-glow_5s_ease-in-out_infinite]" />
-
-                {/* Light Rays - removed for minimalism as per image */}
-                
-                {/* Glass and Liquid Group */}
-                <g className="drop-shadow-lg dark:drop-shadow-[0_0_10px_#FFA500]">
-                    {/* Liquid fill area */}
+                {/* The group for liquid and bubbles, clipped by the glass mask */}
+                <g clipPath="url(#glass-mask)" filter="url(#glow)">
+                    {/* The main liquid body */}
+                    <rect x="20" y="70" width="60" height="70" fill="url(#liquid-gradient)" />
+                    
+                    {/* Wavy surface on top of the liquid */}
                     <path
-                        d="M25 140 Q50 120 75 140 L78 20 Q50 40 22 20 Z"
+                        d="M20 70 C35 65, 65 75, 80 70 V140 H20 Z"
                         fill="url(#liquid-gradient)"
-                        filter="url(#liquid-glow)"
                         className="animate-[wave_4s_ease-in-out_infinite]"
                     />
-                    
-                    {/* Bubbles */}
+
+                    {/* Bubbles rising within the liquid */}
                     <g>
                         {bubbles.map(b => (
-                        <circle
-                            key={b.id}
-                            cx={b.cx}
-                            cy={b.cy}
-                            r={b.r}
-                            fill="#FFD700"
-                            opacity="0.7"
-                            className="animate-[bubbles-rise_infinite]"
-                            style={{ 
-                                animationDuration: b.duration, 
-                                animationDelay: b.delay,
-                                '--bubble-x-end': b.xEnd 
-                            } as React.CSSProperties}
-                        />
+                            <circle
+                                key={b.id}
+                                cx={b.cx}
+                                cy={b.cy}
+                                r={b.r}
+                                fill="#FFD700"
+                                opacity="0.7"
+                                className="animate-[bubbles-rise_infinite]"
+                                style={{ 
+                                    animationDuration: b.duration, 
+                                    animationDelay: b.delay,
+                                    '--bubble-x-end': b.xEnd 
+                                } as React.CSSProperties}
+                            />
                         ))}
                     </g>
-                    
-                    {/* Glass Outline */}
-                    <path 
-                        d="M20 148 L25 5 C25 -5 75 -5 75 5 L80 148 C85 155 15 155 20 148 Z" 
-                        className="stroke-muted-foreground/30 dark:stroke-amber-300/30 fill-white/10 dark:fill-white/5" 
-                        strokeWidth="1.5"
-                    />
-
                 </g>
+
+                {/* The glass outline */}
+                <path 
+                    d="M20 148 C20 155, 80 155, 80 148 L80 20 Q80 0, 50 0 Q20 0, 20 20 Z" 
+                    className="fill-white/10 dark:fill-white/5 stroke-muted-foreground/30 dark:stroke-amber-300/30" 
+                    strokeWidth="1.5"
+                    style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.1))' }}
+                />
+                 {/* Glossy highlight on the glass */}
+                <path 
+                    d="M25 25 C30 50, 30 100, 25 130" 
+                    stroke="white" 
+                    strokeOpacity="0.2" 
+                    strokeWidth="1.5" 
+                    fill="none" 
+                />
             </svg>
         </div>
     );

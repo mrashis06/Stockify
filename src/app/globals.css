@@ -135,11 +135,14 @@
 }
 
 @keyframes wave {
-  0%, 100% {
-    transform: translateX(-2%);
+  0% {
+    transform: translateX(0);
   }
   50% {
-    transform: translateX(2%);
+    transform: translateX(-5px) translateY(-2px);
+  }
+  100% {
+    transform: translateX(0);
   }
 }
 
