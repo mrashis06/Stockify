@@ -2,19 +2,14 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Minus, Plus, GlassWater, Loader2, Wine, Beer, ChevronDown, IndianRupee } from 'lucide-react';
+import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useOnBarInventory, OnBarItem } from '@/hooks/use-onbar-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
+import SellPegDialog from '@/components/dashboard/sell-peg-dialog';
 import { useInventory } from '@/hooks/use-inventory';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { usePageLoading } from '@/hooks/use-loading';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
@@ -25,6 +20,9 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     usePageLoading(loading);
 
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+    const [isSellPegOpen, setIsSellPegOpen] = useState(false);
+    const [sellingItem, setSellingItem] = useState<OnBarItem | null>(null);
+
 
     const handleAddOnBarItem = async (inventoryItemId: string, volume: number) => {
         try {
@@ -36,11 +34,17 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     };
+
+    const handleOpenSellDialog = (item: OnBarItem) => {
+        setSellingItem(item);
+        setIsSellPegOpen(true);
+    };
     
     const handleSell = async (id: string, volume: number) => {
         try {
             await sellPeg(id, volume);
             toast({ title: 'Success', description: `${volume}ml sold.` });
+            setIsSellPegOpen(false);
         } catch (error) {
             console.error('Error selling item:', error);
             const errorMessage = (error as Error).message || 'Failed to sell item.';
@@ -48,10 +52,10 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         }
     };
 
-    const handleRefill = async (id: string, volume: number) => {
+    const handleRefill = async (id: string, amount: number) => {
         try {
-            await refillPeg(id, volume);
-            toast({ title: 'Success', description: `${volume}ml refilled.` });
+            await refillPeg(id, amount);
+            toast({ title: 'Success', description: `Last sale of ${amount}ml cancelled.` });
         } catch (error)
         {
             console.error('Error refilling item:', error);
@@ -85,12 +89,6 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         return null;
     }
 
-    const getPriceForPeg = (item: OnBarItem, pegSize: number) => {
-        if (!item.price || !item.totalVolume) return 0;
-        const pricePerMl = item.price / item.totalVolume;
-        return Math.round(pricePerMl * pegSize);
-    };
-
     return (
         <main className="flex-1 p-4 md:p-8">
             <AddOnBarItemDialog
@@ -100,6 +98,14 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                 onBarInventory={onBarInventory}
                 onAddItem={handleAddOnBarItem}
             />
+            {sellingItem && (
+                <SellPegDialog
+                    isOpen={isSellPegOpen}
+                    onOpenChange={setIsSellPegOpen}
+                    item={sellingItem}
+                    onSell={handleSell}
+                />
+            )}
 
             <header className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
@@ -162,29 +168,15 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                         </Button>
                                      ) : (
                                         <div className="flex justify-center items-center gap-2">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="outline" className="flex-1" disabled={item.remainingVolume <= 0}>
-                                                        <Minus className="mr-2 h-4 w-4" />
-                                                        Sell Peg
-                                                        <ChevronDown className="ml-auto h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="center" className="w-56">
-                                                    <DropdownMenuItem onClick={() => handleSell(item.id, 30)} disabled={item.remainingVolume < 30}>
-                                                        <span>Sell 30ml</span>
-                                                        <span className="ml-auto text-muted-foreground text-xs">₹{getPriceForPeg(item, 30)}</span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleSell(item.id, 60)} disabled={item.remainingVolume < 60}>
-                                                        <span>Sell 60ml</span>
-                                                        <span className="ml-auto text-muted-foreground text-xs">₹{getPriceForPeg(item, 60)}</span>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleSell(item.id, 90)} disabled={item.remainingVolume < 90}>
-                                                        <span>Sell 90ml</span>
-                                                        <span className="ml-auto text-muted-foreground text-xs">₹{getPriceForPeg(item, 90)}</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <Button
+                                                variant="outline"
+                                                className="flex-1"
+                                                disabled={item.remainingVolume <= 0}
+                                                onClick={() => handleOpenSellDialog(item)}
+                                            >
+                                                <Minus className="mr-2 h-4 w-4" />
+                                                Sell Peg
+                                            </Button>
                                             
                                             <Button
                                                 variant="outline"
@@ -215,5 +207,3 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
-
-    
