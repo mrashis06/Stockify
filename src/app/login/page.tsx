@@ -106,11 +106,7 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           variant: "destructive",
         });
       }
-    } finally {
-      // Only stop loading if there was an error, otherwise redirection handles it.
-      if (!auth.currentUser) {
-          setGoogleLoading(false);
-      }
+      setGoogleLoading(false);
     }
   };
   
