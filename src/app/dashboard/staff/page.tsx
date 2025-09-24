@@ -1,12 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, writeBatch, addDoc, serverTimestamp, deleteDoc, orderBy } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, ClipboardCopy, XCircle } from 'lucide-react';
+import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, XCircle, ClipboardCopy } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { differenceInDays, formatDistanceToNow } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,7 +31,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 type StaffMember = {
@@ -44,7 +44,10 @@ type InviteCode = {
     id: string;
     code: string;
     status: 'pending' | 'accepted';
+    createdAt: Timestamp;
 }
+
+const CODE_EXPIRATION_DAYS = 7;
 
 export default function StaffPage() {
     const { user } = useAuth();
@@ -55,13 +58,16 @@ export default function StaffPage() {
     const [generating, setGenerating] = useState(false);
     const [isDeleteCodeAlertOpen, setDeleteCodeAlertOpen] = useState(false);
     const [selectedCode, setSelectedCode] = useState<InviteCode | null>(null);
+    const [lastGeneratedCode, setLastGeneratedCode] = useState<string | null>(null);
+    const [isRemoveStaffAlertOpen, setIsRemoveStaffAlertOpen] = useState(false);
+    const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
 
-    // Fetch staff list for the admin's shop
+    // Fetch staff list and invite codes for the admin's shop
     useEffect(() => {
         if (user && user.shopId) {
             setLoading(true);
             const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
-            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"));
+            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"), orderBy("createdAt", "desc"));
 
             const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
                 const staff: StaffMember[] = [];
@@ -86,7 +92,7 @@ export default function StaffPage() {
                 console.error("Invites listener error: ", error);
                 toast({
                     title: "Database Error",
-                    description: "Could not fetch invite codes. A database index might be required.",
+                    description: "Could not fetch invite codes. A database index might be required. Please follow the instructions in the browser console.",
                     variant: "destructive",
                 });
                 setLoading(false);
@@ -108,7 +114,7 @@ export default function StaffPage() {
         };
         setGenerating(true);
         try {
-            const newCode = uuidv4().substring(0, 8).toUpperCase();
+            const newCode = `${uuidv4().substring(0, 4)}-${uuidv4().substring(0, 4)}-${uuidv4().substring(0, 4)}`.toUpperCase();
             await addDoc(collection(db, "invites"), {
                 code: newCode,
                 shopId: user.shopId,
@@ -117,6 +123,7 @@ export default function StaffPage() {
                 createdAt: serverTimestamp(),
             });
 
+            setLastGeneratedCode(newCode);
             toast({ title: "Success", description: "New invite code generated." });
         } catch (error) {
             console.error("Error generating code:", error);
@@ -161,6 +168,40 @@ export default function StaffPage() {
             setSelectedCode(null);
         }
     };
+    
+    const confirmRemoveStaff = (staff: StaffMember) => {
+        setSelectedStaff(staff);
+        setIsRemoveStaffAlertOpen(true);
+    };
+
+    const handleRemoveStaff = async () => {
+        if (!selectedStaff) return;
+        try {
+            await updateDoc(doc(db, "users", selectedStaff.id), {
+                shopId: null,
+                status: 'blocked'
+            });
+            toast({ title: "Success", description: `${selectedStaff.name} has been removed from the shop.` });
+        } catch(error) {
+            console.error("Error removing staff:", error);
+            toast({ title: "Error", description: "Failed to remove staff member.", variant: "destructive" });
+        } finally {
+            setIsRemoveStaffAlertOpen(false);
+            setSelectedStaff(null);
+        }
+    }
+    
+    const getCodeExpiration = (createdAt: Timestamp) => {
+        if (!createdAt) return { text: 'N/A', isExpired: false, badgeColor: 'bg-gray-400' };
+        
+        const creationDate = createdAt.toDate();
+        const daysSinceCreation = differenceInDays(new Date(), creationDate);
+        const daysLeft = CODE_EXPIRATION_DAYS - daysSinceCreation;
+
+        if (daysLeft <= 0) return { text: 'Expired', isExpired: true, badgeColor: 'bg-red-500' };
+        if (daysLeft <= 2) return { text: `Expires in ${daysLeft} days`, isExpired: false, badgeColor: 'bg-yellow-500 text-yellow-900' };
+        return { text: `Expires in ${daysLeft} days`, isExpired: false, badgeColor: 'bg-yellow-300 text-yellow-800' };
+    };
 
 
     if (loading) {
@@ -173,16 +214,15 @@ export default function StaffPage() {
     
     if (!user?.shopId) {
         return (
-             <main className="flex-1 p-4 md:p-8">
-                 <h1 className="text-2xl font-bold tracking-tight mb-6">Staff Management</h1>
+             <main className="flex-1 p-4 md:p-8 max-w-4xl mx-auto">
+                 <h1 className="text-3xl font-bold tracking-tight mb-6">Staff Management</h1>
                  <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary"/> Create Your Shop</CardTitle>
+                        <CardTitle className="flex items-center gap-2 text-xl"><KeyRound className="h-5 w-5 text-primary"/> Create Your Shop</CardTitle>
                         <CardDescription>To invite staff, you first need to create your shop to get a unique Shop ID.</CardDescription>
                     </CardHeader>
                     <CardContent>
                        <p className="text-sm text-muted-foreground">This is a one-time process. Once your shop is created, you can start generating invite codes for your staff.</p>
-                       {/* This functionality is handled in the join-shop page for the admin, but we can provide a dummy button for now. */}
                         <Button className="mt-4" disabled>Create Shop (Handled on first setup)</Button>
                     </CardContent>
                  </Card>
@@ -191,7 +231,8 @@ export default function StaffPage() {
     }
 
     return (
-        <main className="flex-1 p-4 md:p-8">
+        <main className="flex-1 p-4 md:p-8 max-w-4xl mx-auto">
+            {/* Delete Invite Code Alert */}
             <AlertDialog open={isDeleteCodeAlertOpen} onOpenChange={setDeleteCodeAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -208,98 +249,126 @@ export default function StaffPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <h1 className="text-2xl font-bold tracking-tight mb-6">Staff Management</h1>
-            <div className="grid gap-6 md:grid-cols-2">
+            {/* Remove Staff Alert */}
+            <AlertDialog open={isRemoveStaffAlertOpen} onOpenChange={setIsRemoveStaffAlertOpen}>
+                 <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove {selectedStaff?.name}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will remove the staff member from your shop. They will lose access immediately and will need a new invite code to rejoin. Are you sure?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRemoveStaff} className="bg-destructive hover:bg-destructive/90">
+                            Remove
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <h1 className="text-3xl font-bold tracking-tight mb-8">Staff Management</h1>
+            <div className="space-y-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary"/> Invite Staff</CardTitle>
-                        <CardDescription>Generate a unique, single-use code to invite a new staff member.</CardDescription>
+                        <CardTitle className="text-xl">Invite Staff</CardTitle>
+                        <CardDescription>Generate a unique invite code for new staff members to join your team.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <Button onClick={handleGenerateCode} disabled={generating} className="w-full bg-green-600 hover:bg-green-700 text-white">
+                    <CardContent className="flex items-center gap-4">
+                        <Button onClick={handleGenerateCode} disabled={generating} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
                             {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                             Generate New Invite Code
                         </Button>
+                        {lastGeneratedCode && (
+                            <div className="flex items-center justify-between gap-2 p-2 border rounded-lg bg-muted/50 w-full">
+                                <span className="font-mono text-sm tracking-widest">{lastGeneratedCode}</span>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(lastGeneratedCode)}>
+                                    <Copy className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
                  <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><ClipboardCopy className="h-5 w-5 text-primary"/> Pending Invite Codes</CardTitle>
-                        <CardDescription>Share these codes with new staff. They are single-use.</CardDescription>
+                        <CardTitle className="text-xl">Pending Invite Codes</CardTitle>
+                        <CardDescription>View and manage unused invite codes. Codes expire after 7 days.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {inviteCodes.length > 0 ? (
-                           <ScrollArea className="h-32 pr-4">
                             <div className="space-y-2">
-                                    {inviteCodes.map(invite => (
-                                        <div key={invite.id} className="flex items-center justify-between gap-2 p-2 border rounded-lg bg-muted/50">
-                                            <span className="font-mono text-sm tracking-widest">{invite.code}</span>
-                                            <div className="flex items-center">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(invite.code)}>
-                                                    <Copy className="h-4 w-4" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => confirmDeleteCode(invite)}>
-                                                    <XCircle className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </div>
+                                {inviteCodes.map(invite => {
+                                    const expiration = getCodeExpiration(invite.createdAt);
+                                    return (
+                                    <div key={invite.id} className="flex items-center justify-between gap-4 p-3 border rounded-lg bg-muted/30">
+                                        <span className="font-mono text-sm tracking-wider">{invite.code}</span>
+                                        <div className="flex items-center gap-2">
+                                            {!expiration.isExpired && <Badge className={`text-xs font-medium ${expiration.badgeColor}`}>{expiration.text}</Badge>}
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(invite.code)}>
+                                                <Copy className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 hover:text-destructive" onClick={() => confirmDeleteCode(invite)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
                                         </div>
-                                    ))}
+                                    </div>
+                                )})}
                             </div>
-                           </ScrollArea>
                         ) : (
-                            <div className="flex items-center justify-center h-32 border-2 border-dashed rounded-lg">
+                            <div className="flex items-center justify-center h-24 border-2 border-dashed rounded-lg">
                                 <p className="text-sm text-muted-foreground text-center">No pending invites.</p>
                             </div>
                         )}
                     </CardContent>
                 </Card>
-            </div>
             
-             <Card className="mt-8">
-                <CardHeader>
-                    <CardTitle>Staff Members</CardTitle>
-                    <CardDescription>A list of all staff members in your shop.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {staffList.length > 0 ? (
-                                staffList.map(staff => (
-                                    <TableRow key={staff.id}>
-                                        <TableCell className="font-medium">{staff.name}</TableCell>
-                                        <TableCell>{staff.email}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-600' : ''}>
-                                                {staff.status}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="outline" size="sm" onClick={() => handleToggleStatus(staff)}>
-                                                {staff.status === 'active' ? <ShieldOff className="mr-2 h-4 w-4" /> : <Shield className="mr-2 h-4 w-4" />}
-                                                {staff.status === 'active' ? 'Block' : 'Unblock'}
-                                            </Button>
+                <div>
+                    <h2 className="text-xl font-bold tracking-tight mb-4">Staff Members</h2>
+                    <Card>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {staffList.length > 0 ? (
+                                    staffList.map(staff => (
+                                        <TableRow key={staff.id}>
+                                            <TableCell className="font-medium">{staff.name}</TableCell>
+                                            <TableCell>{staff.email}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                                    {staff.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right space-x-4">
+                                                <Button variant="link" size="sm" className="p-0 h-auto font-medium text-blue-600" onClick={() => handleToggleStatus(staff)}>
+                                                    {staff.status === 'active' ? 'Block' : 'Unblock'}
+                                                </Button>
+                                                <Button variant="link" size="sm" className="p-0 h-auto font-medium text-destructive" onClick={() => confirmRemoveStaff(staff)}>
+                                                    Remove
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="h-24 text-center">
+                                            No staff have joined your shop yet.
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
-                                        No staff have joined your shop yet.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </Card>
+                </div>
+            </div>
         </main>
     );
 }
+
+    
