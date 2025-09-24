@@ -3,12 +3,14 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 
 export type AppUser = User & {
     role?: string;
+    name?: string;
+    dob?: string;
 };
 
 export function useAuth() {
@@ -23,7 +25,13 @@ export function useAuth() {
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
-          setUser({ ...user, ...userDoc.data() });
+          const userData = userDoc.data();
+          setUser({ 
+            ...user, 
+            role: userData.role,
+            name: userData.name || user.displayName,
+            dob: userData.dob,
+          });
         } else {
           setUser(user);
         }
@@ -42,5 +50,19 @@ export function useAuth() {
     return () => unsubscribe();
   }, [router, pathname]);
 
-  return { user, loading };
+  const updateUser = async (uid: string, data: { name: string; dob: string }) => {
+    const userDocRef = doc(db, 'users', uid);
+    await updateDoc(userDocRef, data);
+    // Optimistically update local user state
+    setUser(prevUser => {
+        if (!prevUser) return null;
+        return {
+            ...prevUser,
+            name: data.name,
+            dob: data.dob,
+        }
+    });
+  };
+
+  return { user, loading, updateUser };
 }

@@ -1,46 +1,113 @@
 
 "use client";
 
-import React from 'react';
-import { ChevronRight, LogOut } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import React, { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { format, parseISO } from 'date-fns';
+import { CalendarIcon, ChevronRight, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { signOut } from 'firebase/auth';
+
+import { auth } from '@/lib/firebase';
+import { useAuth } from '@/hooks/use-auth';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
+import { Switch } from '@/components/ui/switch';
+
+
+const formSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  dob: z.date({
+    required_error: "A date of birth is required.",
+  }),
+});
+
+type ProfileFormValues = z.infer<typeof formSchema>;
 
 const SettingsItem = ({ label, description, value, isToggle = false, onToggleChange, defaultChecked }: { label: string, description: string, value: string, isToggle?: boolean, onToggleChange?: (checked: boolean) => void, defaultChecked?: boolean }) => (
-  <div className="flex items-center justify-between py-4">
-    <div className="flex flex-col">
-      <span className="font-medium">{label}</span>
-      <span className="text-sm text-muted-foreground">{description}</span>
+    <div className="flex items-center justify-between py-4">
+      <div className="flex flex-col">
+        <span className="font-medium">{label}</span>
+        <span className="text-sm text-muted-foreground">{description}</span>
+      </div>
+      {isToggle ? (
+          <Switch onCheckedChange={onToggleChange} defaultChecked={defaultChecked} />
+      ) : (
+          <div className="flex items-center text-muted-foreground">
+          <span>{value}</span>
+          <ChevronRight className="h-4 w-4 ml-2" />
+          </div>
+      )}
     </div>
-    {isToggle ? (
-        <Switch onCheckedChange={onToggleChange} defaultChecked={defaultChecked} />
-    ) : (
-        <div className="flex items-center text-muted-foreground">
-        <span>{value}</span>
-        <ChevronRight className="h-4 w-4 ml-2" />
-        </div>
-    )}
-  </div>
-);
-
-const UserProfileItem = ({ label, description, isLogout = false, onClick }: { label: string, description:string, isLogout?: boolean, onClick?: () => void }) => (
-    <div className="flex items-center justify-between py-4" onClick={onClick}>
-        <div className="flex flex-col">
-            <span className={`font-medium ${isLogout ? 'text-destructive' : ''}`}>{label}</span>
-            <span className="text-sm text-muted-foreground">{description}</span>
-        </div>
-        {isLogout ? <LogOut className="h-5 w-5 text-destructive" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-    </div>
-)
+  );
+  
+  const UserProfileItem = ({ label, description, isLogout = false, onClick }: { label: string, description:string, isLogout?: boolean, onClick?: () => void }) => (
+      <div className="flex items-center justify-between py-4" onClick={onClick}>
+          <div className="flex flex-col">
+              <span className={`font-medium ${isLogout ? 'text-destructive' : ''}`}>{label}</span>
+              <span className="text-sm text-muted-foreground">{description}</span>
+          </div>
+          {isLogout ? <LogOut className="h-5 w-5 text-destructive" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+      </div>
+  )
 
 export default function SettingsPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const router = useRouter();
+  const { user, updateUser } = useAuth();
+  const { toast } = useToast();
+
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: user?.name || '',
+      dob: user?.dob ? parseISO(user.dob) : undefined,
+    },
+  });
+
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        name: user.name || '',
+        dob: user.dob ? parseISO(user.dob) : undefined,
+      });
+    }
+  }, [user, form]);
+  
+
+  const onSubmit = async (data: ProfileFormValues) => {
+    if (!user) return;
+    try {
+        const updateData = {
+            name: data.name,
+            dob: format(data.dob, 'yyyy-MM-dd')
+        }
+        await updateUser(user.uid, updateData);
+        toast({ title: 'Success', description: 'Profile updated successfully.' });
+    } catch (error) {
+        toast({ title: 'Error', description: 'Failed to update profile.', variant: 'destructive' });
+    }
+  };
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -53,6 +120,73 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
       </header>
       
+      <Card className="mb-8">
+        <CardHeader>
+            <CardTitle>User Profile</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                     <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Full Name</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Your name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="dob"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                            <FormLabel>Date of birth</FormLabel>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <FormControl>
+                                    <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                        "w-[240px] pl-3 text-left font-normal",
+                                        !field.value && "text-muted-foreground"
+                                    )}
+                                    >
+                                    {field.value ? (
+                                        format(field.value, "PPP")
+                                    ) : (
+                                        <span>Pick a date</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                    </Button>
+                                </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={field.onChange}
+                                    disabled={(date) =>
+                                    date > new Date() || date < new Date("1900-01-01")
+                                    }
+                                    initialFocus
+                                />
+                                </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <Button type="submit">Save Changes</Button>
+                </form>
+            </Form>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-6">
             <section>
