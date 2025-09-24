@@ -57,18 +57,8 @@ const AnimatedGlass = () => {
                 {/* Pulsing Aura */}
                 <ellipse cx="50" cy="100" rx="40" ry="50" fill="url(#liquid-gradient)" opacity="0.6" filter="url(#aura-glow)" className="animate-[pulse-glow_5s_ease-in-out_infinite]" />
 
-                {/* Light Rays */}
-                {[0, 45, 90, 135, 180, 225, 270, 315].map(rot => (
-                    <rect 
-                        key={rot}
-                        x="49.5" y="-50" 
-                        width="1" height="300"
-                        fill="white"
-                        className="origin-center animate-[ray-fade_8s_ease-in-out_infinite]"
-                        style={{ transform: `rotate(${rot}deg)`, animationDelay: `${rot / 45}s` }}
-                    />
-                ))}
-
+                {/* Light Rays - removed for minimalism as per image */}
+                
                 {/* Glass and Liquid Group */}
                 <g className="drop-shadow-lg dark:drop-shadow-[0_0_10px_#FFA500]">
                     {/* Liquid fill area */}
@@ -106,12 +96,6 @@ const AnimatedGlass = () => {
                         strokeWidth="1.5"
                     />
 
-                    {/* Smoke wisps */}
-                    <g>
-                        <path d="M40 5 Q45 -10 50 5" stroke="#ccc" strokeOpacity="0.5" strokeWidth="1" fill="none" className="animate-[smoke-fade_6s_ease-in-out_infinite]" style={{ animationDelay: '0s' }}/>
-                        <path d="M50 5 Q55 -15 60 5" stroke="#ccc" strokeOpacity="0.5" strokeWidth="1" fill="none" className="animate-[smoke-fade_6s_ease-in-out_infinite]" style={{ animationDelay: '2s' }} />
-                        <path d="M45 5 Q50 -10 55 5" stroke="#ccc" strokeOpacity="0.5" strokeWidth="1" fill="none" className="animate-[smoke-fade_6s_ease-in-out_infinite]" style={{ animationDelay: '4s' }}/>
-                    </g>
                 </g>
             </svg>
         </div>
