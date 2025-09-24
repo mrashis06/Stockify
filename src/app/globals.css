@@ -78,11 +78,12 @@
   .loader-bottle {
     filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.4));
   }
-  .animated-liquid {
-    animation: fill-up 5s ease-in-out infinite;
+  
+  .fade-in-slide-up {
+    animation: fade-in-slide-up 1s ease-out forwards;
   }
-  .animated-wave {
-      animation: wave-move 5s ease-in-out infinite;
+  .fade-in {
+    animation: fade-in 1s ease-out 0.5s forwards;
   }
 }
 
@@ -95,53 +96,84 @@
   }
 }
 
-@keyframes fill-up {
-  0% {
-    transform: translateY(100%);
+@keyframes fade-in-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
   }
-  20% {
-    transform: translateY(60%);
-  }
-  40% {
-    transform: translateY(30%);
-  }
-  60% {
-      transform: translateY(60%);
-  }
-  80% {
-      transform: translateY(20%);
-  }
-  100% {
-    transform: translateY(100%);
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@keyframes wave-move {
-    0% {
-      transform: translateY(135px);
-      opacity: 0;
-    }
-    20% {
-        transform: translateY(80px);
-        opacity: 1;
-    }
-    40% {
-        transform: translateY(40px);
-        opacity: 1;
-    }
-    60% {
-        transform: translateY(80px);
-        opacity: 1;
-    }
-    80% {
-        transform: translateY(25px);
-        opacity: 1;
-    }
-    90% {
-        opacity: 0;
-    }
-    100% {
-      transform: translateY(135px);
-      opacity: 0;
-    }
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -500% 0;
+  }
+  100% {
+    background-position: 500% 0;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes wave {
+  0%, 100% {
+    transform: translateX(-2%);
+  }
+  50% {
+    transform: translateX(2%);
+  }
+}
+
+@keyframes bubbles-rise {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-120px) translateX(var(--bubble-x-end));
+    opacity: 0;
+  }
+}
+
+@keyframes smoke-fade {
+  from {
+    opacity: 0.3;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-40px) scale(1.5);
+  }
+}
+
+@keyframes ray-fade {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.1;
+    transform: scale(1);
+  }
 }
