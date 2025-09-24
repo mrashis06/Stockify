@@ -81,13 +81,14 @@ export function useInventory() {
             const dailyItem = dailyData[id];
             
             const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
-
+            
             const added = dailyItem?.added ?? 0;
             const sales = dailyItem?.sales ?? 0;
 
             if (dailyItem) {
                 items.push({ ...masterItem, ...dailyItem, prevStock, added, sales });
             } else {
+                // This is a new day with no entry yet, or item is not in daily doc
                 items.push({
                     ...masterItem,
                     prevStock,
@@ -139,19 +140,17 @@ export function useInventory() {
         await setDoc(docRef, masterItemData, { merge: true });
         
         const dailyDocRef = doc(db, 'dailyInventory', today);
-        const dailyDocSnap = await getDoc(dailyDocRef);
-        const dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
-
-        const currentDailyItem = dailyData[id] || {};
         
+        // When adding a new brand, we create a fresh daily record for it.
+        // We do not merge with any potentially stale data from a previous day's doc copy.
         const dailyItemData = {
             brand: newItemData.brand,
             size: newItemData.size,
             price: newItemData.price,
             category: newItemData.category,
             prevStock: newItemData.prevStock,
-            added: currentDailyItem.added || 0,
-            sales: currentDailyItem.sales || 0,
+            added: 0, // Should be 0 on creation
+            sales: 0, // Should be 0 on creation
         };
 
         dailyItemData.opening = dailyItemData.prevStock + dailyItemData.added;
