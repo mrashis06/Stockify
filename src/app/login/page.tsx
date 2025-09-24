@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   signInWithEmailAndPassword, 
+  signOut,
   AuthError
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import React, { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -34,26 +36,28 @@ const LoginForm = ({
   setPassword,
   loading,
   handleEmailSignIn,
-  authError
+  authError,
+  role
 }: {
   email: string;
   setEmail: (email: string) => void;
   password: string;
   setPassword: (password: string) => void;
   loading: boolean;
-  handleEmailSignIn: (e: React.FormEvent) => Promise<void>;
+  handleEmailSignIn: (e: React.FormEvent, role: 'admin' | 'staff') => Promise<void>;
   authError: string;
+  role: 'admin' | 'staff';
 }) => (
-   <form onSubmit={handleEmailSignIn} className="grid gap-4">
+   <form onSubmit={(e) => handleEmailSignIn(e, role)} className="grid gap-4">
       {authError && (
             <Alert variant="destructive" className="mb-2">
                 <AlertDescription>{authError}</AlertDescription>
             </Alert>
         )}
       <div className="grid gap-2">
-        <Label htmlFor="email">Email address</Label>
+        <Label htmlFor={`email-${role}`}>Email address</Label>
         <Input
-          id="email"
+          id={`email-${role}`}
           type="email"
           placeholder="m@example.com"
           required
@@ -64,7 +68,7 @@ const LoginForm = ({
       </div>
       <div className="grid gap-2">
           <div className="flex items-center">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor={`password-${role}`}>Password</Label>
               <Link
                   href="/forgot-password"
                   className="ml-auto inline-block text-sm text-primary underline"
@@ -72,7 +76,7 @@ const LoginForm = ({
                   Forgot your password?
               </Link>
           </div>
-        <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
+        <Input id={`password-${role}`} type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
       </div>
       <Button type="submit" className="w-full" disabled={loading}>
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -109,13 +113,36 @@ export default function LoginPage() {
     }
   }, [user, authLoading, router]);
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
+  const handleEmailSignIn = async (e: React.FormEvent, role: 'admin' | 'staff') => {
     e.preventDefault();
     setLoading(true);
     setAuthError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const authenticatedUser = userCredential.user;
+
+      // After successful sign-in, check their role from Firestore
+      const userDocRef = doc(db, "users", authenticatedUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        if (userData.role === role) {
+          // Role matches the login panel, proceed
+          router.push('/dashboard');
+        } else {
+          // Role mismatch, sign out and show error
+          await signOut(auth);
+          setAuthError(`Access Denied: You are attempting to log in from the wrong role panel.`);
+          setLoading(false);
+        }
+      } else {
+        // User document doesn't exist, something is wrong
+        await signOut(auth);
+        setAuthError("User data not found. Please contact support.");
+        setLoading(false);
+      }
+
     } catch (error) {
       console.error("Error signing in with email and password: ", error);
       let description = "Failed to sign in. Please try again.";
@@ -148,7 +175,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="admin" className="w-full">
+          <Tabs defaultValue="admin" className="w-full" onValueChange={() => setAuthError('')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="admin">Admin Login</TabsTrigger>
               <TabsTrigger value="staff">Staff Login</TabsTrigger>
@@ -162,6 +189,7 @@ export default function LoginPage() {
                     loading={loading}
                     handleEmailSignIn={handleEmailSignIn}
                     authError={authError}
+                    role="admin"
                 />
             </TabsContent>
             <TabsContent value="staff" className="pt-4">
@@ -173,6 +201,7 @@ export default function LoginPage() {
                     loading={loading}
                     handleEmailSignIn={handleEmailSignIn}
                     authError={authError}
+                    role="staff"
                 />
             </TabsContent>
           </Tabs>
