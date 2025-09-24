@@ -42,7 +42,12 @@ import { useOnBarInventory } from '@/hooks/use-onbar-inventory';
 // Schema for tracking from inventory
 const trackedSchema = z.object({
   inventoryItemId: z.string().min(1, 'Please select an item from your inventory.'),
+  quantity: z.coerce.number().int().min(1, "Quantity must be at least 1."),
+}).refine(data => data.quantity > 0, {
+    message: "Quantity must be a positive number.",
+    path: ["quantity"],
 });
+
 type TrackedFormValues = z.infer<typeof trackedSchema>;
 
 // Schema for manual entry
@@ -70,6 +75,9 @@ function TrackedForm({ shopInventory, onBarInventory, onOpenChange }: { shopInve
     const [search, setSearch] = useState('');
     const { addOnBarItem } = useOnBarInventory();
     
+    const selectedItemId = form.watch('inventoryItemId');
+    const selectedItem = useMemo(() => shopInventory.find(item => item.id === selectedItemId), [shopInventory, selectedItemId]);
+    
     const availableInventory = useMemo(() => {
         const onBarIds = new Set(onBarInventory.map(item => item.inventoryId));
         return shopInventory
@@ -79,12 +87,18 @@ function TrackedForm({ shopInventory, onBarInventory, onOpenChange }: { shopInve
     }, [shopInventory, onBarInventory, search]);
 
     const onSubmit = async (data: TrackedFormValues) => {
-        const selectedItem = shopInventory.find(item => item.id === data.inventoryItemId);
         if (!selectedItem) {
             console.error("Selected item not found in inventory");
+            form.setError("inventoryItemId", { type: "manual", message: "Item not found." });
             return;
         }
         
+        const availableStock = selectedItem.closing ?? 0;
+        if (data.quantity > availableStock) {
+            form.setError("quantity", { type: "manual", message: `Only ${availableStock} in stock.` });
+            return;
+        }
+
         const volumeMatch = selectedItem.size.match(/(\d+)/);
         const volume = volumeMatch ? parseInt(volumeMatch[1], 10) : 0;
         
@@ -94,7 +108,7 @@ function TrackedForm({ shopInventory, onBarInventory, onOpenChange }: { shopInve
         }
 
         try {
-            await addOnBarItem(selectedItem.id, volume);
+            await addOnBarItem(selectedItem.id, volume, data.quantity);
             onOpenChange(false);
         } catch(error) {
             console.error(error);
@@ -145,11 +159,28 @@ function TrackedForm({ shopInventory, onBarInventory, onOpenChange }: { shopInve
                     </FormItem>
                 )}
                 />
+                
+                {selectedItem && (
+                     <FormField
+                        control={form.control}
+                        name="quantity"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Quantity to Open</FormLabel>
+                            <FormControl>
+                                <Input type="number" min="1" max={selectedItem.closing} placeholder="e.g., 1" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
+                
                  <DialogFooter>
                     <DialogClose asChild>
                         <Button type="button" variant="secondary">Cancel</Button>
                     </DialogClose>
-                    <Button type="submit" className="bg-green-600 hover:bg-green-700">Open Bottle</Button>
+                    <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={!selectedItem}>Open Bottle(s)</Button>
                 </DialogFooter>
             </form>
         </Form>
@@ -246,12 +277,12 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
 
 
 export default function AddOnBarItemDialog({ isOpen, onOpenChange, shopInventory, onBarInventory }: AddOnBarItemDialogProps) {
-  const trackedForm = useForm<TrackedFormValues>({ resolver: zodResolver(trackedSchema) });
+  const trackedForm = useForm<TrackedFormValues>({ resolver: zodResolver(trackedSchema), defaultValues: { inventoryItemId: '', quantity: 1 } });
   const manualForm = useForm<ManualFormValues>({ resolver: zodResolver(manualSchema), defaultValues: { brand: '', size: '', category: '', totalVolume: 750 } });
   
   useEffect(() => {
     if (!isOpen) {
-      trackedForm.reset();
+      trackedForm.reset({ inventoryItemId: '', quantity: 1 });
       manualForm.reset();
     }
   }, [isOpen, trackedForm, manualForm]);

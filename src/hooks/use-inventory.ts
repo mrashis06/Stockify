@@ -325,7 +325,7 @@ export function useInventory() {
       }
   };
 
-  const openBottleForOnBar = async (inventoryItemId: string, volume: number) => {
+  const openBottleForOnBar = async (inventoryItemId: string, volume: number, quantity: number = 1) => {
     setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
@@ -356,11 +356,11 @@ export function useInventory() {
 
             const openingStock = (dailyData[inventoryItemId]?.prevStock ?? 0) + (dailyData[inventoryItemId]?.added ?? 0);
             const closingStock = openingStock - (dailyData[inventoryItemId]?.sales ?? 0);
-            if (closingStock < 1) {
-                throw new Error("Not enough stock in inventory to open a bottle.");
+            if (closingStock < quantity) {
+                throw new Error(`Not enough stock in inventory to open ${quantity} bottle(s). Available: ${closingStock}`);
             }
             
-            dailyData[inventoryItemId].sales = (dailyData[inventoryItemId].sales ?? 0) + 1;
+            dailyData[inventoryItemId].sales = (dailyData[inventoryItemId].sales ?? 0) + quantity;
             dailyData[inventoryItemId].opening = openingStock;
             dailyData[inventoryItemId].closing = openingStock - dailyData[inventoryItemId].sales;
 
@@ -372,23 +372,25 @@ export function useInventory() {
             const masterItem = masterItemSnap.data();
 
             const onBarCollectionRef = collection(db, "onBarInventory");
-            const newOnBarDocRef = doc(onBarCollectionRef);
-            
-            transaction.set(newOnBarDocRef, {
-                inventoryId: inventoryItemId,
-                brand: masterItem.brand,
-                size: masterItem.size,
-                category: masterItem.category,
-                totalVolume: volume,
-                remainingVolume: volume,
-                salesVolume: 0,
-                salesValue: 0,
-                price: masterItem.price,
-                openedAt: serverTimestamp(),
-            });
+
+            for (let i = 0; i < quantity; i++) {
+                const newOnBarDocRef = doc(onBarCollectionRef);
+                transaction.set(newOnBarDocRef, {
+                    inventoryId: inventoryItemId,
+                    brand: masterItem.brand,
+                    size: masterItem.size,
+                    category: masterItem.category,
+                    totalVolume: volume,
+                    remainingVolume: volume,
+                    salesVolume: 0,
+                    salesValue: 0,
+                    price: masterItem.price,
+                    openedAt: serverTimestamp(),
+                });
+            }
         });
     } catch (error) {
-        console.error("Error opening bottle for OnBar: ", error);
+        console.error("Error opening bottle(s) for OnBar: ", error);
         throw error;
     } finally {
         setSaving(false);

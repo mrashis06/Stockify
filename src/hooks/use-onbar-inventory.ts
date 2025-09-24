@@ -53,11 +53,11 @@ export function useOnBarInventory() {
     return () => unsubscribe();
   }, []);
 
-  const addOnBarItem = async (inventoryItemId: string, volume: number) => {
+  const addOnBarItem = async (inventoryItemId: string, volume: number, quantity: number = 1) => {
       if (saving) return;
       setSaving(true);
       try {
-          await openBottleForOnBar(inventoryItemId, volume);
+          await openBottleForOnBar(inventoryItemId, volume, quantity);
       } catch (error) {
           console.error("Error opening bottle: ", error);
           throw error;
