@@ -93,8 +93,12 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     }, []);
     
     useEffect(() => {
-        fetchReportData({ from: new Date(), to: new Date() });
-    }, [fetchReportData]);
+        if (date?.from) {
+            fetchReportData(date);
+        } else {
+            fetchReportData({ from: new Date(), to: new Date() });
+        }
+    }, [fetchReportData, date]);
 
     const handleFilter = () => {
         if (date) {
@@ -187,14 +191,14 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             (acc[item.date] = acc[item.date] || []).push(item);
             return acc;
         }, {} as Record<string, DatedSoldItem[]>);
-
-        let startY = 20;
-
+        
+        let startY = 15; // Initial startY for the first page
+        
         doc.setFontSize(16);
-        doc.setTextColor(40);
-        doc.text(title, 14, 15);
-
-        Object.keys(salesByDate).sort().forEach(saleDate => {
+        doc.text(title, 14, startY);
+        startY += 10;
+        
+        Object.keys(salesByDate).sort().forEach((saleDate, index) => {
             const items = salesByDate[saleDate];
             const tableRows: (string | number)[][] = [];
             let dailyTotalUnits = 0;
@@ -219,13 +223,18 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             
             const dateObj = parse(saleDate, 'yyyy-MM-dd', new Date());
 
+            // Add a little space before the next table if it's not the first one
+            if (index > 0) {
+                 startY = (doc as any).lastAutoTable.finalY + 15;
+            }
+
             doc.autoTable({
                 head: [tableColumn],
                 body: tableRows,
                 foot: [
                     ['Daily Total', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)]
                 ],
-                startY: startY + 5,
+                startY: startY,
                 headStyles: {
                     fillColor: [40, 40, 40], 
                     textColor: [255, 255, 255],
@@ -237,37 +246,32 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     fontStyle: 'bold',
                 },
                 didDrawPage: (data) => {
-                    if (data.pageNumber === 1 && startY === 20) { // Only for first page header
+                    // Redraw main title on new pages
+                    if (data.pageNumber > 1) {
                         doc.setFontSize(16);
-                        doc.setTextColor(40);
-                        doc.text(title, data.settings.margin.left, 15);
-                    }
-                },
-                didParseCell: (data) => {
-                    if (data.section === 'head' && data.column.dataKey === 'Total Amount') {
-                        data.cell.styles.halign = 'right';
-                    }
-                    if (data.section === 'body' && (data.column.dataKey === 'Price' || data.column.dataKey === 'Units Sold' || data.column.dataKey === 'Total Amount')) {
-                        data.cell.styles.halign = 'right';
+                        doc.text(title, 14, 15);
                     }
                 },
                 // Add a title for each day's table
                 willDrawPage: (data) => {
                      doc.setFontSize(12);
                      doc.setFont('helvetica', 'bold');
-                     doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, startY);
+                     doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, data.cursor?.y || startY - 5);
+                     if (data.cursor) {
+                       data.cursor.y += 2; // Add a bit more space after title
+                     }
                 }
             });
-
-            startY = (doc as any).lastAutoTable.finalY + 10;
+            startY = (doc as any).lastAutoTable.finalY;
         });
 
         if (!isSingleDay) {
-            doc.autoTable({
+             const finalY = (doc as any).lastAutoTable.finalY || startY;
+             doc.autoTable({
                 body: [
                     [`Grand Total`, ``, ``, ``, grandTotalUnits, grandTotalAmount.toFixed(2)]
                 ],
-                startY: startY,
+                startY: finalY + 10,
                 theme: 'striped',
                 bodyStyles: {
                     fontStyle: 'bold',
@@ -284,15 +288,15 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
 
     const handleExportCSV = () => {
         const header = ["Date", "Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
-        let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
+        let csvContent = "data:text/csv;charset=utf-t," + header.join(",") + "\n";
         
         datedSalesDataForExport.forEach(item => {
-            const row = [item.date, item.brand, item.size, item.category, item.price, item.unitsSold, item.totalAmount].join(",");
+            const row = [item.date, item.brand, `"${item.size}"`, item.category, item.price, item.unitsSold, item.totalAmount].join(",");
             csvContent += row + "\n";
         });
 
         csvContent += "\n";
-        csvContent += `Grand Total,,,,${reportTotals.totalUnits},${reportTotals.grandTotal}\n`;
+        csvContent += `Grand Total,,,,${reportTotals.totalUnits},${reportTotals.grandTotal.toFixed(2)}\n`;
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -317,11 +321,11 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
           <p className="text-muted-foreground">Detailed sales transaction report</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={handleExportPDF} disabled={loading || datedSalesDataForExport.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={handleExportPDF} disabled={loading || datedSalesDataForExport.length === 0} className="bg-red-600 hover:bg-red-700 text-white">
                 <Download className="mr-2 h-4 w-4" />
                 Export to PDF
             </Button>
-             <Button onClick={handleExportCSV} disabled={loading || datedSalesDataForExport.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white">
+             <Button onClick={handleExportCSV} disabled={loading || datedSalesDataForExport.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Export to CSV
             </Button>
@@ -435,8 +439,5 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
-
-
-
 
     
