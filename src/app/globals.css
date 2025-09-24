@@ -70,11 +70,18 @@
 }
 
 @layer components {
-  .loader-orbit {
-    animation: orbit 15s linear infinite;
+  .bg-background-gradient {
+      @apply bg-gradient-to-b from-background via-background/80 to-background/50;
   }
-  .loader-bottle {
-    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.4));
+  .bg-spotlight-gradient {
+      @apply bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent;
+  }
+
+  .dark .bg-background-gradient {
+      @apply bg-gradient-to-b from-background/95 via-background/80 to-background;
+  }
+  .dark .bg-spotlight-gradient {
+       @apply bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent;
   }
   
   .fade-in-slide-up {
@@ -85,14 +92,6 @@
   }
 }
 
-@keyframes orbit {
-  from {
-    transform: rotate(0deg) translateX(70px) rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg) translateX(70px) rotate(-360deg);
-  }
-}
 
 @keyframes fade-in-slide-up {
   from {

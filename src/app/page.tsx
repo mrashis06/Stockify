@@ -13,6 +13,26 @@ import { useLoading } from "@/hooks/use-loading";
 import AnimatedGlass from "@/components/landing/animated-glass";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 
+const BottleSilhouette = () => (
+    <svg width="60" height="150" viewBox="0 0 60 150" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-10 md:w-12">
+        <path d="M20 150V60C20 40 25 30 30 30C35 30 40 40 40 60V150H20Z" fill="currentColor" />
+        <path d="M25 30V10H35V30H25Z" fill="currentColor" />
+    </svg>
+)
+
+const BottleSilhouette2 = () => (
+    <svg width="50" height="120" viewBox="0 0 50 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-8 md:w-10">
+        <path d="M15 120V50C15 35 20 25 25 25C30 25 35 35 35 50V120H15Z" fill="currentColor"/>
+    </svg>
+)
+
+const WineGlassSilhouette = () => (
+    <svg width="70" height="100" viewBox="0 0 70 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-10 md:w-12">
+        <path d="M10 0L60 0L35 40L10 0Z" transform="translate(0 30)" fill="currentColor"/>
+        <path d="M32 70H38V100H32V70Z" fill="currentColor"/>
+    </svg>
+)
+
 export default function Home({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user, loading: authLoading } = useAuth();
   const { showLoader } = useLoading();
@@ -38,18 +58,21 @@ export default function Home({ params, searchParams }: { params: { slug: string 
       <main className="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
         
         {/* Background elements */}
-        <div className="absolute inset-0 w-full h-full">
-            {heroImage && (
-                 <Image
-                    src={heroImage.imageUrl}
-                    alt={heroImage.description}
-                    data-ai-hint={heroImage.imageHint}
-                    fill
-                    className="object-cover opacity-10 dark:opacity-20"
-                />
-            )}
-            {/* Overlay Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-b from-background via-background/80 to-background" />
+        <div className="absolute inset-0 w-full h-full pointer-events-none">
+             <div className="absolute inset-0 bg-background-gradient" />
+             {/* Center Spotlight */}
+             <div className="absolute inset-0 bg-spotlight-gradient" />
+
+            <div className="absolute bottom-0 left-0 right-0 h-1/3 md:h-1/2 flex justify-between items-end px-4 md:px-16 text-foreground/10 dark:text-foreground/5">
+                <div className="flex items-end gap-2 md:gap-4">
+                    <BottleSilhouette />
+                    <BottleSilhouette2 />
+                </div>
+                 <div className="flex items-end gap-2 md:gap-4">
+                    <WineGlassSilhouette />
+                    <BottleSilhouette />
+                </div>
+            </div>
         </div>
 
         <section className="flex flex-col items-center justify-center text-center flex-grow pt-24 pb-16 w-full z-10">
