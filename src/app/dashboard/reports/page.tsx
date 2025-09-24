@@ -171,6 +171,13 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         );
     }, [aggregatedSalesData]);
 
+    const salesByDateForExport = useMemo(() => {
+        return datedSalesDataForExport.reduce((acc, item) => {
+            (acc[item.date] = acc[item.date] || []).push(item);
+            return acc;
+        }, {} as Record<string, DatedSoldItem[]>);
+    }, [datedSalesDataForExport]);
+
 
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
@@ -187,19 +194,14 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         let grandTotalUnits = 0;
         let grandTotalAmount = 0;
 
-        const salesByDate = datedSalesDataForExport.reduce((acc, item) => {
-            (acc[item.date] = acc[item.date] || []).push(item);
-            return acc;
-        }, {} as Record<string, DatedSoldItem[]>);
-        
         let startY = 15;
         
         doc.setFontSize(16);
         doc.text(title, 14, startY);
         startY += 10;
         
-        Object.keys(salesByDate).sort().forEach((saleDate) => {
-            const items = salesByDate[saleDate];
+        Object.keys(salesByDateForExport).sort().forEach((saleDate) => {
+            const items = salesByDateForExport[saleDate];
             const tableRows: (string | number)[][] = [];
             let dailyTotalUnits = 0;
             let dailyTotalAmount = 0;
@@ -241,10 +243,11 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     fontStyle: 'bold',
                 },
                 didDrawPage: (data) => {
-                    // Redraw main title on new pages
-                    if (data.pageNumber > 1) {
-                        doc.setFontSize(16);
-                        doc.text(title, 14, 15);
+                    if (data.pageNumber > 1 && data.cursor?.y) {
+                         doc.setFontSize(12);
+                         doc.setFont('helvetica', 'bold');
+                         doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, data.cursor.y - 5);
+                         data.cursor.y += 2;
                     }
                 },
                 willDrawPage: (data) => {
@@ -258,7 +261,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             });
         });
 
-        if (Object.keys(salesByDate).length > 0) {
+        if (Object.keys(salesByDateForExport).length > 0) {
             doc.autoTable({
                 startY: (doc as any).lastAutoTable.finalY + 10,
                 head: [["", "", "", "", "", ""]], // Empty head to align columns
@@ -282,15 +285,44 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
 
     const handleExportCSV = () => {
         const header = ["Date", "Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
-        let csvContent = "data:text/csv;charset=utf-t," + header.join(",") + "\n";
+        let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
         
-        datedSalesDataForExport.forEach(item => {
-            const row = [item.date, item.brand, `"${item.size}"`, item.category, item.price, item.unitsSold, item.totalAmount].join(",");
-            csvContent += row + "\n";
+        let grandTotalUnits = 0;
+        let grandTotalAmount = 0;
+
+        Object.keys(salesByDateForExport).sort().forEach(saleDate => {
+            const items = salesByDateForExport[saleDate];
+            let dailyTotalUnits = 0;
+            let dailyTotalAmount = 0;
+
+            items.forEach(item => {
+                const row = [
+                    item.date,
+                    item.brand,
+                    `"${item.size}"`,
+                    item.category,
+                    item.price.toFixed(2),
+                    item.unitsSold,
+                    item.totalAmount.toFixed(2)
+                ].join(",");
+                csvContent += row + "\n";
+                
+                dailyTotalUnits += item.unitsSold;
+                dailyTotalAmount += item.totalAmount;
+            });
+
+            // Add daily total row
+            const dailyTotalRow = [`Daily Total for ${saleDate}`, '', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)].join(",");
+            csvContent += dailyTotalRow + "\n\n"; // Add extra newline for spacing
+
+            grandTotalUnits += dailyTotalUnits;
+            grandTotalAmount += dailyTotalAmount;
         });
 
-        csvContent += "\n";
-        csvContent += `Grand Total,,,,${reportTotals.totalUnits},${reportTotals.grandTotal.toFixed(2)}\n`;
+
+        // Add grand total at the very end
+        const grandTotalRow = ["Grand Total", '', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)].join(",");
+        csvContent += grandTotalRow + "\n";
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -433,7 +465,3 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
-
-    
-
-    
