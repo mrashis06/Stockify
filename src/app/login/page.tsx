@@ -155,11 +155,13 @@ function LoginContent() {
         } else {
           // Role mismatch, sign out and show error toast
           await signOut(auth);
-          toast({
-            title: 'Access Denied',
-            description: `You are a ${userData.role}. Please use the ${userData.role} login panel.`,
-            variant: 'destructive',
-          });
+          let description = "Your role does not match this login panel. Please switch panels.";
+          if (userData.role === 'admin') {
+              description = "Access Denied. You are an Admin. Please use the Admin login panel.";
+          } else if (userData.role === 'staff') {
+              description = "Access Denied. You are Staff. Please use the Staff login panel.";
+          }
+          setAuthError(description);
           setLoading(false);
         }
       } else {
