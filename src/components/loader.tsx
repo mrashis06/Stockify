@@ -48,9 +48,9 @@ const BottleIcon = ({ progress, pageName, dynamicText }: { progress: number; pag
                  <style>
                     {`
                         @keyframes wave {
-                            0% { transform: translateX(0) translateY(0); }
-                            50% { transform: translateX(-5px) translateY(0); }
-                            100% { transform: translateX(0) translateY(0); }
+                            0% { transform: translateX(0); }
+                            50% { transform: translateX(-5px); }
+                            100% { transform: translateX(0); }
                         }
                     `}
                 </style>
@@ -111,7 +111,7 @@ export default function Loader() {
         <h2 className="text-xl font-bold text-foreground dark:drop-shadow-[0_0_8px_hsl(var(--foreground)/0.5)]">
           {dynamicText}
         </h2>
-        <p className="mt-2 text-sm text-foreground">
+        <p className="mt-2 text-sm text-foreground dark:text-white">
           Please wait while we prepare your workspace.
         </p>
       </div>
