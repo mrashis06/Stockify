@@ -63,7 +63,7 @@ export default function StaffPage() {
         if (user && user.shopId) {
             setLoading(true);
             const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
-            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"), orderBy("createdAt", "desc"));
+            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"));
 
             const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
                 const staff: StaffMember[] = [];
@@ -346,3 +346,5 @@ export default function StaffPage() {
         </main>
     );
 }
+
+    
