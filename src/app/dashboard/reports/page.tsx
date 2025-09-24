@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { format, eachDayOfInterval, isSameDay, parse, isAfter } from 'date-fns';
+import { format, eachDayOfInterval, isSameDay, parse, isAfter, startOfDay } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc } from 'firebase/firestore';
@@ -56,12 +56,14 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         from: new Date(),
         to: new Date(),
     });
-    const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
     usePageLoading(loading);
 
     const handleDateSelect = (range: DateRange | undefined) => {
+        // This logic allows for intuitive single-day and range selection.
+        // If the user selects a start date and then clicks it again, it confirms a single-day selection.
+        // If they click a different end date, it creates a range.
         setDate(range);
     };
 
@@ -72,9 +74,10 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         }
         setLoading(true);
         const data: ReportDataEntry[] = [];
+        // Ensure start of day to avoid timezone issues.
         const interval = {
-            start: range.from,
-            end: range.to || range.from,
+            start: startOfDay(range.from),
+            end: startOfDay(range.to || range.from),
         };
         const days = eachDayOfInterval(interval);
 
@@ -100,9 +103,12 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         if (date?.from) {
             fetchReportData(date);
         } else {
-            fetchReportData({ from: new Date(), to: new Date() });
+            // Set a default date range on initial load
+            const today = new Date();
+            setDate({ from: today, to: today });
+            fetchReportData({ from: today, to: today });
         }
-    }, [fetchReportData, date]);
+    }, []); // Removed `date` from dependencies to let handleFilter trigger fetches
 
     const handleFilter = () => {
         if (date?.from) {
@@ -396,6 +402,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                         selected={date}
                         onSelect={handleDateSelect}
                         numberOfMonths={1}
+                        disabled={{ after: new Date() }}
                     />
                     </PopoverContent>
                 </Popover>
@@ -466,3 +473,5 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
+
+    
