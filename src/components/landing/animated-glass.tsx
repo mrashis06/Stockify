@@ -37,8 +37,8 @@ const AnimatedGlass = () => {
                         <stop offset="0%" style={{ stopColor: '#FFD700', stopOpacity: 1 }} />
                         <stop offset="100%" style={{ stopColor: '#F5B000', stopOpacity: 1 }} />
                     </linearGradient>
-                    <clipPath id="glass-mask">
-                        <path d="M 30,140 C 10,140 10,100 25,80 C 35,65 35,20 38,10 L 62,10 C 65,20 65,65 75,80 C 90,100 90,140 70,140 Z" />
+                    <clipPath id="bottle-mask">
+                         <path d="M 35,140 L 35,60 C 35,50 30,40 40,40 L 60,40 C 70,40 65,50 65,60 L 65,140 Z" />
                     </clipPath>
                     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
                         <feGaussianBlur stdDeviation="4" result="coloredBlur" />
@@ -49,15 +49,30 @@ const AnimatedGlass = () => {
                     </filter>
                 </defs>
 
-                {/* Glass Outline */}
-                <path d="M 30,140 C 10,140 10,100 25,80 C 35,65 35,20 38,10 L 62,10 C 65,20 65,65 75,80 C 90,100 90,140 70,140 Z" 
+                {/* Bottle Outline */}
+                <path d="M 35,140 L 35,60 C 35,50 30,40 40,40 L 60,40 C 70,40 65,50 65,60 L 65,140 Z" 
                     fill="hsl(var(--card-foreground) / 0.05)" 
                     stroke="hsl(var(--card-foreground) / 0.2)" 
                     strokeWidth="0.5"
                 />
+                 {/* Neck */}
+                <path
+                    d="M40 40 L40 20 L60 20 L60 40 Z"
+                    fill="hsl(var(--card-foreground) / 0.05)"
+                    stroke="hsl(var(--card-foreground) / 0.2)" 
+                    strokeWidth="0.5"
+                />
+                {/* Cork */}
+                <path
+                    d="M42 0H58V20H42V0Z"
+                    className="fill-current text-amber-900/80"
+                    stroke="hsl(var(--card-foreground) / 0.2)" 
+                    strokeWidth="0.5"
+                />
+
 
                 {/* Liquid and Bubbles */}
-                <g clipPath="url(#glass-mask)">
+                <g clipPath="url(#bottle-mask)">
                     {/* Wavy liquid */}
                     <path
                         d="M 10,90 
