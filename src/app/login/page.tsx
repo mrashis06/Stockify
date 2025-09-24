@@ -168,10 +168,10 @@ function LoginContent() {
         } else {
           // Role mismatch, sign out and show error toast
           await signOut(auth);
-          let description = "Your role does not match this login panel. Please switch panels.";
-          if (role === 'staff') { // Tried to log in as staff, but wasn't a staff member
+          let description = "";
+          if (role === 'staff' && effectiveRole === 'admin') { // Tried to log in as staff, but is an Admin
               description = "Access Denied. You are an Admin. Please use the Admin login panel.";
-          } else if (role === 'admin') { // Tried to log in as admin, but wasn't an admin
+          } else if (role === 'admin' && effectiveRole === 'staff') { // Tried to log in as admin, but is Staff
               description = "Access Denied. You are Staff. Please use the Staff login panel.";
           }
           setAuthError(description);

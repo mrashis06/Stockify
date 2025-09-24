@@ -5,6 +5,7 @@ import { useEffect, useState, createContext, useContext, ReactNode } from 'react
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, onSnapshot, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { ADMIN_UIDS } from '@/lib/constants';
 
 export type AppUser = User & {
     role?: string;
@@ -59,10 +60,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         return;
                     }
                     
+                    const isUserAdmin = ADMIN_UIDS.includes(authUser.uid);
+                    const effectiveRole = isUserAdmin ? 'admin' : userData.role || 'staff';
+
                     const fullUser: AppUser = {
                         ...authUser,
                         displayName: userData.name || authUser.displayName,
-                        role: userData.role,
+                        role: effectiveRole,
                         name: userData.name || authUser.displayName,
                         dob: userData.dob,
                         shopId: userData.shopId,
