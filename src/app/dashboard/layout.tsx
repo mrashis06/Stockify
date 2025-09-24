@@ -122,6 +122,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="hidden flex-col gap-6 text-sm font-medium md:flex md:flex-row md:items-center md:gap-5 lg:gap-6">
+           <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Back</span>
+           </Button>
            {navItems.map(item => (
               <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
                   <item.icon className="h-4 w-4" />
@@ -131,9 +135,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </nav>
         
         <div className="flex items-center gap-2 sm:gap-4">
-           <Button variant="ghost" size="icon" onClick={() => router.back()} className="hidden md:flex">
-              <ArrowLeft className="h-4 w-4" />
-          </Button>
           <ThemeToggle />
           <Button variant="ghost" size="icon" className="rounded-full">
             <Bell className="h-5 w-5" />
