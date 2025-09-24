@@ -258,31 +258,25 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             });
         });
 
-        if (!isSingleDay) {
-             let finalY = (doc as any).lastAutoTable.finalY || startY;
-             if (finalY > 250) { // Check if we need a new page
-                doc.addPage();
-                finalY = 15;
-             }
-
-             // Manually draw the Grand Total section for full control
-             doc.autoTable({
-                body: [
-                    [`Grand Total`, ``, ``, ``, grandTotalUnits, grandTotalAmount.toFixed(2)]
+        if (!isSingleDay && datedSalesDataForExport.length > 0) {
+            // This is the final table for the grand total.
+            doc.autoTable({
+                startY: (doc as any).lastAutoTable.finalY + 10,
+                head: [["", "", "", "", "", ""]], // Empty head to align columns
+                body: [], // No body content
+                foot: [
+                    ['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]
                 ],
-                startY: finalY + 10,
-                theme: 'striped',
-                styles: { cellPadding: 3 },
-                bodyStyles: {
-                    fontStyle: 'bold',
-                    fontSize: 12,
+                showHead: false, // Hide the empty header
+                footStyles: {
                     fillColor: [22, 163, 74], // green-600
-                    textColor: [255, 255, 255]
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    fontSize: 12
                 },
                 columnStyles: {
-                    0: { cellWidth: 'auto' },
-                    4: { halign: 'left' },
-                    5: { halign: 'left' },
+                  4: { halign: 'right' },
+                  5: { halign: 'right' }
                 }
             });
         }
@@ -444,3 +438,5 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
+
+    
