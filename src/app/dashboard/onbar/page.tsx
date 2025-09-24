@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee } from 'lucide-react';
+import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -55,7 +55,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const handleRemove = async (id: string) => {
          try {
             await removeOnBarItem(id);
-            toast({ title: 'Success', description: 'Empty bottle removed.' });
+            toast({ title: 'Success', description: 'Bottle removed and stock returned.' });
         } catch (error) {
             console.error('Error removing item:', error);
             const errorMessage = (error as Error).message || 'Failed to remove item.';
@@ -120,9 +120,12 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {onBarInventory.map(item => (
-                        <Card key={item.id} className="flex flex-col h-full">
-                            <CardHeader>
-                                <CardTitle className="text-lg truncate">{item.brand}</CardTitle>
+                        <Card key={item.id} className="flex flex-col h-full relative">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="text-lg truncate pr-8">{item.brand}</CardTitle>
+                                <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8" onClick={() => handleRemove(item.id)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
                             </CardHeader>
                              <CardContent className="flex-1 flex flex-col justify-between p-6">
                                 <div className="text-center flex-1 flex flex-col justify-center">
