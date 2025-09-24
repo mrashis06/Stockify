@@ -3,7 +3,7 @@
 
 import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 export type AppUser = User & {
@@ -18,6 +18,7 @@ type AuthContextType = {
     user: AppUser | null;
     loading: boolean;
     updateUser: (uid: string, data: Partial<AppUser>) => Promise<void>;
+    deleteUserAccount?: (uid: string) => Promise<void>;
     shopId: string | null;
     isStaffActive: boolean;
 };
@@ -42,6 +43,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
         if (authUser) {
+            // Prevent login if auth user is disabled
+            if (authUser.disabled) {
+                setUser(null);
+                setShopId(null);
+                setIsStaffActive(false);
+                setLoading(false);
+                auth.signOut(); // Ensure they are fully logged out
+                return;
+            }
+
             const userDocRef = doc(db, 'users', authUser.uid);
             const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -59,12 +70,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     setShopId(userData.shopId || null);
                     setIsStaffActive(userData.status === 'active');
                 } else {
-                    setUser(authUser);
+                    // This can happen if the user's doc is deleted but they are still logged in.
+                    // We should log them out.
+                    auth.signOut();
+                    setUser(null);
+                    setShopId(null);
+                    setIsStaffActive(false);
                 }
                  setLoading(false);
             }, (error) => {
                 console.error("Error fetching user data:", error);
-                setUser(authUser);
+                setUser(authUser); // Fallback to authUser
                 setLoading(false);
             });
             return () => unsubDoc();
@@ -83,8 +99,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocRef = doc(db, 'users', uid);
       await updateDoc(userDocRef, data);
   };
+  
+  // This function is only available to the admin
+  const deleteUserAccount = user?.role === 'admin' 
+    ? async (uid: string) => {
+        // This is a placeholder for a real backend function call.
+        // In a real app, you would call a Cloud Function to disable/delete the auth user.
+        // For this prototype, we will just delete the Firestore doc and "block" them.
+        const userDocRef = doc(db, 'users', uid);
+        await deleteDoc(userDocRef);
+        
+        // This is a client-side simulation of what a backend function would do.
+        // It's NOT secure for production but demonstrates the flow.
+        console.warn(`Simulating disabling of user ${uid}. In production, this must be a secure backend operation.`);
+        // To complete the "delete" flow, we simply remove their record. The auth listeners
+        // will handle logging them out if they try to refresh or log in again, as their doc is gone.
+    }
+    : undefined;
 
-  const value = { user, loading, updateUser, shopId, isStaffActive };
+
+  const value = { user, loading, updateUser, deleteUserAccount, shopId, isStaffActive };
 
   return (
     <AuthContext.Provider value={value}>

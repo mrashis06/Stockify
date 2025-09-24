@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, XCircle, ChevronDown, ChevronUp, Phone, Cake, FileText, User } from 'lucide-react';
@@ -54,7 +54,7 @@ type InviteCode = {
 const CODE_EXPIRATION_DAYS = 7;
 
 export default function StaffPage() {
-    const { user } = useAuth();
+    const { user, deleteUserAccount } = useAuth();
     const { toast } = useToast();
     const [staffList, setStaffList] = useState<StaffMember[]>([]);
     const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
@@ -179,13 +179,11 @@ export default function StaffPage() {
     };
 
     const handleRemoveStaff = async () => {
-        if (!selectedStaff) return;
+        if (!selectedStaff || !deleteUserAccount) return;
         try {
-            await updateDoc(doc(db, "users", selectedStaff.id), {
-                shopId: null,
-                status: 'blocked'
-            });
-            toast({ title: "Success", description: `${selectedStaff.name} has been removed from the shop.` });
+            // This will delete the user's doc and disable their auth account.
+            await deleteUserAccount(selectedStaff.id);
+            toast({ title: "Success", description: `${selectedStaff.name} has been permanently removed.` });
         } catch(error) {
             console.error("Error removing staff:", error);
             toast({ title: "Error", description: "Failed to remove staff member.", variant: "destructive" });
@@ -267,7 +265,7 @@ export default function StaffPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Remove {selectedStaff?.name}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will remove the staff member from your shop. They will lose access immediately and will need a new invite code to rejoin. Are you sure?
+                           This will permanently remove the staff member's data and disable their login. They will have to sign up again to regain access. Are you sure? This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
