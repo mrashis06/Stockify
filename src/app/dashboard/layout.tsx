@@ -3,7 +3,7 @@
 
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -23,11 +23,13 @@ import { signOut } from 'firebase/auth';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/hooks/use-loading';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 
 export default function DashboardLayout({ children, params, searchParams }: { children: ReactNode, params: { slug: string }, searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -35,6 +37,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   };
   
   const handleNav = (path: string, pageName: string) => {
+    setIsMobileMenuOpen(false);
     showLoader(pageName, path);
   }
 
@@ -57,18 +60,60 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
-      <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
-        <div className="flex items-center gap-6">
+      <header className="sticky top-0 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6 z-50">
+        <div className="flex items-center gap-2">
+           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0 md:hidden"
+              >
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle navigation menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left">
+                <SheetHeader>
+                    <SheetTitle>Navigation</SheetTitle>
+                    <SheetDescription className="sr-only">Main dashboard navigation</SheetDescription>
+                </SheetHeader>
+                <nav className="grid gap-6 text-lg font-medium mt-8">
+                    <NavLink href="/" pageName='Home' onNavigate={handleNav}>
+                        <Home className="h-5 w-5" />
+                        Home
+                    </NavLink>
+                    <NavLink href="/dashboard" pageName='Dashboard' onNavigate={handleNav}>
+                        <LayoutDashboard className="h-5 w-5" />
+                        Dashboard
+                    </NavLink>
+                    <NavLink href="/dashboard/inventory" pageName='Inventory' onNavigate={handleNav}>
+                        <Warehouse className="h-5 w-5" />
+                        Inventory
+                    </NavLink>
+                    <NavLink href="/dashboard/godown" pageName='Godown' onNavigate={handleNav}>
+                        <Archive className="h-5 w-5" />
+                        Godown
+                    </NavLink>
+                    <NavLink href="/dashboard/onbar" pageName='OnBar' onNavigate={handleNav}>
+                        <GlassWater className="h-5 w-5" />
+                        OnBar
+                    </NavLink>
+                    <NavLink href="/dashboard/reports" pageName='Reports' onNavigate={handleNav}>
+                        <FileText className="h-5 w-5" />
+                        Reports
+                    </NavLink>
+                </nav>
+            </SheetContent>
+          </Sheet>
+
           <Link
             href="/dashboard"
             className="flex items-center gap-2 text-lg font-semibold"
           >
             <Package className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl">Stockify</span>
+            <span className="hidden sm:inline font-bold text-xl">Stockify</span>
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="hidden md:flex">
-              <ArrowLeft className="h-4 w-4" />
-          </Button>
         </div>
 
         <nav className="hidden md:flex flex-1 items-center justify-center gap-6">
@@ -98,7 +143,10 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
           </NavLink>
         </nav>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
+           <Button variant="ghost" size="icon" onClick={() => router.back()} className="hidden md:flex">
+              <ArrowLeft className="h-4 w-4" />
+          </Button>
           <ThemeToggle />
           <Button variant="ghost" size="icon" className="rounded-full">
             <Bell className="h-5 w-5" />

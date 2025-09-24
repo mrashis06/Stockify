@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Menu, Package, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const Navbar = () => {
@@ -40,17 +40,18 @@ const Navbar = () => {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <SheetHeader className="border-b pb-4">
+                    <SheetTitle>
+                        <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
+                            <Package className="h-6 w-6 text-primary" />
+                            <span className="font-headline text-xl font-bold">Stockify</span>
+                        </Link>
+                    </SheetTitle>
+                    <SheetDescription className="sr-only">
+                        Main navigation menu for Stockify.
+                    </SheetDescription>
+                </SheetHeader>
               <div className="flex h-full flex-col">
-                <div className="flex items-center justify-between border-b pb-4">
-                  <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
-                    <Package className="h-6 w-6 text-primary" />
-                    <span className="font-headline text-xl font-bold">Stockify</span>
-                  </Link>
-                   <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                      <X className="h-6 w-6" />
-                      <span className="sr-only">Close menu</span>
-                   </Button>
-                </div>
                 <nav className="flex-1 overflow-y-auto pt-6">
                     <div className="flex flex-col gap-4">
                         <ThemeToggle />
