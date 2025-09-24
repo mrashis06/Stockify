@@ -8,9 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useOnBarInventory, OnBarItem } from '@/hooks/use-onbar-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
-import SellPegDialog from '@/components/dashboard/sell-peg-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useInventory } from '@/hooks/use-inventory';
 import { usePageLoading } from '@/hooks/use-loading';
+
+const pegSizes = [30, 60, 90, 120, 150, 180];
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { onBarInventory, loading, sellPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
@@ -20,9 +29,6 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     usePageLoading(loading);
 
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
-    const [isSellPegOpen, setIsSellPegOpen] = useState(false);
-    const [sellingItem, setSellingItem] = useState<OnBarItem | null>(null);
-
 
     const handleAddOnBarItem = async (inventoryItemId: string, volume: number) => {
         try {
@@ -34,17 +40,11 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     };
-
-    const handleOpenSellDialog = (item: OnBarItem) => {
-        setSellingItem(item);
-        setIsSellPegOpen(true);
-    };
     
     const handleSell = async (id: string, volume: number) => {
         try {
             await sellPeg(id, volume);
             toast({ title: 'Success', description: `${volume}ml sold.` });
-            setIsSellPegOpen(false);
         } catch (error) {
             console.error('Error selling item:', error);
             const errorMessage = (error as Error).message || 'Failed to sell item.';
@@ -98,15 +98,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                 onBarInventory={onBarInventory}
                 onAddItem={handleAddOnBarItem}
             />
-            {sellingItem && (
-                <SellPegDialog
-                    isOpen={isSellPegOpen}
-                    onOpenChange={setIsSellPegOpen}
-                    item={sellingItem}
-                    onSell={handleSell}
-                />
-            )}
-
+            
             <header className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
                 <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
@@ -168,15 +160,43 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                         </Button>
                                      ) : (
                                         <div className="flex justify-center items-center gap-2">
-                                            <Button
-                                                variant="outline"
-                                                className="flex-1"
-                                                disabled={item.remainingVolume <= 0}
-                                                onClick={() => handleOpenSellDialog(item)}
-                                            >
-                                                <Minus className="mr-2 h-4 w-4" />
-                                                Sell Peg
-                                            </Button>
+                                             <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        className="flex-1"
+                                                        disabled={item.remainingVolume <= 0}
+                                                    >
+                                                        <Minus className="mr-2 h-4 w-4" />
+                                                        Sell Peg
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent className="w-56">
+                                                    <DropdownMenuLabel>Select Serving Size</DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+                                                    {pegSizes.map(size => {
+                                                        const pricePerMl = item.price > 0 && item.totalVolume > 0 ? item.price / item.totalVolume : 0;
+                                                        const pegPrice = pricePerMl * size;
+                                                        const isSellable = item.remainingVolume >= size;
+
+                                                        return (
+                                                            <DropdownMenuItem
+                                                                key={size}
+                                                                disabled={!isSellable}
+                                                                onClick={() => handleSell(item.id, size)}
+                                                                className="flex justify-between"
+                                                            >
+                                                                <span>Sell {size}ml</span>
+                                                                {item.price > 0 && (
+                                                                     <span className="text-muted-foreground">
+                                                                        ₹{pegPrice.toFixed(0)}
+                                                                     </span>
+                                                                )}
+                                                            </DropdownMenuItem>
+                                                        )
+                                                    })}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                             
                                             <Button
                                                 variant="outline"
