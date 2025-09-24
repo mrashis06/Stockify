@@ -24,11 +24,8 @@ const Navbar = () => {
         </Link>
         <div className="hidden items-center gap-4 md:flex">
           <ThemeToggle />
-          <Button variant="ghost" asChild>
-            <Link href="/login">Log In</Link>
-          </Button>
           <Button asChild>
-            <Link href="/signup">Sign Up</Link>
+            <Link href="/login">Get Started</Link>
           </Button>
         </div>
         <div className="md:hidden">
@@ -58,11 +55,8 @@ const Navbar = () => {
                     </div>
                 </nav>
                 <div className="mt-auto flex flex-col gap-4 border-t pt-6">
-                  <Button variant="ghost" asChild>
-                    <Link href="/login" onClick={() => setIsOpen(false)}>Log In</Link>
-                  </Button>
                   <Button asChild>
-                    <Link href="/signup" onClick={() => setIsOpen(false)}>Sign Up</Link>
+                    <Link href="/login" onClick={() => setIsOpen(false)}>Get Started</Link>
                   </Button>
                 </div>
               </div>
