@@ -201,11 +201,11 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
     useEffect(() => {
         if (isBeer) {
             const sizeMl = parseInt(size.match(/(\d+)/)?.[1] || '0', 10);
-            if (sizeMl > 0 && quantity > 0) {
+            if (sizeMl > 0) { // Quantity doesn't need to be checked here for setting volume
                 form.setValue('totalVolume', sizeMl, { shouldValidate: true });
             }
         }
-    }, [size, quantity, isBeer, form]);
+    }, [size, isBeer, form.setValue]);
 
 
     const onSubmit = async (data: ManualFormValues) => {
@@ -365,5 +365,3 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, shopInventory
     </Dialog>
   );
 }
-
-    
