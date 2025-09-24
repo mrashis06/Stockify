@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ADMIN_UID } from '@/lib/constants';
+import { ADMIN_UIDS } from '@/lib/constants';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -77,7 +77,7 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
       
-      const role = user.uid === ADMIN_UID ? 'admin' : 'staff';
+      const role = ADMIN_UIDS.includes(user.uid) ? 'admin' : 'staff';
 
       // Create user document in Firestore
       await setDoc(doc(db, "users", user.uid), {
@@ -93,7 +93,7 @@ export default function SignupPage() {
         createdAt: serverTimestamp(),
       });
       
-      if (role === 'staff' || (role === 'admin' && user.uid !== ADMIN_UID)) {
+      if (role === 'staff' || !ADMIN_UIDS.includes(user.uid)) {
           router.push('/join-shop');
       } else {
           router.push('/join-shop');
