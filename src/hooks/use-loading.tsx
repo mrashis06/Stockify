@@ -48,7 +48,7 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
 
   setDataReady: () => {
       set({ dataReady: true });
-      // If progress is already done, this allows hiding the loader.
+      // If progress animation is already done, hide the loader.
       if (get().progress >= 100) {
           get().hideLoader();
       }
@@ -71,22 +71,20 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
         const newProgress = state.progress + 5;
         if (newProgress >= 100) {
           clearInterval(intervalId);
+          // If data is ready when animation finishes, hide the loader.
           if (state.dataReady) {
-            // Data is ready and animation is done, hide immediately.
             hideLoader();
           }
-          // Otherwise, wait for setDataReady to call hideLoader.
           return { progress: 100 };
         }
         return { progress: newProgress };
       });
-    }, 80); // ~1.6 seconds to 100%
+    }, 80); // ~1.6 seconds to reach 100%
 
-    // Fallback timeout to prevent getting stuck
+    // Hard fallback timeout to prevent getting stuck
     const timeoutId = setTimeout(() => {
-        const { isLoading, progress } = get();
-        if (isLoading && progress < 100) {
-            // Force completion if still loading after 2.5s
+        const { isLoading } = get();
+        if (isLoading) {
             hideLoader();
         }
     }, 2500);
@@ -116,20 +114,16 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
         }
     };
 
-    // Handle browser back/forward navigation
+    // This effect handles browser back/forward navigation.
     useEffect(() => {
-        // This part is tricky with Next.js App Router.
-        // A simple solution is to ensure the loader is hidden on path changes
-        // that are not controlled by our `showLoader` function.
-        const handlePathChange = () => {
-             const { isLoading, _internalState } = useLoadingStore.getState();
-             if (isLoading && pathname !== _internalState.path) {
-                 // If the router path changes and it's not our target, something else happened (e.g. back button).
-                 // We can't easily predict the destination page name here, so we just hide the loader.
-                 useLoadingStore.getState().hideLoader();
-             }
-        };
-        handlePathChange();
+      const handlePathChange = () => {
+        const { isLoading, _internalState } = useLoadingStore.getState();
+        // If a navigation happens that our loader didn't initiate, hide any active loader.
+        if (isLoading && pathname !== _internalState.path) {
+          useLoadingStore.getState().hideLoader();
+        }
+      };
+      handlePathChange();
     }, [pathname]);
     
     return (
@@ -148,7 +142,8 @@ export const useLoading = () => {
 };
 
 export const usePageLoading = (pageIsLoading: boolean) => {
-    const { setDataReady, isLoading } = useLoadingStore();
+    const setDataReady = useLoadingStore(state => state.setDataReady);
+    const isLoading = useLoadingStore(state => state.isLoading);
     
     useEffect(() => {
         if (!pageIsLoading && isLoading) {
