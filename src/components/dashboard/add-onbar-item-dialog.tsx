@@ -200,12 +200,15 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
 
     useEffect(() => {
         if (isBeer) {
-            const sizeMl = parseInt(size.match(/(\d+)/)?.[1] || '0', 10);
-            if (sizeMl > 0) { // Quantity doesn't need to be checked here for setting volume
-                form.setValue('totalVolume', sizeMl, { shouldValidate: true });
+            const sizeMl = parseInt(size.match(/(\d+)/)?.[0] || '0', 10);
+            const numQuantity = Number(quantity) || 0;
+            if (sizeMl > 0 && numQuantity > 0) {
+                form.setValue('totalVolume', sizeMl * numQuantity, { shouldValidate: true });
+            } else if (sizeMl > 0) {
+                 form.setValue('totalVolume', sizeMl, { shouldValidate: true });
             }
         }
-    }, [size, isBeer, form.setValue]);
+    }, [size, quantity, isBeer, form.setValue]);
 
 
     const onSubmit = async (data: ManualFormValues) => {
