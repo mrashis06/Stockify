@@ -10,7 +10,8 @@ import {
   runTransaction,
   deleteDoc,
   serverTimestamp,
-  addDoc
+  addDoc,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useInventory } from './use-inventory'; // To trigger stock updates
@@ -36,7 +37,7 @@ export function useOnBarInventory() {
   const [onBarInventory, setOnBarInventory] = useState<OnBarItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { openBottleForOnBar } = useInventory();
+  const { inventory, updateItemField } = useInventory();
 
   usePageLoading(loading);
 
@@ -57,7 +58,40 @@ export function useOnBarInventory() {
       if (saving) return;
       setSaving(true);
       try {
-          await openBottleForOnBar(inventoryItemId, volume, quantity);
+        const itemInShop = inventory.find(item => item.id === inventoryItemId);
+        if (!itemInShop) throw new Error("Item not found in shop inventory.");
+        
+        const currentSales = itemInShop.sales || 0;
+        const closingStock = (itemInShop.opening || 0) - currentSales;
+
+        if (closingStock < quantity) {
+            throw new Error(`Not enough stock. Available: ${closingStock}, trying to open: ${quantity}`);
+        }
+
+        // Treat opening a bottle as a "sale" from the main inventory
+        await updateItemField(inventoryItemId, 'sales', currentSales + quantity);
+        
+        // Then, add the bottle(s) to the on-bar collection
+        const batch = writeBatch(db);
+        const onBarCollectionRef = collection(db, "onBarInventory");
+
+        for (let i = 0; i < quantity; i++) {
+            const newOnBarDocRef = doc(onBarCollectionRef);
+             batch.set(newOnBarDocRef, {
+                inventoryId: inventoryItemId,
+                brand: itemInShop.brand,
+                size: itemInShop.size,
+                category: itemInShop.category,
+                totalVolume: volume,
+                remainingVolume: volume,
+                salesVolume: 0,
+                salesValue: 0,
+                price: itemInShop.price,
+                openedAt: serverTimestamp(),
+            });
+        }
+        await batch.commit();
+
       } catch (error) {
           console.error("Error opening bottle: ", error);
           throw error;
@@ -171,7 +205,23 @@ export function useOnBarInventory() {
       setSaving(true);
       try {
           const itemRef = doc(db, 'onBarInventory', id);
+          const itemSnap = await getDoc(itemRef);
+          if (!itemSnap.exists()) throw new Error("On-bar item not found");
+          const onBarItemData = itemSnap.data();
+          const inventoryId = onBarItemData.inventoryId;
+
+          // If the item was tracked from main inventory, treat its removal as a "return"
+          if (inventoryId && inventoryId !== 'manual') {
+              const itemInShop = inventory.find(item => item.id === inventoryId);
+              if (itemInShop) {
+                  const currentSales = itemInShop.sales || 0;
+                  // Decrementing sales by 1 effectively returns one bottle to stock.
+                  await updateItemField(inventoryId, 'sales', currentSales - 1);
+              }
+          }
+          
           await deleteDoc(itemRef);
+
       } catch (error) {
           console.error("Error removing on-bar item: ", error);
           throw error;
