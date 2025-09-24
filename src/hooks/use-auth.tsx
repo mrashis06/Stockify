@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
@@ -36,6 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
         if (authUser) {
             const userDocRef = doc(db, 'users', authUser.uid);
+            // Listen for real-time updates to user data
             const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const userData = docSnap.data();
@@ -47,22 +49,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         dob: userData.dob,
                     });
                 } else {
-                    setUser(authUser); // Auth user exists, but no firestore doc yet
+                    // This case might happen if the Firestore doc is not created yet
+                    setUser(authUser);
                 }
                  setLoading(false);
             }, (error) => {
                 console.error("Error fetching user data:", error);
-                setUser(authUser);
+                setUser(authUser); // Still set the basic auth user on error
                 setLoading(false);
             });
-            return () => unsubDoc(); // Cleanup firestore listener
+            // Return the firestore listener's cleanup function
+            return () => unsubDoc();
         } else {
+            // No authenticated user
             setUser(null);
             setLoading(false);
         }
     });
 
-    return () => unsubscribe(); // Cleanup auth listener
+    // Return the auth listener's cleanup function
+    return () => unsubscribe();
   }, []);
   
   const updateUser = async (uid: string, data: Partial<AppUser>) => {

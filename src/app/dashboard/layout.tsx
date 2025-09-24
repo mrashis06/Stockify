@@ -32,8 +32,12 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
+    // Only perform redirection checks once the initial auth state has been determined.
+    if (!authLoading) {
+      // If auth check is complete and there's no user, redirect to login.
+      if (!user) {
+        router.push('/login');
+      }
     }
   }, [user, authLoading, router]);
 
@@ -47,6 +51,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
     showLoader(pageName, path);
   }
 
+  // While loading auth state or if there's no user (and we are about to redirect), show a loader.
   if (authLoading || !user) {
     return (
         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
@@ -55,6 +60,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
     );
   }
   
+  // If we have a user, render the dashboard.
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
        <header className="sticky top-0 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6 z-50">

@@ -63,6 +63,8 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
+    // If the user is already logged in, redirect them to the dashboard.
+    // This handles cases where a logged-in user tries to access the login page.
     if (!authLoading && user) {
       router.push('/dashboard');
     }
@@ -73,7 +75,8 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
+      // On successful sign-in, Firebase's onAuthStateChanged will trigger the
+      // useEffect above to redirect.
     } catch (error) {
       console.error("Error signing in with email and password: ", error);
       toast({
@@ -81,9 +84,9 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
         description: "Failed to sign in. Please check your credentials.",
         variant: "destructive",
       });
-    } finally {
-        setLoading(false);
+      setLoading(false);
     }
+    // No need to set loading to false here, as redirection will unmount the component
   };
 
   const handleGoogleSignIn = async () => {
@@ -104,7 +107,7 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           createdAt: serverTimestamp(),
         });
       }
-      router.push('/dashboard');
+      // On successful sign-in, the useEffect will handle redirection.
     } catch (error: any) {
       if (error.code !== 'auth/popup-closed-by-user') {
         console.error("Error with Google sign-in: ", error);
@@ -114,11 +117,12 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           variant: "destructive",
         });
       }
-    } finally {
-        setGoogleLoading(false);
+      setGoogleLoading(false);
     }
   };
   
+  // While auth state is loading, or if the user exists (and we're about to redirect)
+  // show a loading screen to prevent flicker.
   if (authLoading || user) {
     return (
         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
