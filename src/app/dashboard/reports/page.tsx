@@ -2,9 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 import { format, eachDayOfInterval, isSameDay } from 'date-fns';
-import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet } from 'lucide-react';
+import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -17,24 +16,32 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import {
-  ChartContainer,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+    Table,
+    TableBody,
+    TableCell,
+    TableFooter,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table"
 import { toast } from '@/hooks/use-toast';
 import { usePageLoading } from '@/hooks/use-loading';
-
-const chartConfig = {
-  sales: {
-    label: "Sales (INR)",
-    color: "hsl(var(--primary))",
-  },
-};
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
 
-type DailyLog = { [itemId: string]: { sales: number; price: number; category: string } };
+type DailyLog = { [itemId: string]: { brand: string; size: string; sales: number; price: number; category: string } };
+
+type SoldItem = {
+    productId: string;
+    brand: string;
+    size: string;
+    category: string;
+    price: number;
+    unitsSold: number;
+    totalAmount: number;
+};
 
 export default function ReportsPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const [date, setDate] = useState<DateRange | undefined>({
@@ -77,7 +84,6 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         }
     }, []);
     
-    // Fetch today's data on initial load
     useEffect(() => {
         fetchReportData({ from: new Date(), to: new Date() });
     }, [fetchReportData]);
@@ -91,39 +97,62 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     };
 
 
-    const salesData = useMemo(() => {
-        const categorySales = new Map<string, number>();
+    const detailedSalesData = useMemo((): SoldItem[] => {
+        const salesMap = new Map<string, SoldItem>();
+
         reportData.forEach(dailyLog => {
-            for (const itemId in dailyLog) {
-                const item = dailyLog[itemId];
-                if (item.sales && item.price && item.category) {
-                    const saleAmount = item.sales * item.price;
-                    categorySales.set(item.category, (categorySales.get(item.category) || 0) + saleAmount);
+            for (const productId in dailyLog) {
+                const item = dailyLog[productId];
+                if (item.sales && item.sales > 0 && item.price && item.brand) {
+                    const existingEntry = salesMap.get(productId);
+                    if (existingEntry) {
+                        existingEntry.unitsSold += item.sales;
+                        existingEntry.totalAmount += item.sales * item.price;
+                    } else {
+                        salesMap.set(productId, {
+                            productId,
+                            brand: item.brand,
+                            size: item.size,
+                            category: item.category,
+                            price: item.price,
+                            unitsSold: item.sales,
+                            totalAmount: item.sales * item.price,
+                        });
+                    }
                 }
             }
         });
 
-        const sortedSales = Array.from(categorySales.entries())
-            .map(([category, sales]) => ({ category, sales }))
-            .sort((a, b) => b.sales - a.sales);
-        
-        return sortedSales.length > 0 ? sortedSales : [{ category: 'No Sales', sales: 0 }];
+        return Array.from(salesMap.values()).sort((a, b) => a.brand.localeCompare(b.brand));
     }, [reportData]);
+
+    const reportTotals = useMemo(() => {
+        return detailedSalesData.reduce(
+            (totals, item) => {
+                totals.totalUnits += item.unitsSold;
+                totals.grandTotal += item.totalAmount;
+                return totals;
+            },
+            { totalUnits: 0, grandTotal: 0 }
+        );
+    }, [detailedSalesData]);
+
 
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
-        const tableColumn = ["Category", "Sales (INR)"];
+        const tableColumn = ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
         const tableRows: (string | number)[][] = [];
 
-        let totalSales = 0;
-        salesData.forEach(item => {
-            if (item.category === 'No Sales') return;
+        detailedSalesData.forEach(item => {
             const rowData = [
+                item.brand,
+                item.size,
                 item.category,
-                item.sales.toLocaleString('en-IN')
+                `Rs. ${item.price.toFixed(2)}`,
+                item.unitsSold,
+                `Rs. ${item.totalAmount.toFixed(2)}`
             ];
             tableRows.push(rowData);
-            totalSales += item.sales;
         });
 
         const startDate = date?.from ? format(date.from, 'PPP') : '';
@@ -131,16 +160,18 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         
         const isSingleDay = !date?.to || isSameDay(date?.from || new Date(), date.to);
         const title = isSingleDay
-            ? `Sales Report for ${startDate}`
-            : `Sales Report: ${startDate} to ${endDate}`;
+            ? `Sales Statement for ${startDate}`
+            : `Sales Statement: ${startDate} to ${endDate}`;
 
         doc.autoTable({
             head: [tableColumn],
             body: tableRows,
-            foot: [['Total Sales', totalSales.toLocaleString('en-IN')]],
+            foot: [
+                ['Total', '', '', '', reportTotals.totalUnits, `Rs. ${reportTotals.grandTotal.toFixed(2)}`]
+            ],
             startY: 20,
             headStyles: {
-                fillColor: [22, 163, 74], // Green background for header
+                fillColor: [22, 163, 74], 
                 textColor: [255, 255, 255],
                 fontStyle: 'bold'
             },
@@ -157,30 +188,27 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         });
         
         const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
-        doc.save(`sales_report_${fileDate}.pdf`);
+        doc.save(`sales_statement_${fileDate}.pdf`);
     };
 
     const handleExportCSV = () => {
-        const header = ["Category", "Sales (INR)"];
+        const header = ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
         let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
         
-        let totalSales = 0;
-        salesData.forEach(item => {
-            if (item.category === 'No Sales') return;
-            const row = [item.category, item.sales].join(",");
+        detailedSalesData.forEach(item => {
+            const row = [item.brand, item.size, item.category, item.price, item.unitsSold, item.totalAmount].join(",");
             csvContent += row + "\n";
-            totalSales += item.sales;
         });
 
         csvContent += "\n";
-        csvContent += `Total Sales,${totalSales}\n`;
+        csvContent += `Total,,,${reportTotals.totalUnits},${reportTotals.grandTotal}\n`;
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         
         const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
-        link.setAttribute("download", `sales_report_${fileDate}.csv`);
+        link.setAttribute("download", `sales_statement_${fileDate}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -194,15 +222,15 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Sales Summary</h1>
-          <p className="text-muted-foreground">Historical sales overview</p>
+          <h1 className="text-2xl font-bold tracking-tight">Sales Statement</h1>
+          <p className="text-muted-foreground">Detailed sales transaction report</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={handleExportPDF} disabled={loading || salesData[0]?.category === 'No Sales'} className="bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={handleExportPDF} disabled={loading || detailedSalesData.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
                 <Download className="mr-2 h-4 w-4" />
                 Export to PDF
             </Button>
-             <Button onClick={handleExportCSV} disabled={loading || salesData[0]?.category === 'No Sales'} className="bg-blue-600 hover:bg-blue-700 text-white">
+             <Button onClick={handleExportCSV} disabled={loading || detailedSalesData.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white">
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Export to CSV
             </Button>
@@ -212,7 +240,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
       <Card>
         <CardHeader>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <CardTitle>Reports</CardTitle>
+                <CardTitle>Generate Report</CardTitle>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <Popover>
                     <PopoverTrigger asChild>
@@ -249,9 +277,9 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     />
                     </PopoverContent>
                 </Popover>
-                    <Button onClick={handleFilter} disabled={loading} className="bg-green-600 hover:bg-green-700 text-white">
+                    <Button onClick={handleFilter} disabled={loading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                         {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
-                        Filter
+                        Generate
                     </Button>
                 </div>
             </div>
@@ -259,37 +287,55 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         <CardContent>
             <Card>
                 <CardHeader>
-                    <CardTitle>Sales by Category</CardTitle>
+                    <CardTitle>
+                        Sales Details for {date?.from ? (isSameDay(date.from, date.to || date.from) ? format(date.from, 'PPP') : `${format(date.from, 'PPP')} to ${format(date.to || date.from, 'PPP')}`) : 'selected date'}
+                    </CardTitle>
                 </CardHeader>
-                <CardContent className="h-[400px]">
-                    <ChartContainer config={chartConfig}>
-                        <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                            data={salesData}
-                            layout="vertical"
-                            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                            <CartesianGrid horizontal={false} stroke="hsl(var(--border))" />
-                            <YAxis
-                                dataKey="category"
-                                type="category"
-                                tickLine={false}
-                                axisLine={false}
-                                stroke="hsl(var(--muted-foreground))"
-                                width={80}
-                                tick={{fontSize: 12}}
-                            />
-                            <XAxis type="number" stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${Number(value) / 1000}k`} />
-                            <Tooltip
-                                cursor={{ fill: 'hsla(var(--muted-foreground), 0.2)' }}
-                                content={<ChartTooltipContent indicator="dot" formatter={(value) => `₹${value.toLocaleString()}`} />}
-                            />
-                            <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]}>
-                                <LabelList dataKey="sales" position="right" offset={10} className="fill-foreground" formatter={(value: number) => `₹${value.toLocaleString()}`} />
-                            </Bar>
-                        </BarChart>
-                        </ResponsiveContainer>
-                    </ChartContainer>
+                <CardContent>
+                     <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Brand</TableHead>
+                                    <TableHead>Size</TableHead>
+                                    <TableHead>Category</TableHead>
+                                    <TableHead className="text-right">Price</TableHead>
+                                    <TableHead className="text-right">Units Sold</TableHead>
+                                    <TableHead className="text-right">Total Amount</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {detailedSalesData.length > 0 ? (
+                                    detailedSalesData.map(item => (
+                                        <TableRow key={item.productId}>
+                                            <TableCell className="font-medium">{item.brand}</TableCell>
+                                            <TableCell>{item.size}</TableCell>
+                                            <TableCell>{item.category}</TableCell>
+                                            <TableCell className="text-right">{item.price.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">{item.unitsSold}</TableCell>
+                                            <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="h-24 text-center">
+                                            No sales data for the selected period.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                            <TableFooter>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-bold text-right text-base">Grand Total</TableCell>
+                                    <TableCell className="font-bold text-right text-base">{reportTotals.totalUnits}</TableCell>
+                                    <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
+                                        <IndianRupee className="h-4 w-4" />
+                                        {reportTotals.grandTotal.toFixed(2)}
+                                    </TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </CardContent>
@@ -297,3 +343,4 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
+
