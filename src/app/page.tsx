@@ -63,7 +63,7 @@ export default function Home({ params, searchParams }: { params: { slug: string 
              {/* Center Spotlight */}
              <div className="absolute inset-0 bg-spotlight-gradient" />
 
-            <div className="absolute bottom-0 left-0 right-0 h-1/3 md:h-1/2 flex justify-between items-end px-4 md:px-16 text-foreground/10 dark:text-foreground/5">
+            <div className="absolute bottom-0 left-0 right-0 h-1/3 md:h-1/2 flex justify-between items-end px-4 md:px-16 text-foreground/10 dark:text-foreground/10 dark:drop-shadow-[0_0_5px_hsl(var(--foreground)/0.1)]">
                 <div className="flex items-end gap-2 md:gap-4">
                     <BottleSilhouette />
                     <BottleSilhouette2 />
