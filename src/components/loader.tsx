@@ -90,10 +90,10 @@ export default function Loader() {
 
       <div className="mt-8 text-center">
         <h2 className="text-xl font-bold text-foreground">
-          Loading {pageName}...
+          Preparing your {pageName}
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Please wait while we get things ready.
+          Just a moment...
         </p>
       </div>
     </div>
