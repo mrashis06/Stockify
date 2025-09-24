@@ -26,6 +26,61 @@ import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// Define LoginForm as a standalone component outside of LoginPage
+const LoginForm = ({
+  email,
+  setEmail,
+  password,
+  setPassword,
+  loading,
+  handleEmailSignIn,
+  authError
+}: {
+  email: string;
+  setEmail: (email: string) => void;
+  password: string;
+  setPassword: (password: string) => void;
+  loading: boolean;
+  handleEmailSignIn: (e: React.FormEvent) => Promise<void>;
+  authError: string;
+}) => (
+   <form onSubmit={handleEmailSignIn} className="grid gap-4">
+      {authError && (
+            <Alert variant="destructive" className="mb-2">
+                <AlertDescription>{authError}</AlertDescription>
+            </Alert>
+        )}
+      <div className="grid gap-2">
+        <Label htmlFor="email">Email address</Label>
+        <Input
+          id="email"
+          type="email"
+          placeholder="m@example.com"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={loading}
+        />
+      </div>
+      <div className="grid gap-2">
+          <div className="flex items-center">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                  href="/forgot-password"
+                  className="ml-auto inline-block text-sm text-primary underline"
+              >
+                  Forgot your password?
+              </Link>
+          </div>
+        <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
+      </div>
+      <Button type="submit" className="w-full" disabled={loading}>
+        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Login
+      </Button>
+    </form>
+)
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,44 +134,6 @@ export default function LoginPage() {
         </div>
     );
   }
-  
-  const LoginForm = () => (
-     <form onSubmit={handleEmailSignIn} className="grid gap-4">
-        {authError && (
-              <Alert variant="destructive" className="mb-2">
-                  <AlertDescription>{authError}</AlertDescription>
-              </Alert>
-          )}
-        <div className="grid gap-2">
-          <Label htmlFor="email">Email address</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="m@example.com"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={loading}
-          />
-        </div>
-        <div className="grid gap-2">
-            <div className="flex items-center">
-                <Label htmlFor="password">Password</Label>
-                <Link
-                    href="/forgot-password"
-                    className="ml-auto inline-block text-sm text-primary underline"
-                >
-                    Forgot your password?
-                </Link>
-            </div>
-          <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
-        </div>
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Login
-        </Button>
-      </form>
-  )
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
@@ -137,10 +154,26 @@ export default function LoginPage() {
               <TabsTrigger value="staff">Staff Login</TabsTrigger>
             </TabsList>
             <TabsContent value="admin" className="pt-4">
-                <LoginForm />
+                <LoginForm 
+                    email={email}
+                    setEmail={setEmail}
+                    password={password}
+                    setPassword={setPassword}
+                    loading={loading}
+                    handleEmailSignIn={handleEmailSignIn}
+                    authError={authError}
+                />
             </TabsContent>
             <TabsContent value="staff" className="pt-4">
-                <LoginForm />
+                <LoginForm 
+                    email={email}
+                    setEmail={setEmail}
+                    password={password}
+                    setPassword={setPassword}
+                    loading={loading}
+                    handleEmailSignIn={handleEmailSignIn}
+                    authError={authError}
+                />
             </TabsContent>
           </Tabs>
 
