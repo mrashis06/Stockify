@@ -118,7 +118,9 @@ function PhoneLoginTab() {
     
     // Cleanup the verifier on unmount
     return () => {
-      window.recaptchaVerifier.clear();
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+      }
     };
   }, []);
 
@@ -126,19 +128,32 @@ function PhoneLoginTab() {
     e.preventDefault();
     setLoading(true);
     try {
-      const formattedPhone = `+${phone.replace(/\D/g, '')}`;
-      if (formattedPhone.length < 10) {
-        toast({ title: "Error", description: "Please enter a valid phone number.", variant: "destructive" });
+      let digitsOnly = phone.replace(/\D/g, '');
+      let formattedPhone;
+
+      if (digitsOnly.startsWith('91') && digitsOnly.length > 10) {
+        // Number includes country code, e.g., 919876543210
+        formattedPhone = `+${digitsOnly}`;
+      } else if (digitsOnly.length === 10) {
+        // Standard 10-digit mobile number, prepend +91
+        formattedPhone = `+91${digitsOnly}`;
+      } else {
+        toast({ title: "Error", description: "Please enter a valid 10-digit Indian phone number.", variant: "destructive" });
         setLoading(false);
         return;
       }
+      
       const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
       window.confirmationResult = confirmationResult;
       setOtpSent(true);
       toast({ title: "OTP Sent", description: "A verification code has been sent to your phone." });
     } catch (error) {
       console.error("Error sending OTP:", error);
-      toast({ title: "Error", description: "Failed to send OTP. Please try again.", variant: "destructive" });
+      let description = "Failed to send OTP. Please try again.";
+      if ((error as AuthError).code === 'auth/invalid-phone-number') {
+        description = "The phone number is not valid. Please check and re-enter.";
+      }
+      toast({ title: "Error", description: description, variant: "destructive" });
     } finally {
       setLoading(false);
     }
