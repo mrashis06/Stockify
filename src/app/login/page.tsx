@@ -94,6 +94,7 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [activeTab, setActiveTab] = useState('admin');
 
   useEffect(() => {
     const errorType = searchParams.get('error');
@@ -131,9 +132,13 @@ export default function LoginPage() {
           // Role matches the login panel, proceed
           router.push('/dashboard');
         } else {
-          // Role mismatch, sign out and show error
+          // Role mismatch, sign out and show error toast
           await signOut(auth);
-          setAuthError(`Access Denied: You are attempting to log in from the wrong role panel.`);
+          toast({
+            title: 'Access Denied',
+            description: `You are a ${userData.role}. Please use the ${userData.role} login panel.`,
+            variant: 'destructive',
+          });
           setLoading(false);
         }
       } else {
@@ -162,6 +167,11 @@ export default function LoginPage() {
     );
   }
 
+  const handleTabChange = (value: string) => {
+      setActiveTab(value);
+      setAuthError(''); // Clear errors when switching tabs
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-sm">
@@ -175,7 +185,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="admin" className="w-full" onValueChange={() => setAuthError('')}>
+          <Tabs defaultValue="admin" className="w-full" onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="admin">Admin Login</TabsTrigger>
               <TabsTrigger value="staff">Staff Login</TabsTrigger>
@@ -186,7 +196,7 @@ export default function LoginPage() {
                     setEmail={setEmail}
                     password={password}
                     setPassword={setPassword}
-                    loading={loading}
+                    loading={loading && activeTab === 'admin'}
                     handleEmailSignIn={handleEmailSignIn}
                     authError={authError}
                     role="admin"
@@ -198,7 +208,7 @@ export default function LoginPage() {
                     setEmail={setEmail}
                     password={password}
                     setPassword={setPassword}
-                    loading={loading}
+                    loading={loading && activeTab === 'staff'}
                     handleEmailSignIn={handleEmailSignIn}
                     authError={authError}
                     role="staff"
