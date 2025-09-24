@@ -8,43 +8,31 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useOnBarInventory, OnBarItem } from '@/hooks/use-onbar-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { useInventory } from '@/hooks/use-inventory';
 import { usePageLoading } from '@/hooks/use-loading';
 
-const pegSizes = [30, 60, 90, 120, 150, 180];
-
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
-    const { onBarInventory, loading, sellPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
+    const { onBarInventory, loading, sellCustomPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
     const { inventory: shopInventory } = useInventory();
     const { toast } = useToast();
     
     usePageLoading(loading);
 
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+    const [isSellItemOpen, setIsSellItemOpen] = useState(false);
+    const [sellingItem, setSellingItem] = useState<OnBarItem | null>(null);
 
-    const handleAddOnBarItem = async (inventoryItemId: string, volume: number) => {
-        try {
-            // The logic is now within the hook, so we just call it
-            toast({ title: 'Success', description: 'Bottle opened and moved to OnBar.' });
-        } catch (error) {
-            console.error('Error opening bottle:', error);
-            const errorMessage = (error as Error).message || 'Failed to open bottle.';
-            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
-        }
+    const handleOpenSellDialog = (item: OnBarItem) => {
+        setSellingItem(item);
+        setIsSellItemOpen(true);
     };
     
-    const handleSell = async (id: string, volume: number) => {
+    const handleSell = async (id: string, volume: number, price: number) => {
         try {
-            await sellPeg(id, volume);
-            toast({ title: 'Success', description: `${volume}ml sold.` });
+            await sellCustomPeg(id, volume, price);
+            toast({ title: 'Success', description: `${volume}ml sold for ₹${price}.` });
+            setIsSellItemOpen(false);
         } catch (error) {
             console.error('Error selling item:', error);
             const errorMessage = (error as Error).message || 'Failed to sell item.';
@@ -54,10 +42,10 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
 
     const handleRefill = async (id: string, amount: number) => {
         try {
-            await refillPeg(id, amount);
-            toast({ title: 'Success', description: `Last sale of ${amount}ml cancelled.` });
-        } catch (error)
-        {
+            // Refilling a standard 30ml peg for simplicity
+            await refillPeg(id, 30); 
+            toast({ title: 'Success', description: `Last sale of 30ml cancelled.` });
+        } catch (error) {
             console.error('Error refilling item:', error);
             const errorMessage = (error as Error).message || 'Failed to refill item.';
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
@@ -76,13 +64,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     }
 
     const totalOnBarSales = useMemo(() => {
-        return onBarInventory.reduce((total, item) => {
-            if (item.salesVolume > 0 && item.price > 0 && item.totalVolume > 0) {
-                const pricePerMl = item.price / item.totalVolume;
-                return total + (item.salesVolume * pricePerMl);
-            }
-            return total;
-        }, 0);
+        return onBarInventory.reduce((total, item) => total + (item.salesValue || 0), 0);
     }, [onBarInventory]);
     
     if (loading) {
@@ -96,8 +78,16 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                 onOpenChange={setIsAddItemOpen}
                 shopInventory={shopInventory}
                 onBarInventory={onBarInventory}
-                onAddItem={handleAddOnBarItem}
             />
+
+            {sellingItem && (
+                <SellOnBarItemDialog
+                    isOpen={isSellItemOpen}
+                    onOpenChange={setIsSellItemOpen}
+                    item={sellingItem}
+                    onSell={handleSell}
+                />
+            )}
             
             <header className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
@@ -152,51 +142,23 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                      {item.category === 'Beer' ? (
                                         <Button
                                             variant="outline"
-                                            onClick={() => handleSell(item.id, item.totalVolume)}
+                                            onClick={() => handleSell(item.id, item.totalVolume, item.price)}
                                             disabled={item.remainingVolume <= 0}
                                             className="w-full"
                                         >
-                                            <Beer className="mr-2 h-4 w-4" /> Sell Bottle
+                                            <Beer className="mr-2 h-4 w-4" /> Sell Bottle (₹{item.price})
                                         </Button>
                                      ) : (
                                         <div className="flex justify-center items-center gap-2">
-                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        className="flex-1"
-                                                        disabled={item.remainingVolume <= 0}
-                                                    >
-                                                        <Minus className="mr-2 h-4 w-4" />
-                                                        Sell Peg
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent className="w-56">
-                                                    <DropdownMenuLabel>Select Serving Size</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator />
-                                                    {pegSizes.map(size => {
-                                                        const pricePerMl = item.price > 0 && item.totalVolume > 0 ? item.price / item.totalVolume : 0;
-                                                        const pegPrice = pricePerMl * size;
-                                                        const isSellable = item.remainingVolume >= size;
-
-                                                        return (
-                                                            <DropdownMenuItem
-                                                                key={size}
-                                                                disabled={!isSellable}
-                                                                onClick={() => handleSell(item.id, size)}
-                                                                className="flex justify-between"
-                                                            >
-                                                                <span>Sell {size}ml</span>
-                                                                {item.price > 0 && (
-                                                                     <span className="text-muted-foreground">
-                                                                        ₹{pegPrice.toFixed(0)}
-                                                                     </span>
-                                                                )}
-                                                            </DropdownMenuItem>
-                                                        )
-                                                    })}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                             <Button
+                                                variant="outline"
+                                                className="flex-1"
+                                                disabled={item.remainingVolume <= 0}
+                                                onClick={() => handleOpenSellDialog(item)}
+                                            >
+                                                <Minus className="mr-2 h-4 w-4" />
+                                                Sell Peg
+                                            </Button>
                                             
                                             <Button
                                                 variant="outline"

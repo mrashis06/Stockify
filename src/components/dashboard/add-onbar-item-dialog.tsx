@@ -60,7 +60,6 @@ type AddOnBarItemDialogProps = {
   onOpenChange: (isOpen: boolean) => void;
   shopInventory: InventoryItem[];
   onBarInventory: OnBarItem[];
-  onAddItem: (inventoryItemId: string, volume: number) => void; // This might need adjustment
 };
 
 const categories = ['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine', 'Gin', 'Tequila', 'IML'];
@@ -246,7 +245,7 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
 }
 
 
-export default function AddOnBarItemDialog({ isOpen, onOpenChange, shopInventory, onBarInventory, onAddItem }: AddOnBarItemDialogProps) {
+export default function AddOnBarItemDialog({ isOpen, onOpenChange, shopInventory, onBarInventory }: AddOnBarItemDialogProps) {
   const trackedForm = useForm<TrackedFormValues>({ resolver: zodResolver(trackedSchema) });
   const manualForm = useForm<ManualFormValues>({ resolver: zodResolver(manualSchema), defaultValues: { brand: '', size: '', category: '', totalVolume: 750 } });
   

@@ -43,13 +43,11 @@ export function useEndOfDay() {
 
       onBarSnap.forEach(doc => {
         const item = doc.data() as OnBarItem;
-        if (item.salesVolume > 0 && item.price > 0 && item.totalVolume > 0 && item.inventoryId !== 'manual') {
-            const pricePerMl = item.price / item.totalVolume;
-            const saleValue = item.salesVolume * pricePerMl;
-            onBarTotalValue += saleValue;
+        if (item.salesValue && item.salesValue > 0) {
+            onBarTotalValue += item.salesValue;
         }
-        // Reset salesVolume for the next day for all on-bar items
-        batch.update(doc.ref, { salesVolume: 0 });
+        // Reset sales volumes and values for the next day
+        batch.update(doc.ref, { salesVolume: 0, salesValue: 0 });
       });
 
       // Add On-Bar sales to today's daily doc for historical reporting
@@ -100,5 +98,3 @@ export function useEndOfDay() {
 
   return { isEndingDay, endOfDayProcess };
 }
-
-    

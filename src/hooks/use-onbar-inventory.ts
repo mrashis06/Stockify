@@ -25,17 +25,18 @@ export type OnBarItem = {
   totalVolume: number; // e.g., 750 for a 750ml bottle
   remainingVolume: number;
   salesVolume: number; // Volume sold today in ml
+  salesValue: number; // Monetary value of sales today
   price: number; // Price of the full bottle
   openedAt: any; // Firestore Timestamp
 };
 
-export type OnBarManualItem = Omit<OnBarItem, 'id' | 'inventoryId' | 'remainingVolume' | 'salesVolume' | 'price' | 'openedAt'>;
+export type OnBarManualItem = Omit<OnBarItem, 'id' | 'inventoryId' | 'remainingVolume' | 'salesVolume' | 'salesValue' | 'price' | 'openedAt'>;
 
 export function useOnBarInventory() {
   const [onBarInventory, setOnBarInventory] = useState<OnBarItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { openBottleForOnBar } = useInventory(); // Get the function to update main inventory
+  const { openBottleForOnBar } = useInventory();
 
   usePageLoading(loading);
 
@@ -52,16 +53,14 @@ export function useOnBarInventory() {
     return () => unsubscribe();
   }, []);
 
-  // This function is now mostly a wrapper around the one in useInventory
   const addOnBarItem = async (inventoryItemId: string, volume: number) => {
       if (saving) return;
       setSaving(true);
       try {
-          // This function now handles the entire transaction
           await openBottleForOnBar(inventoryItemId, volume);
       } catch (error) {
           console.error("Error opening bottle: ", error);
-          throw error; // Re-throw to be caught in the component
+          throw error;
       } finally {
           setSaving(false);
       }
@@ -73,10 +72,11 @@ export function useOnBarInventory() {
       try {
           await addDoc(collection(db, "onBarInventory"), {
               ...manualItem,
-              inventoryId: 'manual', // Mark as a manual entry
+              inventoryId: 'manual',
               remainingVolume: manualItem.totalVolume,
               salesVolume: 0,
-              price: 0, // Manual items won't have a price for sales calculation
+              salesValue: 0,
+              price: 0,
               openedAt: serverTimestamp(),
           });
       } catch(error) {
@@ -87,7 +87,7 @@ export function useOnBarInventory() {
       }
   };
 
-  const sellPeg = async (id: string, pegSize: number) => {
+  const sellCustomPeg = async (id: string, volume: number, price: number) => {
     if (saving) return;
     setSaving(true);
     try {
@@ -98,27 +98,29 @@ export function useOnBarInventory() {
           throw new Error("Item not found on bar.");
         }
         const itemData = itemDoc.data() as OnBarItem;
-        const currentVolume = itemData.remainingVolume;
         
-        if (currentVolume < pegSize) {
+        if (itemData.remainingVolume < volume) {
           throw new Error("Not enough liquor remaining to sell this peg.");
         }
         
-        const newVolume = currentVolume - pegSize;
-        const newSalesVolume = (itemData.salesVolume || 0) + pegSize;
+        const newRemainingVolume = itemData.remainingVolume - volume;
+        const newSalesVolume = (itemData.salesVolume || 0) + volume;
+        const newSalesValue = (itemData.salesValue || 0) + price;
         
         transaction.update(itemRef, { 
-            remainingVolume: newVolume,
-            salesVolume: newSalesVolume
+            remainingVolume: newRemainingVolume,
+            salesVolume: newSalesVolume,
+            salesValue: newSalesValue,
         });
       });
     } catch (error) {
-      console.error("Error selling peg: ", error);
+      console.error("Error selling custom peg: ", error);
       throw error;
     } finally {
       setSaving(false);
     }
   };
+
 
   const refillPeg = async (id: string, amount: number) => {
     if (saving) return;
@@ -132,20 +134,28 @@ export function useOnBarInventory() {
             }
             const itemData = itemDoc.data() as OnBarItem;
 
-            // Ensure we don't refill more than was sold or more than the bottle's total volume
-            const effectiveAmount = Math.min(amount, itemData.salesVolume || 0);
-            if (effectiveAmount <= 0) return;
-
-            let newRemainingVolume = itemData.remainingVolume + effectiveAmount;
-            if (newRemainingVolume > itemData.totalVolume) {
-                newRemainingVolume = itemData.totalVolume;
+            if ((itemData.salesVolume || 0) < amount) {
+                throw new Error("Cannot refill more than what was sold.");
             }
 
-            const newSalesVolume = (itemData.salesVolume || 0) - (newRemainingVolume - itemData.remainingVolume);
+            const newRemainingVolume = itemData.remainingVolume + amount;
+            if (newRemainingVolume > itemData.totalVolume) {
+                // This case should ideally not happen if salesVolume is tracked correctly
+                throw new Error("Refill amount exceeds bottle capacity.");
+            }
             
+            // This is a simplification. A more robust implementation would need to know
+            // the value of the specific sale being reversed. For now, we reduce by average cost.
+            const averagePricePerMl = (itemData.salesValue || 0) / (itemData.salesVolume || 1);
+            const valueToRefund = averagePricePerMl * amount;
+            
+            const newSalesVolume = (itemData.salesVolume || 0) - amount;
+            const newSalesValue = (itemData.salesValue || 0) - valueToRefund;
+
             transaction.update(itemRef, {
                 remainingVolume: newRemainingVolume,
-                salesVolume: Math.max(0, newSalesVolume)
+                salesVolume: Math.max(0, newSalesVolume),
+                salesValue: Math.max(0, newSalesValue),
             });
         });
     } catch (error) {
@@ -170,7 +180,5 @@ export function useOnBarInventory() {
       }
   }
 
-  return { onBarInventory, loading, saving, addOnBarItem, addOnBarItemManual, sellPeg, refillPeg, removeOnBarItem };
+  return { onBarInventory, loading, saving, addOnBarItem, addOnBarItemManual, sellCustomPeg, refillPeg, removeOnBarItem };
 }
-
-    
