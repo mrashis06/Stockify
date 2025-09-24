@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { ADMIN_UID } from '@/lib/constants';
+import { useAuth } from '@/hooks/use-auth';
 
 function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -54,11 +55,18 @@ function GoogleIcon(props: React.SVGProps<SVGSVGElement>) {
 
 export default function LoginPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/dashboard');
+    }
+  }, [user, authLoading, router]);
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,10 +114,19 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           variant: "destructive",
         });
       }
+    } finally {
       setGoogleLoading(false);
     }
   };
   
+  if (authLoading || user) {
+    return (
+        <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
+            <div>Loading...</div>
+        </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-sm">

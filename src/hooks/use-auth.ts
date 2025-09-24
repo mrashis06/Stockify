@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 export type AppUser = User & {
@@ -52,11 +52,5 @@ export function useAuth() {
     return () => unsubscribe();
   }, []);
 
-
-  const updateUser = async (uid: string, data: { name: string; dob: string }) => {
-    const userDocRef = doc(db, 'users', uid);
-    await updateDoc(userDocRef, data);
-  };
-
-  return { user, loading, updateUser };
+  return { user, loading };
 }
