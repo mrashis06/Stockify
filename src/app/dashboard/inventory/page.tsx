@@ -36,6 +36,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
+import { useOnBarInventory } from '@/hooks/use-onbar-inventory';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +62,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     
     usePageLoading(loading);
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
+    const { onBarInventory } = useOnBarInventory();
 
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -194,6 +196,10 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const totalAmount = useMemo(() => {
         return filteredInventory.reduce((total, item) => total + (item.sales ?? 0) * item.price, 0);
     }, [filteredInventory]);
+
+    const totalOnBarSales = useMemo(() => {
+        return onBarInventory.reduce((total, item) => total + (item.salesValue || 0), 0);
+    }, [onBarInventory]);
 
   if (loading) {
     return null;
@@ -400,11 +406,29 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                         </TableBody>
                          <TableFooter>
                             <TableRow>
-                                <TableCell colSpan={9} className="text-right font-bold text-lg">Total Sales Amount</TableCell>
+                                <TableCell colSpan={9} className="text-right font-bold text-lg">Total Bottle Sales</TableCell>
                                 <TableCell colSpan={2} className="font-bold text-lg">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-5 w-5 mr-1 shrink-0" />
                                         {totalAmount.toLocaleString('en-IN')}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell colSpan={9} className="text-right font-medium">Today's On-Bar Sales</TableCell>
+                                <TableCell colSpan={2} className="font-medium">
+                                    <div className="flex items-center">
+                                        <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                        {totalOnBarSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                             <TableRow className="border-t-2 border-primary/50">
+                                <TableCell colSpan={9} className="text-right font-extrabold text-xl text-primary">Grand Total Sales</TableCell>
+                                <TableCell colSpan={2} className="font-extrabold text-xl text-primary">
+                                    <div className="flex items-center">
+                                        <IndianRupee className="h-6 w-6 mr-1 shrink-0" />
+                                        {(totalAmount + totalOnBarSales).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -417,3 +441,5 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    

@@ -333,13 +333,36 @@ export function useInventory() {
             const dailyDocSnap = await transaction.get(dailyDocRef);
             let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
 
-            const closingStock = (dailyData[inventoryItemId]?.opening ?? 0) - (dailyData[inventoryItemId]?.sales ?? 0);
-            if (!dailyData[inventoryItemId] || closingStock < 1) {
+            if (!dailyData[inventoryItemId]) {
+                 const masterRef = doc(db, 'inventory', inventoryItemId);
+                const masterSnap = await transaction.get(masterRef);
+                if (!masterSnap.exists()) throw new Error("Item does not exist.");
+
+                const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
+                const yesterdaySnap = await transaction.get(yesterdayDocRef);
+                const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
+                
+                const masterData = masterSnap.data();
+                const prevStock = yesterdayData[inventoryItemId]?.closing ?? masterData.prevStock ?? 0;
+
+                dailyData[inventoryItemId] = {
+                    ...masterData,
+                    prevStock: prevStock,
+                    added: 0,
+                    sales: 0
+                };
+            }
+
+
+            const openingStock = (dailyData[inventoryItemId]?.prevStock ?? 0) + (dailyData[inventoryItemId]?.added ?? 0);
+            const closingStock = openingStock - (dailyData[inventoryItemId]?.sales ?? 0);
+            if (closingStock < 1) {
                 throw new Error("Not enough stock in inventory to open a bottle.");
             }
             
             dailyData[inventoryItemId].sales = (dailyData[inventoryItemId].sales ?? 0) + 1;
-            dailyData[inventoryItemId].closing = (dailyData[inventoryItemId].opening ?? 0) - dailyData[inventoryItemId].sales;
+            dailyData[inventoryItemId].opening = openingStock;
+            dailyData[inventoryItemId].closing = openingStock - dailyData[inventoryItemId].sales;
 
             transaction.set(dailyDocRef, { [inventoryItemId]: dailyData[inventoryItemId] }, { merge: true });
 
@@ -359,6 +382,7 @@ export function useInventory() {
                 totalVolume: volume,
                 remainingVolume: volume,
                 salesVolume: 0,
+                salesValue: 0,
                 price: masterItem.price,
                 openedAt: serverTimestamp(),
             });
@@ -374,5 +398,7 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, openBottleForOnBar };
 }
+
+    
 
     
