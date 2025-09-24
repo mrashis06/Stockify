@@ -110,7 +110,7 @@ export default function StaffPage() {
         } else if (user) {
             setLoading(false);
         }
-    }, [user, toast]);
+    }, [user]);
 
     const handleGenerateCode = async () => {
         if (!user || !user.shopId) {
@@ -181,7 +181,6 @@ export default function StaffPage() {
     const handleRemoveStaff = async () => {
         if (!selectedStaff || !updateUser) return;
         try {
-             // "Removing" a staff member is now just blocking them and clearing their shopId
             await updateUser(selectedStaff.id, { status: 'blocked', shopId: null });
             toast({ title: "Success", description: `${selectedStaff.name} has been removed from the shop.` });
         } catch(error) {
