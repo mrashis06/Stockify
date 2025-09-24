@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, AuthError } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import React, { useState, useEffect } from 'react';
 
@@ -45,9 +45,13 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
       // useEffect above to redirect.
     } catch (error) {
       console.error("Error signing in with email and password: ", error);
+      let description = "Failed to sign in. Please try again.";
+      if ((error as AuthError).code === 'auth/invalid-credential') {
+          description = "Invalid credentials. Please check your email and password and try again.";
+      }
       toast({
         title: "Authentication Error",
-        description: "Failed to sign in. Please check your credentials.",
+        description: description,
         variant: "destructive",
       });
       setLoading(false);
