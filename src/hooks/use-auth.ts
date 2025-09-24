@@ -52,12 +52,14 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    // This effect handles redirection and runs only after the initial loading is complete.
-    if (!loading && !user) {
-      const isPublicPage = ['/login', '/signup', '/'].includes(pathname);
-      if (!isPublicPage) {
-        router.push('/login');
-      }
+    if (loading) {
+      return; // Do nothing until loading is complete
+    }
+
+    const isPublicPage = ['/login', '/signup', '/'].includes(pathname);
+
+    if (!user && !isPublicPage) {
+      router.push('/login');
     }
   }, [user, loading, pathname, router]);
 
