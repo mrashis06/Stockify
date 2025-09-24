@@ -174,7 +174,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                             </Button>
                                         </div>
                                      )}
-                                    {item.remainingVolume <= 0 && (
+                                    {item.remainingVolume <= 0 && item.category !== 'Beer' && (
                                         <Button
                                             variant="destructive"
                                             className="w-full"
@@ -192,3 +192,5 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
+
+    

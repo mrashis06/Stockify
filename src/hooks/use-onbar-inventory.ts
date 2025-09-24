@@ -31,7 +31,7 @@ export type OnBarItem = {
   openedAt: any; // Firestore Timestamp
 };
 
-export type OnBarManualItem = Omit<OnBarItem, 'id' | 'inventoryId' | 'remainingVolume' | 'salesVolume' | 'salesValue' | 'price' | 'openedAt'>;
+export type OnBarManualItem = Omit<OnBarItem, 'id' | 'inventoryId' | 'remainingVolume' | 'salesVolume' | 'salesValue' | 'openedAt'> & { quantity: number };
 
 export function useOnBarInventory() {
   const [onBarInventory, setOnBarInventory] = useState<OnBarItem[]>([]);
@@ -62,7 +62,8 @@ export function useOnBarInventory() {
         if (!itemInShop) throw new Error("Item not found in shop inventory.");
         
         const currentSales = itemInShop.sales || 0;
-        const closingStock = (itemInShop.opening || 0) - currentSales;
+        const opening = (itemInShop.prevStock || 0) + (itemInShop.added || 0);
+        const closingStock = opening - currentSales;
 
         if (closingStock < quantity) {
             throw new Error(`Not enough stock. Available: ${closingStock}, trying to open: ${quantity}`);
@@ -104,15 +105,26 @@ export function useOnBarInventory() {
       if (saving) return;
       setSaving(true);
       try {
-          await addDoc(collection(db, "onBarInventory"), {
-              ...manualItem,
+          const onBarCollectionRef = collection(db, "onBarInventory");
+          const batch = writeBatch(db);
+          const quantity = manualItem.category === 'Beer' ? manualItem.quantity : 1;
+
+          for (let i = 0; i < quantity; i++) {
+            const newOnBarDocRef = doc(onBarCollectionRef);
+            batch.set(newOnBarDocRef, {
+              brand: manualItem.brand,
+              size: manualItem.size,
+              category: manualItem.category,
+              totalVolume: manualItem.totalVolume,
+              price: manualItem.price || 0,
               inventoryId: 'manual',
               remainingVolume: manualItem.totalVolume,
               salesVolume: 0,
               salesValue: 0,
-              price: 0,
               openedAt: serverTimestamp(),
-          });
+            });
+          }
+          await batch.commit();
       } catch(error) {
           console.error("Error adding manual on-bar item:", error);
           throw error;
@@ -210,13 +222,13 @@ export function useOnBarInventory() {
           const onBarItemData = itemSnap.data();
           const inventoryId = onBarItemData.inventoryId;
 
-          // If the item was tracked from main inventory, treat its removal as a "return"
-          if (inventoryId && inventoryId !== 'manual') {
+          // If the item was tracked from main inventory and it's not empty, "return" it to stock
+          if (inventoryId && inventoryId !== 'manual' && onBarItemData.remainingVolume >= onBarItemData.totalVolume) {
               const itemInShop = inventory.find(item => item.id === inventoryId);
               if (itemInShop) {
                   const currentSales = itemInShop.sales || 0;
                   // Decrementing sales by 1 effectively returns one bottle to stock.
-                  await updateItemField(inventoryId, 'sales', currentSales - 1);
+                  await updateItemField(inventoryId, 'sales', Math.max(0, currentSales - 1));
               }
           }
           
@@ -232,3 +244,5 @@ export function useOnBarInventory() {
 
   return { onBarInventory, loading, saving, addOnBarItem, addOnBarItemManual, sellCustomPeg, refillPeg, removeOnBarItem };
 }
+
+    

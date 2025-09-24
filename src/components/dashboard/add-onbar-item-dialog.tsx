@@ -53,9 +53,11 @@ type TrackedFormValues = z.infer<typeof trackedSchema>;
 // Schema for manual entry
 const manualSchema = z.object({
     brand: z.string().min(1, 'Brand name is required.'),
-    size: z.string().min(1, 'Size is required (e.g., 750ml).'),
+    size: z.string().min(1, 'Size is required (e.g., 650ml).'),
     category: z.string().min(1, 'Category is required'),
     totalVolume: z.coerce.number().int().min(1, 'Volume must be a positive number.'),
+    quantity: z.coerce.number().int().min(1, "Quantity must be at least 1"),
+    price: z.coerce.number().min(0, "Price must be non-negative").optional(),
 });
 type ManualFormValues = z.infer<typeof manualSchema>;
 
@@ -191,6 +193,21 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
     const form = useFormContext<ManualFormValues>();
     const { addOnBarItemManual } = useOnBarInventory();
 
+    const category = form.watch('category');
+    const size = form.watch('size');
+    const quantity = form.watch('quantity');
+    const isBeer = category === 'Beer';
+
+    useEffect(() => {
+        if (isBeer) {
+            const sizeMl = parseInt(size.match(/(\d+)/)?.[1] || '0', 10);
+            if (sizeMl > 0 && quantity > 0) {
+                form.setValue('totalVolume', sizeMl, { shouldValidate: true });
+            }
+        }
+    }, [size, quantity, isBeer, form]);
+
+
     const onSubmit = async (data: ManualFormValues) => {
         try {
             await addOnBarItemManual(data);
@@ -221,9 +238,9 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
                     name="size"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Size</FormLabel>
+                        <FormLabel>Size (ml)</FormLabel>
                         <FormControl>
-                            <Input placeholder="e.g., 750ml" {...field} />
+                            <Input placeholder="e.g., 750ml or 650" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -251,6 +268,36 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
                         </FormItem>
                     )}
                 />
+                
+                {isBeer && (
+                    <FormField
+                        control={form.control}
+                        name="quantity"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Quantity of Units</FormLabel>
+                            <FormControl>
+                                <Input type="number" min="1" placeholder="e.g., 6" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
+                <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Sale Price per Unit (₹)</FormLabel>
+                        <FormControl>
+                            <Input type="number" placeholder="e.g., 250" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+
                 <FormField
                     control={form.control}
                     name="totalVolume"
@@ -258,7 +305,7 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
                         <FormItem>
                         <FormLabel>Total Volume (ml)</FormLabel>
                         <FormControl>
-                            <Input type="number" placeholder="e.g., 750" {...field} />
+                            <Input type="number" placeholder="e.g., 750" {...field} disabled={isBeer} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -278,12 +325,12 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
 
 export default function AddOnBarItemDialog({ isOpen, onOpenChange, shopInventory, onBarInventory }: AddOnBarItemDialogProps) {
   const trackedForm = useForm<TrackedFormValues>({ resolver: zodResolver(trackedSchema), defaultValues: { inventoryItemId: '', quantity: 1 } });
-  const manualForm = useForm<ManualFormValues>({ resolver: zodResolver(manualSchema), defaultValues: { brand: '', size: '', category: '', totalVolume: 750 } });
+  const manualForm = useForm<ManualFormValues>({ resolver: zodResolver(manualSchema), defaultValues: { brand: '', size: '', category: '', totalVolume: 750, quantity: 1, price: 0 } });
   
   useEffect(() => {
     if (!isOpen) {
       trackedForm.reset({ inventoryItemId: '', quantity: 1 });
-      manualForm.reset();
+      manualForm.reset({ brand: '', size: '', category: '', totalVolume: 750, quantity: 1, price: 0 });
     }
   }, [isOpen, trackedForm, manualForm]);
 
@@ -318,3 +365,5 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, shopInventory
     </Dialog>
   );
 }
+
+    
