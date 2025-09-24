@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
+import { usePageLoading } from './use-loading';
 
 export type GodownItem = {
   id: string;
@@ -45,6 +46,8 @@ export function useGodownInventory() {
   const [godownInventory, setGodownInventory] = useState<GodownItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  usePageLoading(loading);
 
   useEffect(() => {
     setLoading(true);

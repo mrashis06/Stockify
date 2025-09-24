@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useInventory } from './use-inventory'; // To trigger stock updates
+import { usePageLoading } from './use-loading';
 
 export type OnBarItem = {
   id: string;
@@ -35,6 +36,8 @@ export function useOnBarInventory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { openBottleForOnBar } = useInventory(); // Get the function to update main inventory
+
+  usePageLoading(loading);
 
   useEffect(() => {
     setLoading(true);

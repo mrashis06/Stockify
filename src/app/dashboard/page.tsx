@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card"
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import type { InventoryItem } from "@/hooks/use-inventory";
+import { usePageLoading } from "@/hooks/use-loading";
 
 
 const categories = [
@@ -34,7 +35,8 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const [loading, setLoading] = useState(true);
   const [todaySalesData, setTodaySalesData] = useState<any>({});
   const [yesterdaySalesData, setYesterdaySalesData] = useState<any>({});
-
+  
+  usePageLoading(loading);
 
   useEffect(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -42,6 +44,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     const dailyDocRef = doc(db, 'dailyInventory', today);
 
     const unsubscribe = onSnapshot(dailyDocRef, async (dailySnap) => {
+      setLoading(true);
       try {
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
         setTodaySalesData(dailyData);
@@ -121,12 +124,8 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const lowStockItems = processedInventory.filter(item => (item.closing ?? 0) < 10);
 
   if (loading) {
-      return (
-          <main className="flex-1 p-4 md:p-8">
-              <h1 className="text-2xl font-bold tracking-tight mb-6">Dashboard</h1>
-              <div>Loading dashboard data...</div>
-          </main>
-      )
+      // The loader will be displayed by the global state, so we can return null or a minimal placeholder.
+      return null;
   }
 
   return (

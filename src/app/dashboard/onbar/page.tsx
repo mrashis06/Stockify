@@ -15,11 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { usePageLoading } from '@/hooks/use-loading';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { onBarInventory, loading, sellPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
     const { inventory: shopInventory } = useInventory();
     const { toast } = useToast();
+    
+    usePageLoading(loading);
 
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
 
@@ -67,6 +70,10 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     }
+    
+    if (loading) {
+        return null;
+    }
 
     return (
         <main className="flex-1 p-4 md:p-8">
@@ -85,12 +92,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                 </Button>
             </header>
 
-            {loading ? (
-                <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                    <span className="ml-4 text-muted-foreground">Loading On-Bar Stock...</span>
-                </div>
-            ) : onBarInventory.length === 0 ? (
+            {onBarInventory.length === 0 ? (
                 <div className="text-center py-16 border-2 border-dashed rounded-lg">
                     <Wine className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-medium">No Open Bottles</h3>

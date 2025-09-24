@@ -46,6 +46,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { usePageLoading } from '@/hooks/use-loading';
 
 
 export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
@@ -58,6 +59,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         updateItemField,
     } = useInventory();
     
+    usePageLoading(loading);
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
 
 
@@ -193,6 +195,9 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         return filteredInventory.reduce((total, item) => total + (item.sales ?? 0) * item.price, 0);
     }, [filteredInventory]);
 
+  if (loading) {
+    return null;
+  }
 
   return (
     <main className="flex-1 p-4 md:p-8">
@@ -306,12 +311,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                 </div>
 
                 <div className="overflow-x-auto mt-4">
-                    {loading ? (
-                        <div className="flex justify-center items-center h-64">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                            <span className="ml-4 text-muted-foreground">Loading Inventory...</span>
-                        </div>
-                    ) : (
+                    
                     <Table>
                         <TableHeader>
                         <TableRow>
@@ -410,7 +410,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                             </TableRow>
                         </TableFooter>
                     </Table>
-                    )}
+                    
                 </div>
             </CardContent>
         </Card>

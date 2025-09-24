@@ -21,6 +21,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { toast } from '@/hooks/use-toast';
+import { usePageLoading } from '@/hooks/use-loading';
 
 const chartConfig = {
   sales: {
@@ -42,6 +43,8 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     });
     const [reportData, setReportData] = useState<DailyLog[]>([]);
     const [loading, setLoading] = useState(true);
+
+    usePageLoading(loading);
 
     const fetchReportData = useCallback(async (range: DateRange) => {
         if (!range.from) {
@@ -183,6 +186,10 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         document.body.removeChild(link);
     };
 
+  if (loading) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -250,12 +257,6 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             </div>
         </CardHeader>
         <CardContent>
-             {loading ? (
-                <div className="flex justify-center items-center h-[400px]">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                    <span className="ml-4 text-muted-foreground">Loading Report Data...</span>
-                </div>
-            ) : (
             <Card>
                 <CardHeader>
                     <CardTitle>Sales by Category</CardTitle>
@@ -291,7 +292,6 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     </ChartContainer>
                 </CardContent>
             </Card>
-            )}
         </CardContent>
       </Card>
     </div>

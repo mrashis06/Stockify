@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,15 +22,21 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Badge } from '@/components/ui/badge';
+import { useLoading } from '@/hooks/use-loading'; // Import the useLoading hook
 
 export default function DashboardLayout({ children, params, searchParams }: { children: ReactNode, params: { slug: string }, searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { showLoader } = useLoading();
 
   const handleLogout = async () => {
     await signOut(auth);
     router.push('/login');
   };
+  
+  const handleNav = (path: string, pageName: string) => {
+    showLoader(pageName, path);
+  }
 
   if (loading) {
     return (
@@ -41,8 +47,6 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   }
 
   if (!user) {
-    // This check is primarily for client-side routing.
-    // The useAuth hook handles the initial redirect.
     return (
          <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
             <div>Loading...</div>
@@ -65,27 +69,27 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
              <Button variant="ghost" size="icon" onClick={() => router.back()}>
                 <ArrowLeft className="h-4 w-4" />
              </Button>
-             <NavLink href="/">
+             <NavLink href="/" pageName='Home' onNavigate={handleNav}>
                 <Home className="h-4 w-4" />
                 Home
             </NavLink>
-             <NavLink href="/dashboard">
+             <NavLink href="/dashboard" pageName='Dashboard' onNavigate={handleNav}>
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
             </NavLink>
-             <NavLink href="/dashboard/inventory">
+             <NavLink href="/dashboard/inventory" pageName='Inventory' onNavigate={handleNav}>
                 <Warehouse className="h-4 w-4" />
                 Inventory
             </NavLink>
-            <NavLink href="/dashboard/godown">
+            <NavLink href="/dashboard/godown" pageName='Godown' onNavigate={handleNav}>
                 <Archive className="h-4 w-4" />
                 Godown
             </NavLink>
-            <NavLink href="/dashboard/onbar">
+            <NavLink href="/dashboard/onbar" pageName='OnBar' onNavigate={handleNav}>
                 <GlassWater className="h-4 w-4" />
                 OnBar
             </NavLink>
-             <NavLink href="/dashboard/reports">
+             <NavLink href="/dashboard/reports" pageName='Reports' onNavigate={handleNav}>
                 <FileText className="h-4 w-4" />
                 Reports
             </NavLink>
@@ -101,7 +105,6 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
-                  
                   <AvatarFallback>
                     {user.displayName ? user.displayName.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
                   </AvatarFallback>

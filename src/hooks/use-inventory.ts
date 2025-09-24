@@ -22,6 +22,7 @@ import {
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { usePageLoading } from './use-loading';
 
 export type InventoryItem = {
   id: string;
@@ -47,6 +48,8 @@ export function useInventory() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  usePageLoading(loading);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
@@ -370,5 +373,3 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, openBottleForOnBar };
 }
-
-    

@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
+import { usePageLoading } from '@/hooks/use-loading';
 
 // A new type for our grouped data structure
 type GroupedGodownItem = {
@@ -57,6 +58,8 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
         deleteGodownItem,
         transferToShop,
     } = useGodownInventory();
+    
+    usePageLoading(loading);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
@@ -160,7 +163,10 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
         const cats = new Set(godownInventory.map(i => i.category).filter(Boolean));
         return ['All Categories', ...Array.from(cats).sort()];
     }, [godownInventory]);
-
+    
+  if (loading) {
+      return null;
+  }
 
   return (
     <main className="flex-1 p-4 md:p-8">
@@ -216,12 +222,6 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                 </div>
 
                 <div className="overflow-x-auto">
-                    {loading ? (
-                        <div className="flex justify-center items-center h-64">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                            <span className="ml-4 text-muted-foreground">Loading Godown Stock...</span>
-                        </div>
-                    ) : (
                     <Table>
                         <TableHeader>
                         <TableRow>
@@ -300,7 +300,6 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                         )})}
                         </TableBody>
                     </Table>
-                    )}
                 </div>
             </CardContent>
         </Card>

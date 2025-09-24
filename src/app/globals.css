@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -65,5 +66,23 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .loader-orbit {
+    animation: orbit 15s linear infinite;
+  }
+  .loader-bottle {
+    filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.4));
+  }
+}
+
+@keyframes orbit {
+  from {
+    transform: rotate(0deg) translateX(70px) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(70px) rotate(-360deg);
   }
 }

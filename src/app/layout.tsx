@@ -2,6 +2,8 @@
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
+import { LoadingProvider } from '@/hooks/use-loading';
+import Loader from '@/components/loader';
 
 export default function RootLayout({
   children,
@@ -35,8 +37,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
+          <LoadingProvider>
+            {children}
+            <Loader />
+            <Toaster />
+          </LoadingProvider>
         </ThemeProvider>
       </body>
     </html>

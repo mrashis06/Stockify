@@ -57,7 +57,8 @@
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.24.2",
     "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2"
+    "jspdf-autotable": "^3.8.2",
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -70,5 +71,3 @@
     "typescript": "^5"
   }
 }
-
-    
