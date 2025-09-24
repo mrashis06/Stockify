@@ -56,28 +56,13 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         from: new Date(),
         to: new Date(),
     });
-    const [isSelectingFirstDay, setIsSelectingFirstDay] = useState(true);
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
     usePageLoading(loading);
 
     const handleDateSelect = (range: DateRange | undefined) => {
-        if (isSelectingFirstDay) {
-            setDate({ from: range?.from, to: range?.from });
-            setIsSelectingFirstDay(false);
-        } else {
-            if (range?.from && date?.from) {
-                // If the new date is before the start date, start a new selection
-                if (isAfter(date.from, range.from)) {
-                     setDate({ from: range.from, to: undefined }); // Start a new range
-                     setIsSelectingFirstDay(false);
-                } else {
-                    setDate({ from: date.from, to: range.from }); // Complete the range
-                    setIsSelectingFirstDay(true);
-                }
-            }
-        }
+        setDate(range);
     };
 
     const fetchReportData = useCallback(async (range: DateRange) => {
@@ -121,8 +106,6 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
 
     const handleFilter = () => {
         if (date?.from) {
-            // Close the popover by resetting the selection state
-            setIsSelectingFirstDay(true); 
             fetchReportData(date);
         } else {
             toast({ title: "Error", description: "Please select a date range.", variant: "destructive" });
@@ -266,40 +249,23 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     fontStyle: 'bold',
                 },
                 didDrawPage: (data) => {
-                     // This hook is better for adding content after the table is drawn on the page.
                 },
                 willDrawPage: (data) => {
-                    // This hook runs before the page content is drawn.
-                    // We add the date title here.
                      doc.setFontSize(12);
                      doc.setFont('helvetica', 'bold');
-                     // Position the text slightly above where the table will start.
                      doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, data.cursor ? data.cursor.y - 5 : startY - 5);
                      if (data.cursor) {
-                       data.cursor.y += 2; // Add some space after the title
+                       data.cursor.y += 2; 
                      }
                 }
             });
         });
 
-        // Use a separate autoTable call for the grand total to ensure clean styling
-        if (Object.keys(salesByDateForExport).length > 1) { // Only show if more than one day
+        if (Object.keys(salesByDateForExport).length > 1) { 
             const finalY = (doc as any).lastAutoTable.finalY;
             doc.autoTable({
                 startY: finalY + 10,
-                body: [['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]],
-                theme: 'plain',
-                styles: {
-                    fontStyle: 'bold',
-                    fontSize: 12,
-                    fillColor: [22, 163, 74],
-                    textColor: [255, 255, 255],
-                },
-                columnStyles: {
-                    0: { halign: 'left' },
-                    4: { halign: 'right' },
-                    5: { halign: 'right' }
-                },
+                body: [],
                 foot: [
                     ['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]
                 ],
@@ -309,6 +275,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     fontStyle: 'bold',
                     fontSize: 12,
                 },
+                columnStyles: { 0: { halign: 'left' } },
             });
         }
         
@@ -344,17 +311,15 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                 dailyTotalAmount += item.totalAmount;
             });
 
-            // Add daily total row with proper alignment
-            const dailyTotalRow = [`Daily Total for ${saleDate}`, '', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)].join(",");
-            csvContent += dailyTotalRow + "\n\n"; // Add extra newline for spacing
+            const dailyTotalRow = [`,,,,Daily Total for ${saleDate}`, dailyTotalUnits, dailyTotalAmount.toFixed(2)].join(",");
+            csvContent += dailyTotalRow + "\n\n";
 
             grandTotalUnits += dailyTotalUnits;
             grandTotalAmount += dailyTotalAmount;
         });
 
 
-        // Add grand total at the very end with proper alignment
-        const grandTotalRow = ["Grand Total", '', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)].join(",");
+        const grandTotalRow = [`,,,,Grand Total`, grandTotalUnits, grandTotalAmount.toFixed(2)].join(",");
         csvContent += grandTotalRow + "\n";
 
         const encodedUri = encodeURI(csvContent);
@@ -498,7 +463,3 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
-
-    
-
-    
