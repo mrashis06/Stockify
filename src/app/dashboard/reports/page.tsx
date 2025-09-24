@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { format, eachDayOfInterval, isSameDay, parse } from 'date-fns';
+import { format, eachDayOfInterval, isSameDay, parse, isAfter } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc } from 'firebase/firestore';
@@ -56,10 +56,29 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         from: new Date(),
         to: new Date(),
     });
+    const [isSelectingFirstDay, setIsSelectingFirstDay] = useState(true);
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
     usePageLoading(loading);
+
+    const handleDateSelect = (range: DateRange | undefined) => {
+        if (isSelectingFirstDay) {
+            setDate({ from: range?.from, to: range?.from });
+            setIsSelectingFirstDay(false);
+        } else {
+            if (range?.from && date?.from) {
+                // If the new date is before the start date, start a new selection
+                if (isAfter(date.from, range.from)) {
+                     setDate({ from: range.from, to: range.from });
+                     setIsSelectingFirstDay(false);
+                } else {
+                    setDate({ from: date.from, to: range.from });
+                    setIsSelectingFirstDay(true);
+                }
+            }
+        }
+    };
 
     const fetchReportData = useCallback(async (range: DateRange) => {
         if (!range.from) {
@@ -103,6 +122,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     const handleFilter = () => {
         if (date) {
             fetchReportData(date);
+            setIsSelectingFirstDay(true); // Reset selection logic after generating
         } else {
             toast({ title: "Error", description: "Please select a date range.", variant: "destructive" });
         }
@@ -263,23 +283,19 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
 
         // Use a separate autoTable call for the grand total to ensure clean styling
         if (Object.keys(salesByDateForExport).length > 0) {
-            const finalY = (doc as any).lastAutoTable.finalY + 10;
+            const finalY = (doc as any).lastAutoTable.finalY;
             doc.autoTable({
-                startY: finalY,
-                head: [["", "", "", "", "", ""]], // Dummy head
-                body: [],
-                foot: [['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]],
-                showHead: false,
-                footStyles: {
-                    fillColor: [22, 163, 74], // green-600
-                    textColor: [255, 255, 255],
+                startY: finalY + 10,
+                body: [['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]],
+                theme: 'plain',
+                styles: {
                     fontStyle: 'bold',
                     fontSize: 12,
-                    halign: 'right'
+                    fillColor: [22, 163, 74],
+                    textColor: [255, 255, 255],
                 },
-                // Align the grand total values correctly
                 columnStyles: {
-                    0: { halign: 'left', fontStyle: 'bold' },
+                    0: { halign: 'left' },
                     4: { halign: 'right' },
                     5: { halign: 'right' }
                 }
@@ -400,7 +416,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                         mode="range"
                         defaultMonth={date?.from}
                         selected={date}
-                        onSelect={setDate}
+                        onSelect={handleDateSelect}
                         numberOfMonths={1}
                     />
                     </PopoverContent>
@@ -473,3 +489,4 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
   );
 }
 
+    
