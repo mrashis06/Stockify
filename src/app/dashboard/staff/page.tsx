@@ -67,7 +67,7 @@ export default function StaffPage() {
         if (user && user.shopId) {
             setLoading(true);
             const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
-            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"), orderBy("createdAt", "desc"));
+            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"));
 
             const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
                 const staff: StaffMember[] = [];
@@ -177,6 +177,7 @@ export default function StaffPage() {
     const handleRemoveStaff = async () => {
         if (!selectedStaff) return;
         try {
+            // This is a "soft delete" - the user's auth record remains but they are removed from the shop.
             await updateDoc(doc(db, "users", selectedStaff.id), {
                 shopId: null,
                 status: 'blocked'
