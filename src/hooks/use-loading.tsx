@@ -34,24 +34,30 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
 
     const interval = setInterval(() => {
       set(state => {
-          const newProgress = state.progress + Math.floor(Math.random() * 10) + 5;
+          // Quickly ramp up to 90%
+          const newProgress = state.progress + Math.floor(Math.random() * 15) + 5;
           if (newProgress >= 90) {
               clearInterval(interval);
+              return { progress: 90 };
           }
-          return { progress: Math.min(newProgress, 90) };
+          return { progress: newProgress };
       });
-    }, 200);
+    }, 150); // Faster interval for a quicker ramp-up
 
     set({ _interval: interval });
   },
   hideLoader: () => {
-    if (get()._interval) {
-      clearInterval(get()._interval as NodeJS.Timeout);
+    const state = get();
+    if (state._interval) {
+      clearInterval(state._interval);
     }
-    set({ progress: 100, _interval: null });
+    // Animate from 90 to 100
+    set({ progress: 100 });
+    
+    // Wait for the final animation and a small delay, then hide
     setTimeout(() => {
       set({ isLoading: false });
-    }, 500); // Fade-out duration
+    }, 700); // This delay includes the animation to 100% + fade-out time
   },
   setProgress: (progress) => set({ progress }),
 }));
