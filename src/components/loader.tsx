@@ -45,17 +45,28 @@ const BottleIcon = ({ progress, pageName, dynamicText }: { progress: number; pag
                     {/* This path is slightly smaller than the bottle to contain the liquid */}
                     <path d="M42,293 L42,80 C42,67 37,52 52,52 L68,52 C83,52 78,67 78,80 L78,293 L42,293 Z" />
                 </clipPath>
+                 <style>
+                    {`
+                        @keyframes wave {
+                            0% { transform: translateX(0); }
+                            50% { transform: translateX(-10px); }
+                            100% { transform: translateX(0); }
+                        }
+                    `}
+                </style>
             </defs>
 
             {/* The liquid that fills up */}
             <g clipPath="url(#bottleClip)">
-                <rect
-                    x="42"
-                    y={293 - liquidHeight}
-                    width="36"
-                    height={liquidHeight}
-                    className={`transition-all duration-700 ease-in-out ${liquidColorClass}`}
-                />
+                 <g className="animate-[wave_4s_ease-in-out_infinite]">
+                    <rect
+                        x="32"
+                        y={293 - liquidHeight}
+                        width="56"
+                        height={liquidHeight}
+                        className={`transition-all duration-700 ease-in-out ${liquidColorClass}`}
+                    />
+                </g>
             </g>
 
             {/* Label Area to display percentage */}
@@ -97,10 +108,10 @@ export default function Loader() {
         </div>
 
       <div className="mt-8 text-center">
-        <h2 className="text-xl font-bold text-foreground">
+        <h2 className="text-xl font-bold text-foreground dark:drop-shadow-[0_0_8px_hsl(var(--foreground)/0.5)]">
           {dynamicText}
         </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-foreground/90">
           Please wait while we prepare your workspace.
         </p>
       </div>
