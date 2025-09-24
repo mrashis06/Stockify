@@ -26,9 +26,9 @@ export type OnBarItem = {
   totalVolume: number; // e.g., 750 for a 750ml bottle, or the volume of one beer bottle
   remainingVolume: number; // remaining ml for liquor, or remaining *units* for beer
   totalQuantity?: number; // Total units for grouped items like beer
-  salesVolume: number; // Volume sold today in ml
+  salesVolume: number; // Volume sold today in ml (for liquor) or units (for beer)
   salesValue: number; // Monetary value of sales today
-  price: number; // Price of the full bottle
+  price: number; // Price of the full bottle (for liquor) or a single unit (for beer)
   openedAt: any; // Firestore Timestamp
 };
 
@@ -70,29 +70,27 @@ export function useOnBarInventory() {
             throw new Error(`Not enough stock. Available: ${closingStock}, trying to open: ${quantity}`);
         }
 
-        // Treat opening a bottle as a "sale" from the main inventory
         await updateItemField(inventoryItemId, 'sales', currentSales + quantity);
         
-        // Then, add the bottle(s) to the on-bar collection
-        const batch = writeBatch(db);
-        const onBarCollectionRef = collection(db, "onBarInventory");
+        const newOnBarDocRef = doc(collection(db, "onBarInventory"));
+        
+        const isBeer = itemInShop.category === 'Beer';
 
-        for (let i = 0; i < quantity; i++) {
-            const newOnBarDocRef = doc(onBarCollectionRef);
-             batch.set(newOnBarDocRef, {
-                inventoryId: inventoryItemId,
-                brand: itemInShop.brand,
-                size: itemInShop.size,
-                category: itemInShop.category,
-                totalVolume: volume,
-                remainingVolume: volume,
-                salesVolume: 0,
-                salesValue: 0,
-                price: itemInShop.price,
-                openedAt: serverTimestamp(),
-            });
-        }
-        await batch.commit();
+        const onBarItemPayload = {
+            inventoryId: inventoryItemId,
+            brand: itemInShop.brand,
+            size: itemInShop.size,
+            category: itemInShop.category,
+            totalVolume: volume,
+            remainingVolume: isBeer ? quantity : volume,
+            price: itemInShop.price,
+            totalQuantity: isBeer ? quantity : 1,
+            salesVolume: 0,
+            salesValue: 0,
+            openedAt: serverTimestamp(),
+        };
+
+        await setDoc(newOnBarDocRef, onBarItemPayload);
 
       } catch (error) {
           console.error("Error opening bottle: ", error);
@@ -160,13 +158,13 @@ export function useOnBarInventory() {
         const itemData = itemDoc.data() as OnBarItem;
 
         if (itemData.category === 'Beer') {
-            // Selling a beer decrements remainingVolume (which is units) by 1
-            if (itemData.remainingVolume < 1) {
-                throw new Error("No more bottles to sell.");
+            const quantityToSell = volume; // For beer, 'volume' is quantity
+            if (itemData.remainingVolume < quantityToSell) {
+                throw new Error(`Not enough bottles to sell. Available: ${itemData.remainingVolume}`);
             }
-            const newRemainingUnits = itemData.remainingVolume - 1;
-            const newSalesUnits = (itemData.salesVolume || 0) + 1;
-            const newSalesValue = (itemData.salesValue || 0) + itemData.price; // Use the stored price per bottle
+            const newRemainingUnits = itemData.remainingVolume - quantityToSell;
+            const newSalesUnits = (itemData.salesVolume || 0) + quantityToSell;
+            const newSalesValue = (itemData.salesValue || 0) + price;
             
             transaction.update(itemRef, {
                 remainingVolume: newRemainingUnits,
@@ -211,21 +209,26 @@ export function useOnBarInventory() {
                 throw new Error("Item not found on bar.");
             }
             const itemData = itemDoc.data() as OnBarItem;
+            const isBeer = itemData.category === 'Beer';
 
-            if ((itemData.salesVolume || 0) < amount) {
+            const soldAmount = itemData.salesVolume || 0;
+            const amountToRefill = isBeer ? 1 : amount; // For beer, always refill 1 unit
+
+            if (soldAmount < amountToRefill) {
                 throw new Error("Cannot refill more than what was sold.");
             }
 
-            const newRemainingVolume = itemData.remainingVolume + amount;
-            if (newRemainingVolume > (itemData.category === 'Beer' ? (itemData.totalQuantity || 0) : itemData.totalVolume)) {
+            const newRemainingVolume = itemData.remainingVolume + amountToRefill;
+            const totalCapacity = isBeer ? (itemData.totalQuantity || 0) : itemData.totalVolume;
+            if (newRemainingVolume > totalCapacity) {
                 throw new Error("Refill amount exceeds bottle capacity.");
             }
             
-            const valueToRefund = itemData.category === 'Beer' 
+            const valueToRefund = isBeer 
                 ? itemData.price // Refunding one beer bottle
-                : ((itemData.salesValue || 0) / (itemData.salesVolume || 1)) * amount; // Avg price for liquor
+                : ((itemData.salesValue || 0) / (soldAmount || 1)) * amountToRefill; // Avg price for liquor
             
-            const newSalesVolume = (itemData.salesVolume || 0) - (itemData.category === 'Beer' ? 1 : amount);
+            const newSalesVolume = soldAmount - amountToRefill;
             const newSalesValue = (itemData.salesValue || 0) - valueToRefund;
 
             transaction.update(itemRef, {
@@ -256,9 +259,10 @@ export function useOnBarInventory() {
               const itemInShop = inventory.find(item => item.id === inventoryId);
               if (itemInShop) {
                   const currentSales = itemInShop.sales || 0;
-                  const quantityToReturn = onBarItemData.category === 'Beer' ? onBarItemData.remainingVolume : 1;
+                  // For beer, remainingVolume is units. For liquor, it's 1 bottle if not empty.
+                  const quantityToReturn = onBarItemData.category === 'Beer' ? onBarItemData.remainingVolume : onBarItemData.remainingVolume > 0 ? 1 : 0;
                   
-                  if (onBarItemData.remainingVolume > 0) {
+                  if (quantityToReturn > 0) {
                     await updateItemField(inventoryId, 'sales', Math.max(0, currentSales - quantityToReturn));
                   }
               }

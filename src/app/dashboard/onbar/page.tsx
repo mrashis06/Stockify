@@ -5,6 +5,14 @@ import React, { useState, useMemo } from 'react';
 import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
 import { useOnBarInventory, OnBarItem } from '@/hooks/use-onbar-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
@@ -32,7 +40,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         try {
             await sellCustomPeg(id, volume, price);
             const item = onBarInventory.find(i => i.id === id);
-            const message = item?.category === 'Beer' ? `1 unit sold for ₹${item.price}.` : `${volume}ml sold for ₹${price}.`;
+            const message = item?.category === 'Beer' ? `${volume} unit(s) sold for ₹${price}.` : `${volume}ml sold for ₹${price}.`;
             toast({ title: 'Success', description: message });
             setIsSellItemOpen(false);
         } catch (error) {
@@ -128,6 +136,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                         const remaining = item.remainingVolume;
                         const total = isBeer ? (item.totalQuantity || 1) : item.totalVolume;
                         const unitLabel = isBeer ? 'units' : 'ml';
+                        const beerSaleQuantities = [1, 2, 3, 4, 6];
 
                         return (
                         <Card key={item.id} className="flex flex-col h-full relative">
@@ -153,14 +162,28 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                 
                                 <div className="space-y-2">
                                      {isBeer ? (
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => handleSell(item.id, 1, item.price)}
-                                            disabled={remaining <= 0}
-                                            className="w-full"
-                                        >
-                                            <Beer className="mr-2 h-4 w-4" /> Sell Bottle (₹{item.price})
-                                        </Button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="outline" className="w-full" disabled={remaining <= 0}>
+                                                    <Beer className="mr-2 h-4 w-4" /> Sell Beer
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                <DropdownMenuLabel>Select Quantity</DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                {beerSaleQuantities.map(qty => (
+                                                     <DropdownMenuItem
+                                                        key={qty}
+                                                        disabled={remaining < qty}
+                                                        onClick={() => handleSell(item.id, qty, item.price * qty)}
+                                                        className="flex justify-between"
+                                                     >
+                                                        <span>Sell {qty} Unit(s)</span>
+                                                        <span className="text-muted-foreground">₹{item.price * qty}</span>
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                      ) : (
                                         <div className="flex justify-center items-center gap-2">
                                              <Button
