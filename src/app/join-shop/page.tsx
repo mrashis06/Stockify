@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { ADMIN_UIDS } from '@/lib/constants';
 
 
 export default function JoinShopPage() {
@@ -89,7 +90,13 @@ export default function JoinShopPage() {
     
     const handleCreateShop = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user || user.role !== 'admin') return;
+        if (!user || user.role !== 'admin') {
+             if (user && ADMIN_UIDS.includes(user.uid) && user.role !== 'admin') {
+                // This user should be an admin, but their role is wrong. Fix it.
+             } else {
+                return;
+             }
+        }
         setLoading(true);
         
         try {
@@ -101,9 +108,18 @@ export default function JoinShopPage() {
                 ownerId: user.uid,
                 createdAt: serverTimestamp()
             });
-            batch.update(userDocRef, {
+
+            const userUpdateData: {shopId: string, role?: 'admin'} = {
                 shopId: shopDocRef.id
-            });
+            };
+            
+            // Re-verify role in case it was 'staff' due to signup timing
+            if (ADMIN_UIDS.includes(user.uid)) {
+                userUpdateData.role = 'admin';
+            }
+            
+            batch.update(userDocRef, userUpdateData);
+
             await batch.commit();
             
             toast({ title: "Shop Created!", description: "Your shop has been successfully created. You can now manage your staff." });
@@ -119,7 +135,6 @@ export default function JoinShopPage() {
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/login');
-        router.refresh();
     };
 
     if (authLoading) {
@@ -135,7 +150,7 @@ export default function JoinShopPage() {
         return null;
     }
 
-    if (isAdminSetup) {
+    if (isAdminSetup || (user && ADMIN_UIDS.includes(user.uid) && !user.shopId)) {
          return (
             <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
                 <Card className="mx-auto w-full max-w-sm">
