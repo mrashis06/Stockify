@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import Link from 'next/link';
 import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -31,6 +31,12 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   const { showLoader, isLoading } = useLoading();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
+
   const handleLogout = async () => {
     await signOut(auth);
     router.push('/login');
@@ -41,19 +47,10 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
     showLoader(pageName, path);
   }
 
-  if (authLoading) {
+  if (authLoading || !user) {
     return (
         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
             <div>Loading...</div>
-        </div>
-    );
-  }
-
-  if (!user) {
-    // This case is handled by the useAuth hook redirecting, but as a fallback:
-    return (
-         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
-            <div>Redirecting to login...</div>
         </div>
     );
   }

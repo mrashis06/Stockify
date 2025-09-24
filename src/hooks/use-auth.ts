@@ -3,9 +3,9 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 export type AppUser = User & {
     role?: string;
@@ -16,14 +16,13 @@ export type AppUser = User & {
 export function useAuth() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
       if (authUser) {
         const userDocRef = doc(db, 'users', authUser.uid);
         
+        // Listen for changes on the user document
         const userDocUnsubscribe = onSnapshot(userDocRef, (userDoc) => {
             if (userDoc.exists()) {
               const userData = userDoc.data();
@@ -35,11 +34,17 @@ export function useAuth() {
                 dob: userData.dob,
               });
             } else {
+              // This case might happen if the user doc hasn't been created yet.
               setUser(authUser);
             }
             setLoading(false);
+        }, (error) => {
+            console.error("Error listening to user document:", error);
+            setUser(authUser); // Fallback to authUser
+            setLoading(false);
         });
 
+        // Cleanup the listener for the user document
         return () => userDocUnsubscribe();
 
       } else {
@@ -48,35 +53,15 @@ export function useAuth() {
       }
     });
 
+    // Cleanup the auth state listener
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (loading) {
-      return; // Do nothing until loading is complete
-    }
-
-    const isPublicPage = ['/login', '/signup', '/'].includes(pathname);
-
-    if (!user && !isPublicPage) {
-      router.push('/login');
-    }
-  }, [user, loading, pathname, router]);
 
   const updateUser = async (uid: string, data: { name: string; dob: string }) => {
     const userDocRef = doc(db, 'users', uid);
     await updateDoc(userDocRef, data);
-    setUser(currentUser => {
-        if (currentUser && currentUser.uid === uid) {
-            return {
-                ...currentUser,
-                displayName: data.name,
-                name: data.name,
-                dob: data.dob
-            };
-        }
-        return currentUser;
-    });
+    // The onSnapshot listener will automatically update the user state.
   };
 
   return { user, loading, updateUser };

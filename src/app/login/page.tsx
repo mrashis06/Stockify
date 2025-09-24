@@ -73,6 +73,7 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
         description: "Failed to sign in. Please check your credentials.",
         variant: "destructive",
       });
+    } finally {
       setLoading(false);
     }
   };
@@ -105,8 +106,11 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           variant: "destructive",
         });
       }
-      // If we reach here, there was an error or popup was closed. Stop loading.
-      setGoogleLoading(false);
+    } finally {
+      // Only stop loading if there was an error, otherwise redirection handles it.
+      if (!auth.currentUser) {
+          setGoogleLoading(false);
+      }
     }
   };
   
