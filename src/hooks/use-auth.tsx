@@ -12,6 +12,8 @@ export type AppUser = User & {
     dob?: string;
     shopId?: string | null;
     status?: 'active' | 'blocked';
+    aadhaar?: string;
+    pan?: string;
 };
 
 type AuthContextType = {
@@ -44,6 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (authUser) {
             const userDocRef = doc(db, 'users', authUser.uid);
             const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
+                setLoading(true); // Set loading to true while we process user data
                 if (docSnap.exists()) {
                     const userData = docSnap.data();
                      // Prevent login if user is blocked
@@ -64,6 +67,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         dob: userData.dob,
                         shopId: userData.shopId,
                         status: userData.status,
+                        aadhaar: userData.aadhaar,
+                        pan: userData.pan,
                     };
                     setUser(fullUser);
                     setShopId(userData.shopId || null);
@@ -79,7 +84,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  setLoading(false);
             }, (error) => {
                 console.error("Error fetching user data:", error);
-                setUser(authUser); // Fallback to authUser
+                // In case of error, still treat as logged in with basic info but stop loading
+                setUser(authUser); 
                 setLoading(false);
             });
             return () => unsubDoc();
@@ -107,5 +113,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     </AuthContext.Provider>
   );
 }
-
-    

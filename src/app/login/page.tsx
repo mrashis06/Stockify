@@ -30,6 +30,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoading } from '@/hooks/use-loading';
+import { ADMIN_UIDS } from '@/lib/constants';
 
 // Define LoginForm as a standalone component outside of LoginPage
 const LoginForm = ({
@@ -128,9 +129,16 @@ function LoginContent() {
   }, [searchParams, toast]);
 
   useEffect(() => {
-    // If the user is already logged in, redirect them to the dashboard.
+    // If the user is already logged in, redirect them.
     if (!authLoading && user) {
-      router.push('/dashboard');
+        if (user.role === 'staff' && !user.shopId) {
+            router.push('/join-shop');
+        } else if (user.role === 'admin' && !user.shopId) {
+            router.push('/join-shop');
+        }
+        else {
+            router.push('/dashboard');
+        }
     }
   }, [user, authLoading, router]);
 
@@ -149,16 +157,21 @@ function LoginContent() {
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        if (userData.role === role) {
+        const userIsAdmin = ADMIN_UIDS.includes(authenticatedUser.uid);
+
+        // This check ensures a user whose role might be 'staff' in DB but is in ADMIN_UIDS list is treated as admin
+        const effectiveRole = userIsAdmin ? 'admin' : userData.role;
+
+        if (effectiveRole === role) {
           // Role matches the login panel, proceed and show loader
           showLoader('Dashboard', '/dashboard');
         } else {
           // Role mismatch, sign out and show error toast
           await signOut(auth);
           let description = "Your role does not match this login panel. Please switch panels.";
-          if (userData.role === 'admin') {
+          if (role === 'staff') { // Tried to log in as staff, but wasn't a staff member
               description = "Access Denied. You are an Admin. Please use the Admin login panel.";
-          } else if (userData.role === 'staff') {
+          } else if (role === 'admin') { // Tried to log in as admin, but wasn't an admin
               description = "Access Denied. You are Staff. Please use the Staff login panel.";
           }
           setAuthError(description);
@@ -183,6 +196,7 @@ function LoginContent() {
   };
   
   if (authLoading || user) {
+    // Return a loader or null while waiting for the redirect in the useEffect.
     return (
         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
             <div>Loading...</div>
