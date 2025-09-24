@@ -22,12 +22,12 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Badge } from '@/components/ui/badge';
-import { useLoading } from '@/hooks/use-loading'; // Import the useLoading hook
+import { useLoading } from '@/hooks/use-loading';
 
 export default function DashboardLayout({ children, params, searchParams }: { children: ReactNode, params: { slug: string }, searchParams?: { [key: string]: string | string[] | undefined } }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const { showLoader } = useLoading();
+  const { showLoader, isLoading } = useLoading();
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -38,7 +38,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
     showLoader(pageName, path);
   }
 
-  if (loading) {
+  if (authLoading) {
     return (
         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
             <div>Loading...</div>
@@ -47,9 +47,10 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   }
 
   if (!user) {
+    // This case is handled by the useAuth hook redirecting, but as a fallback:
     return (
          <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
-            <div>Loading...</div>
+            <div>Redirecting to login...</div>
         </div>
     );
   }
@@ -131,7 +132,7 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
           </DropdownMenu>
         </div>
       </header>
-      {children}
+      {isLoading ? null : children}
     </div>
   );
 }
