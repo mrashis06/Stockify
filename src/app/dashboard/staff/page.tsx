@@ -2,10 +2,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, writeBatch, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, writeBatch, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, ClipboardCopy } from 'lucide-react';
+import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, ClipboardCopy, XCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 
 type StaffMember = {
     id: string;
@@ -53,14 +54,16 @@ export default function StaffPage() {
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [isDeleteAlertOpen, setDeleteAlertOpen] = useState(false);
+    const [isDeleteCodeAlertOpen, setDeleteCodeAlertOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+    const [selectedCode, setSelectedCode] = useState<InviteCode | null>(null);
 
     // Fetch staff list for the admin's shop
     useEffect(() => {
         if (user && user.shopId) {
             setLoading(true);
             const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
-            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"));
+            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"), where("createdAt", "!=", null));
 
             const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
                 const staff: StaffMember[] = [];
@@ -152,6 +155,25 @@ export default function StaffPage() {
         }
     };
 
+    const confirmDeleteCode = (code: InviteCode) => {
+        setSelectedCode(code);
+        setDeleteCodeAlertOpen(true);
+    };
+
+    const handleDeleteCode = async () => {
+        if (!selectedCode) return;
+        try {
+            await deleteDoc(doc(db, "invites", selectedCode.id));
+            toast({ title: "Success", description: "Invite code has been deleted." });
+        } catch (error) {
+            console.error("Error deleting invite code:", error);
+            toast({ title: "Error", description: "Failed to delete invite code.", variant: "destructive" });
+        } finally {
+            setDeleteCodeAlertOpen(false);
+            setSelectedCode(null);
+        }
+    };
+
 
     if (loading) {
         return (
@@ -198,6 +220,22 @@ export default function StaffPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <AlertDialog open={isDeleteCodeAlertOpen} onOpenChange={setDeleteCodeAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Invite Code?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete the code <span className="font-mono bg-muted p-1 rounded-sm">{selectedCode?.code}</span>? This action is permanent and the code will no longer be usable.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteCode} className="bg-destructive hover:bg-destructive/90">
+                            Delete Code
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <h1 className="text-2xl font-bold tracking-tight mb-6">Staff Management</h1>
             <div className="grid gap-6 md:grid-cols-2">
                 <Card>
@@ -206,7 +244,7 @@ export default function StaffPage() {
                         <CardDescription>Generate a unique, single-use code to invite a new staff member.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button onClick={handleGenerateCode} disabled={generating} className="w-full">
+                        <Button onClick={handleGenerateCode} disabled={generating} className="w-full bg-green-600 hover:bg-green-700 text-white">
                             {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                             Generate New Invite Code
                         </Button>
@@ -219,18 +257,27 @@ export default function StaffPage() {
                     </CardHeader>
                     <CardContent>
                         {inviteCodes.length > 0 ? (
-                           <div className="space-y-2">
-                                {inviteCodes.map(invite => (
-                                    <div key={invite.id} className="flex items-center justify-between gap-4 p-2 border rounded-lg">
-                                        <span className="font-mono text-sm tracking-widest">{invite.code}</span>
-                                        <Button variant="ghost" size="icon" onClick={() => handleCopyCode(invite.code)}>
-                                            <Copy className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                ))}
-                           </div>
+                           <ScrollArea className="h-32 pr-4">
+                            <div className="space-y-2">
+                                    {inviteCodes.map(invite => (
+                                        <div key={invite.id} className="flex items-center justify-between gap-2 p-2 border rounded-lg bg-muted/50">
+                                            <span className="font-mono text-sm tracking-widest">{invite.code}</span>
+                                            <div className="flex items-center">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(invite.code)}>
+                                                    <Copy className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => confirmDeleteCode(invite)}>
+                                                    <XCircle className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                           </ScrollArea>
                         ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">No pending invites. Generate a new code to invite staff.</p>
+                            <div className="flex items-center justify-center h-32 border-2 border-dashed rounded-lg">
+                                <p className="text-sm text-muted-foreground text-center">No pending invites.</p>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
@@ -258,7 +305,7 @@ export default function StaffPage() {
                                         <TableCell className="font-medium">{staff.name}</TableCell>
                                         <TableCell>{staff.email}</TableCell>
                                         <TableCell>
-                                            <Badge variant={staff.status === 'active' ? 'default' : 'destructive'}>
+                                            <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-600' : ''}>
                                                 {staff.status}
                                             </Badge>
                                         </TableCell>
@@ -267,7 +314,7 @@ export default function StaffPage() {
                                                 {staff.status === 'active' ? <ShieldOff className="mr-2 h-4 w-4" /> : <Shield className="mr-2 h-4 w-4" />}
                                                 {staff.status === 'active' ? 'Block' : 'Unblock'}
                                             </Button>
-                                            <Button variant="ghost" size="sm" className="text-destructive" onClick={() => confirmRemoveStaff(staff)}>
+                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => confirmRemoveStaff(staff)}>
                                                 <Trash2 className="mr-2 h-4 w-4" />
                                                 Remove
                                             </Button>
@@ -288,3 +335,5 @@ export default function StaffPage() {
         </main>
     );
 }
+
+    
