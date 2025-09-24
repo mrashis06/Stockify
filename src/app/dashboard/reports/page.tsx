@@ -258,8 +258,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             });
         });
 
-        if (!isSingleDay && datedSalesDataForExport.length > 0) {
-            // This is the final table for the grand total.
+        if (Object.keys(salesByDate).length > 0) {
             doc.autoTable({
                 startY: (doc as any).lastAutoTable.finalY + 10,
                 head: [["", "", "", "", "", ""]], // Empty head to align columns
@@ -274,10 +273,6 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     fontStyle: 'bold',
                     fontSize: 12
                 },
-                columnStyles: {
-                  4: { halign: 'right' },
-                  5: { halign: 'right' }
-                }
             });
         }
         
@@ -341,7 +336,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     <Button
                         variant={"outline"}
                         className={cn(
-                        "w-full sm:w-[240px] justify-start text-left font-normal",
+                        "w-full sm:w-[300px] justify-start text-left font-normal",
                         !date && "text-muted-foreground"
                         )}
                     >
@@ -438,5 +433,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
+
+    
 
     
