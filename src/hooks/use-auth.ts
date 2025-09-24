@@ -20,7 +20,7 @@ export function useAuth() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const authUnsubscribe = onAuthStateChanged(auth, (authUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (authUser) => {
       if (authUser) {
         const userDocRef = doc(db, 'users', authUser.uid);
         
@@ -29,7 +29,6 @@ export function useAuth() {
               const userData = userDoc.data();
               setUser({ 
                 ...authUser, 
-                // Explicitly use displayName from Firebase Auth as a fallback for the name from Firestore.
                 displayName: userData.name || authUser.displayName,
                 role: userData.role,
                 name: userData.name || authUser.displayName,
@@ -46,21 +45,25 @@ export function useAuth() {
       } else {
         setUser(null);
         setLoading(false);
-        const isPublicPage = ['/login', '/signup', '/'].includes(pathname);
-        if (!isPublicPage) {
-          router.push('/login');
-        }
       }
     });
 
-    return () => authUnsubscribe();
-  }, [router, pathname]);
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // This effect handles redirection and runs only after the initial loading is complete.
+    if (!loading && !user) {
+      const isPublicPage = ['/login', '/signup', '/'].includes(pathname);
+      if (!isPublicPage) {
+        router.push('/login');
+      }
+    }
+  }, [user, loading, pathname, router]);
 
   const updateUser = async (uid: string, data: { name: string; dob: string }) => {
     const userDocRef = doc(db, 'users', uid);
     await updateDoc(userDocRef, data);
-    // The onSnapshot listener will now automatically update the state.
-    // We can also optimistically update the local state for a faster UI response.
     setUser(currentUser => {
         if (currentUser && currentUser.uid === uid) {
             return {
