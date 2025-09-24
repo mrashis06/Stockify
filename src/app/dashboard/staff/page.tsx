@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, writeBatch, addDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, setDoc, updateDoc, writeBatch, addDoc, serverTimestamp, deleteDoc, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, ClipboardCopy, XCircle } from 'lucide-react';
@@ -63,7 +63,7 @@ export default function StaffPage() {
         if (user && user.shopId) {
             setLoading(true);
             const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
-            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"), where("createdAt", "!=", null));
+            const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"), orderBy("createdAt", "desc"));
 
             const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
                 const staff: StaffMember[] = [];
@@ -72,6 +72,9 @@ export default function StaffPage() {
                 });
                 setStaffList(staff);
                 if(loading) setLoading(false);
+            }, (error) => {
+                console.error("Staff listener error: ", error);
+                setLoading(false);
             });
 
             const unsubscribeInvites = onSnapshot(invitesQuery, (snapshot) => {
@@ -81,6 +84,14 @@ export default function StaffPage() {
                 });
                 setInviteCodes(codes);
                  if(loading) setLoading(false);
+            }, (error) => {
+                console.error("Invites listener error: ", error);
+                toast({
+                    title: "Database Error",
+                    description: "Could not fetch invite codes. A database index might be required.",
+                    variant: "destructive",
+                });
+                setLoading(false);
             });
 
             return () => {
@@ -90,7 +101,7 @@ export default function StaffPage() {
         } else if (user) {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, toast]);
 
     const handleGenerateCode = async () => {
         if (!user || !user.shopId) {
@@ -335,5 +346,3 @@ export default function StaffPage() {
         </main>
     );
 }
-
-    
