@@ -66,6 +66,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(circle at top left, hsl(var(--secondary)), transparent 40%),
+                      radial-gradient(circle at bottom right, hsl(var(--primary) / 0.1), transparent 50%);
   }
 }
 
@@ -76,6 +78,12 @@
   .loader-bottle {
     filter: drop-shadow(0 0 8px hsl(var(--primary) / 0.4));
   }
+  .animated-liquid {
+    animation: fill-up 5s ease-in-out infinite;
+  }
+  .animated-wave {
+      animation: wave-move 5s ease-in-out infinite;
+  }
 }
 
 @keyframes orbit {
@@ -85,4 +93,55 @@
   to {
     transform: rotate(360deg) translateX(70px) rotate(-360deg);
   }
+}
+
+@keyframes fill-up {
+  0% {
+    transform: translateY(100%);
+  }
+  20% {
+    transform: translateY(60%);
+  }
+  40% {
+    transform: translateY(30%);
+  }
+  60% {
+      transform: translateY(60%);
+  }
+  80% {
+      transform: translateY(20%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes wave-move {
+    0% {
+      transform: translateY(135px);
+      opacity: 0;
+    }
+    20% {
+        transform: translateY(80px);
+        opacity: 1;
+    }
+    40% {
+        transform: translateY(40px);
+        opacity: 1;
+    }
+    60% {
+        transform: translateY(80px);
+        opacity: 1;
+    }
+    80% {
+        transform: translateY(25px);
+        opacity: 1;
+    }
+    90% {
+        opacity: 0;
+    }
+    100% {
+      transform: translateY(135px);
+      opacity: 0;
+    }
 }
