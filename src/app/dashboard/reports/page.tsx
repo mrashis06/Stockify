@@ -192,13 +192,13 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             return acc;
         }, {} as Record<string, DatedSoldItem[]>);
         
-        let startY = 15; // Initial startY for the first page
+        let startY = 15;
         
         doc.setFontSize(16);
         doc.text(title, 14, startY);
         startY += 10;
         
-        Object.keys(salesByDate).sort().forEach((saleDate, index) => {
+        Object.keys(salesByDate).sort().forEach((saleDate) => {
             const items = salesByDate[saleDate];
             const tableRows: (string | number)[][] = [];
             let dailyTotalUnits = 0;
@@ -223,18 +223,13 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             
             const dateObj = parse(saleDate, 'yyyy-MM-dd', new Date());
 
-            // Add a little space before the next table if it's not the first one
-            if (index > 0) {
-                 startY = (doc as any).lastAutoTable.finalY + 15;
-            }
-
             doc.autoTable({
                 head: [tableColumn],
                 body: tableRows,
                 foot: [
                     ['Daily Total', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)]
                 ],
-                startY: startY,
+                startY: (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 15 : startY,
                 headStyles: {
                     fillColor: [40, 40, 40], 
                     textColor: [255, 255, 255],
@@ -252,34 +247,44 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                         doc.text(title, 14, 15);
                     }
                 },
-                // Add a title for each day's table
                 willDrawPage: (data) => {
                      doc.setFontSize(12);
                      doc.setFont('helvetica', 'bold');
-                     doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, data.cursor?.y || startY - 5);
+                     doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, data.cursor ? data.cursor.y - 5 : startY - 5);
                      if (data.cursor) {
-                       data.cursor.y += 2; // Add a bit more space after title
+                       data.cursor.y += 2;
                      }
                 }
             });
-            startY = (doc as any).lastAutoTable.finalY;
         });
 
         if (!isSingleDay) {
-             const finalY = (doc as any).lastAutoTable.finalY || startY;
+             let finalY = (doc as any).lastAutoTable.finalY || startY;
+             if (finalY > 250) { // Check if we need a new page
+                doc.addPage();
+                finalY = 15;
+             }
+
+             // Manually draw the Grand Total section for full control
              doc.autoTable({
                 body: [
                     [`Grand Total`, ``, ``, ``, grandTotalUnits, grandTotalAmount.toFixed(2)]
                 ],
                 startY: finalY + 10,
                 theme: 'striped',
+                styles: { cellPadding: 3 },
                 bodyStyles: {
                     fontStyle: 'bold',
                     fontSize: 12,
-                    fillColor: [22, 163, 74],
-                    textColor: [255,255,255]
+                    fillColor: [22, 163, 74], // green-600
+                    textColor: [255, 255, 255]
+                },
+                columnStyles: {
+                    0: { cellWidth: 'auto' },
+                    4: { halign: 'left' },
+                    5: { halign: 'left' },
                 }
-            })
+            });
         }
         
         const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
@@ -439,5 +444,3 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
-
-    
