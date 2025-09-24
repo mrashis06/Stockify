@@ -3,84 +3,97 @@
 
 import React, { useState, useEffect } from 'react';
 
-const AnimatedGlass = () => {
-    // This component is now a bottle, but we keep the name to avoid breaking imports.
-    return (
-        <div className="relative w-48 h-64 flex items-center justify-center">
-            <svg
-                width="100"
-                height="250"
-                viewBox="0 0 100 250"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="drop-shadow-lg"
-            >
-                {/* Bottle Glass Outline - with slight transparency */}
-                <path 
-                    d="M35,245 L35,60 C35,50 30,40 40,40 L60,40 C70,40 65,50 65,60 L65,245 L35,245 Z" 
-                    className="fill-current text-muted-foreground/20"
-                />
-                {/* Neck */}
-                <path
-                    d="M40 40 L40 20 L60 20 L60 40 Z"
-                    className="fill-current text-muted-foreground/20"
-                />
-                {/* Cork */}
-                 <path
-                    d="M42 0H58V20H42V0Z"
-                    className="fill-current text-amber-900/80"
-                />
+type Bubble = {
+    id: number;
+    cx: number;
+    cy: number;
+    r: number;
+    animationDuration: string;
+    animationDelay: string;
+    xEnd: string;
+};
 
-                {/* Liquid - This part is clipped by the bottle shape */}
+const AnimatedGlass = () => {
+    const [bubbles, setBubbles] = useState<Bubble[]>([]);
+
+    useEffect(() => {
+        const newBubbles: Bubble[] = Array.from({ length: 15 }).map((_, i) => ({
+            id: i,
+            cx: 35 + Math.random() * 30, // Start within the liquid base
+            cy: 180, // Start from the bottom
+            r: Math.random() * 1.5 + 0.5,
+            animationDuration: `${Math.random() * 3 + 3}s`, // 3s to 6s duration
+            animationDelay: `${Math.random() * 5}s`,
+            xEnd: `${(Math.random() - 0.5) * 20}px` // Horizontal drift
+        }));
+        setBubbles(newBubbles);
+    }, []);
+
+    return (
+        <div className="relative w-48 h-72 flex items-center justify-center">
+            <svg viewBox="0 0 100 150" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                    <clipPath id="bottleClip">
-                         {/* This path is slightly smaller than the bottle to contain the liquid */}
-                        <path d="M37,243 L37,60 C37,52 32,42 42,42 L58,42 C68,42 63,52 63,60 L63,243 L37,243 Z" />
+                    <linearGradient id="liquidGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style={{ stopColor: '#FFD700', stopOpacity: 1 }} />
+                        <stop offset="100%" style={{ stopColor: '#F5B000', stopOpacity: 1 }} />
+                    </linearGradient>
+                    <clipPath id="glass-mask">
+                        <path d="M 30,140 C 10,140 10,100 25,80 C 35,65 35,20 38,10 L 62,10 C 65,20 65,65 75,80 C 90,100 90,140 70,140 Z" />
                     </clipPath>
+                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+                        <feMerge>
+                            <feMergeNode in="coloredBlur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
                 </defs>
 
-                {/* The liquid that fills up */}
-                <g clipPath="url(#bottleClip)">
-                    <rect
-                        x="37"
-                        y="93" 
-                        width="26"
-                        height="150"
-                        className="fill-yellow-500"
-                        style={{ animation: 'fill-up 5s ease-in-out infinite' }}
-                    />
-                     {/* Wavy surface on top of the liquid */}
-                    <path
-                        d="M37 93 C47 88, 53 98, 63 93 V243 H37 Z"
-                        className="fill-yellow-500 animate-[wave-move_4s_ease-in-out_infinite]"
-                         style={{ animation: 'fill-up-wave 5s ease-in-out infinite' }}
-                    />
-                </g>
-                
-                 {/* Glossy highlight */}
-                <path 
-                    d="M42 70 C45 120, 45 200, 42 240" 
-                    stroke="white" 
-                    strokeOpacity="0.2" 
-                    strokeWidth="1.5" 
-                    fill="none" 
+                {/* Glass Outline */}
+                <path d="M 30,140 C 10,140 10,100 25,80 C 35,65 35,20 38,10 L 62,10 C 65,20 65,65 75,80 C 90,100 90,140 70,140 Z" 
+                    fill="hsl(var(--card-foreground) / 0.05)" 
+                    stroke="hsl(var(--card-foreground) / 0.2)" 
+                    strokeWidth="0.5"
                 />
+
+                {/* Liquid and Bubbles */}
+                <g clipPath="url(#glass-mask)">
+                    {/* Wavy liquid */}
+                    <path
+                        d="M 10,90 
+                           C 25,85 40,95 50,90 
+                           T 90,90
+                           L 90,150 L 10,150 Z"
+                        fill="url(#liquidGradient)"
+                        className="animate-[wave_4s_ease-in-out_infinite]"
+                    />
+                    
+                    {/* Bubbles */}
+                    <g>
+                        {bubbles.map(b => (
+                        <circle
+                            key={b.id}
+                            cx={b.cx}
+                            cy={b.cy}
+                            r={b.r}
+                            fill="#FFD700"
+                            opacity="0.7"
+                            className="animate-[bubbles-rise_infinite]"
+                            style={{
+                                '--bubble-x-end': b.xEnd,
+                                animationDuration: b.animationDuration,
+                                animationDelay: b.animationDelay
+                            } as React.CSSProperties}
+                        />
+                        ))}
+                    </g>
+                </g>
+
+                {/* Highlights */}
+                <path d="M 38,15 C 38,40 42,80 38,120" fill="none" stroke="white" strokeWidth="1" strokeOpacity="0.3"/>
+                <path d="M 32,138 Q 50,142 68,138" fill="none" stroke="white" strokeWidth="0.7" strokeOpacity="0.2"/>
             </svg>
-             <style jsx>{`
-                @keyframes fill-up {
-                    from { transform: translateY(150px); }
-                    to { transform: translateY(0px); }
-                }
-                @keyframes fill-up-wave {
-                    from { transform: translateY(150px); }
-                    to { transform: translateY(0px); }
-                }
-                @keyframes wave-move {
-                    0% { transform: translateX(0); }
-                    50% { transform: translateX(-2px); }
-                    100% { transform: translateX(0); }
-                }
-            `}</style>
+            <div className="absolute inset-0 bg-amber-500/10 dark:bg-amber-400/20 rounded-full blur-2xl -z-10 animate-[pulse-glow_5s_ease-in-out_infinite]" />
         </div>
     );
 };
