@@ -135,24 +135,13 @@
 
 @keyframes wave {
   0% {
-    transform: translateX(0);
+    transform: translateX(0) translateY(0);
   }
   50% {
     transform: translateX(-5px) translateY(-2px);
   }
   100% {
-    transform: translateX(0);
-  }
-}
-
-@keyframes bubbles-rise {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(-120px) translateX(var(--bubble-x-end));
-    opacity: 0;
+    transform: translateX(0) translateY(0);
   }
 }
 
