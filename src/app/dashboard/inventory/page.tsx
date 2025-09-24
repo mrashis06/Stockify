@@ -437,7 +437,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                             <TableCell colSpan={2} className="italic text-muted-foreground">
                                                 {item.category === 'Beer' 
                                                     ? `${item.salesVolume} units` 
-                                                    : `${item.salesVolume}ml`
+                                                    : <>{item.salesVolume}<span className="ml-1">ml</span></>
                                                 }
                                             </TableCell>
                                         </TableRow>
@@ -462,5 +462,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
 
     
