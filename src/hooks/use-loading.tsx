@@ -9,6 +9,7 @@ type LoadingStore = {
   isLoading: boolean;
   progress: number;
   pageName: string;
+  dynamicText: string;
   dataReady: boolean;
   _internalState: {
     intervalId: NodeJS.Timeout | null;
@@ -23,10 +24,19 @@ type LoadingActions = {
     setDataReady: () => void;
 };
 
+const getDynamicText = (progress: number): string => {
+    if (progress < 20) return 'Preparing your workspace...';
+    if (progress < 50) return 'Mixing the perfect cocktail...';
+    if (progress < 80) return 'Stocking up your shelves...';
+    if (progress < 100) return 'Polishing the glasses...';
+    return 'All set. Cheers! 🍷';
+}
+
 const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
   isLoading: false,
   progress: 0,
   pageName: '',
+  dynamicText: 'Preparing your workspace...',
   dataReady: false,
   _internalState: {
     intervalId: null,
@@ -62,6 +72,7 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
       isLoading: true,
       progress: 0,
       pageName,
+      dynamicText: 'Preparing your workspace...',
       dataReady: false,
       _internalState: { ...get()._internalState, path: path },
     });
@@ -75,11 +86,11 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
           if (state.dataReady) {
             hideLoader();
           }
-          return { progress: 100 };
+          return { progress: 100, dynamicText: getDynamicText(100) };
         }
-        return { progress: newProgress };
+        return { progress: newProgress, dynamicText: getDynamicText(newProgress) };
       });
-    }, 80); // ~1.6 seconds to reach 100%
+    }, 120); // Slower interval for a more premium feel
 
     // Hard fallback timeout to prevent getting stuck
     const timeoutId = setTimeout(() => {
@@ -87,7 +98,7 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
         if (isLoading) {
             hideLoader();
         }
-    }, 2500);
+    }, 3000); // Increased timeout
 
     set(state => ({
       _internalState: { ...state._internalState, intervalId, timeoutId },
@@ -99,6 +110,7 @@ const LoadingContext = createContext<{
     isLoading: boolean;
     progress: number;
     pageName: string;
+    dynamicText: string;
     showLoader: (pageName: string, path: string) => void;
 } | undefined>(undefined);
 
