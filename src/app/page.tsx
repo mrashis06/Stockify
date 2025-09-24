@@ -15,23 +15,40 @@ import { PlaceHolderImages } from "@/lib/placeholder-images";
 
 const BottleSilhouette = () => (
     <svg width="60" height="150" viewBox="0 0 60 150" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-10 md:w-12">
-        <path d="M20 150V60C20 40 25 30 30 30C35 30 40 40 40 60V150H20Z" fill="currentColor" />
-        <path d="M25 30V10H35V30H25Z" fill="currentColor" />
+        <path d="M20 150 V 60 C 18 50, 22 45, 30 45 C 38 45, 42 50, 40 60 V 150 H 20 Z" fill="currentColor" />
+        <path d="M25 45 V 10 H 35 V 45 H 25 Z" fill="currentColor" />
     </svg>
 )
 
-const BottleSilhouette2 = () => (
-    <svg width="50" height="120" viewBox="0 0 50 120" fill="none" xmlns="http://wwws.w3.org/2000/svg" className="h-auto w-8 md:w-10">
-        <path d="M15 120V50C15 35 20 25 25 25C30 25 35 35 35 50V120H15Z" fill="currentColor"/>
+const StoutBottleSilhouette = () => (
+     <svg width="70" height="130" viewBox="0 0 70 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-12 md:w-14 -mx-2">
+        <path d="M15 130 V 50 C 15 35, 20 25, 35 25 C 50 25, 55 35, 55 50 V 130 H 15 Z" fill="currentColor"/>
+        <path d="M30 25 V 10 H 40 V 25 H 30 Z" fill="currentColor" />
+    </svg>
+)
+
+const MiniBottleSilhouette = () => (
+    <svg width="40" height="100" viewBox="0 0 40 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-7 md:w-8 -ml-4">
+        <path d="M10 100 V 45 C 8 40, 12 35, 20 35 C 28 35, 32 40, 30 45 V 100 H 10 Z" fill="currentColor" />
+        <path d="M15 35 V 5 H 25 V 35 H 15 Z" fill="currentColor" />
     </svg>
 )
 
 const WineGlassSilhouette = () => (
-    <svg width="70" height="100" viewBox="0 0 70 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-10 md:w-12">
-        <path d="M10 0L60 0L35 40L10 0Z" transform="translate(0 30)" fill="currentColor"/>
-        <path d="M32 70H38V100H32V70Z" fill="currentColor"/>
+    <svg width="80" height="110" viewBox="0 0 80 110" fill="none" xmlns="http://wwws.w3.org/2000/svg" className="h-auto w-12 md:w-16">
+        <path d="M10 0 C 10 -5, 70 -5, 70 0 L 75 30 C 75 50, 5 50, 5 30 L 10 0 Z" fill="currentColor"/>
+        <path d="M38 50 H 42 V 100 H 38 V 50 Z" fill="currentColor"/>
+        <path d="M20 100 H 60 V 105 H 20 V 100 Z" fill="currentColor" />
     </svg>
 )
+
+const StandardBottleSilhouette = () => (
+     <svg width="60" height="140" viewBox="0 0 60 140" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-10 md:w-12">
+        <path d="M15 140 V 55 C 15 40, 20 30, 30 30 C 40 30, 45 40, 45 55 V 140 H 15 Z" fill="currentColor"/>
+        <path d="M25 30 V 10 H 35 V 30 H 25 Z" fill="currentColor" />
+    </svg>
+)
+
 
 export default function Home({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user, loading: authLoading } = useAuth();
@@ -39,7 +56,6 @@ export default function Home({ params, searchParams }: { params: { slug: string 
   const router = useRouter();
   
   const getStartedLink = authLoading ? '#' : user ? '/dashboard' : '/login';
-  const heroImage = PlaceHolderImages.find(p => p.id === 'hero-liquor-bottles');
 
   const handleGetStarted = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
@@ -63,14 +79,15 @@ export default function Home({ params, searchParams }: { params: { slug: string 
              {/* Center Spotlight */}
              <div className="absolute inset-0 bg-spotlight-gradient" />
 
-            <div className="absolute bottom-0 left-0 right-0 h-1/3 md:h-1/2 flex justify-between items-end px-4 md:px-16 text-foreground/10 dark:text-foreground/15 dark:drop-shadow-[0_0_10px_hsl(var(--foreground)/0.15)]">
+            <div className="absolute bottom-0 left-0 right-0 h-1/2 md:h-2/3 flex justify-between items-end px-4 md:px-16 text-foreground/10 dark:text-foreground/15 dark:drop-shadow-[0_0_15px_hsl(var(--foreground)/0.15)]">
                 <div className="flex items-end gap-2 md:gap-4">
+                    <MiniBottleSilhouette />
+                    <StoutBottleSilhouette />
                     <BottleSilhouette />
-                    <BottleSilhouette2 />
                 </div>
                  <div className="flex items-end gap-2 md:gap-4">
                     <WineGlassSilhouette />
-                    <BottleSilhouette />
+                    <StandardBottleSilhouette />
                 </div>
             </div>
         </div>
