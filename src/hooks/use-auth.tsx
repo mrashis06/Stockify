@@ -47,21 +47,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (authUser) {
             const userDocRef = doc(db, 'users', authUser.uid);
             const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
-                setLoading(true); // Set loading to true while we process user data
+                setLoading(true);
                 if (docSnap.exists()) {
                     const userData = docSnap.data();
-                     // Prevent login if user is blocked
+                    
                     if (userData.status === 'blocked') {
                         setUser(null);
                         setShopId(null);
                         setIsStaffActive(false);
-                        auth.signOut(); // Ensure they are fully logged out
+                        auth.signOut();
                         setLoading(false);
                         return;
                     }
                     
                     const isUserAdmin = ADMIN_UIDS.includes(authUser.uid);
                     const effectiveRole = isUserAdmin ? 'admin' : userData.role || 'staff';
+
+                    // Self-correction logic: If user is an admin but their DB role is 'staff', fix it.
+                    if (isUserAdmin && userData.role !== 'admin') {
+                        updateDoc(userDocRef, { role: 'admin' });
+                    }
 
                     const fullUser: AppUser = {
                         ...authUser,
@@ -74,12 +79,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         aadhaar: userData.aadhaar,
                         pan: userData.pan,
                     };
+
                     setUser(fullUser);
                     setShopId(userData.shopId || null);
                     setIsStaffActive(userData.status === 'active');
+
                 } else {
-                    // This can happen if the user's doc is deleted but they are still logged in.
-                    // We should log them out.
                     auth.signOut();
                     setUser(null);
                     setShopId(null);
@@ -88,7 +93,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                  setLoading(false);
             }, (error) => {
                 console.error("Error fetching user data:", error);
-                // In case of error, still treat as logged in with basic info but stop loading
                 setUser(authUser); 
                 setLoading(false);
             });
