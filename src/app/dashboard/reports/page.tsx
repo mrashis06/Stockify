@@ -197,7 +197,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
           <h1 className="text-2xl font-bold tracking-tight">Sales Summary</h1>
           <p className="text-muted-foreground">Historical sales overview</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button onClick={handleExportPDF} disabled={loading || salesData[0]?.category === 'No Sales'} className="bg-green-600 hover:bg-green-700 text-white">
                 <Download className="mr-2 h-4 w-4" />
                 Export to PDF
@@ -213,13 +213,13 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         <CardHeader>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <CardTitle>Reports</CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <Popover>
                     <PopoverTrigger asChild>
                     <Button
                         variant={"outline"}
                         className={cn(
-                        "w-[240px] justify-start text-left font-normal",
+                        "w-full sm:w-[240px] justify-start text-left font-normal",
                         !date && "text-muted-foreground"
                         )}
                     >

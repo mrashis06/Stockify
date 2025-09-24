@@ -410,7 +410,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                         </TableBody>
                          <TableFooter>
                             <TableRow>
-                                <TableCell colSpan={9} className="text-right font-bold text-lg">Total Bottle Sales</TableCell>
+                                <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right font-bold text-lg">Total Bottle Sales</TableCell>
                                 <TableCell colSpan={2} className="font-bold text-lg">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-5 w-5 mr-1 shrink-0" />
@@ -419,7 +419,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                 </TableCell>
                             </TableRow>
                             <TableRow>
-                                <TableCell colSpan={9} className="text-right font-medium">Today's On-Bar Sales</TableCell>
+                                <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right font-medium">Today's On-Bar Sales</TableCell>
                                 <TableCell colSpan={2} className="font-medium">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
@@ -431,7 +431,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                 <>
                                     {soldOnBarItems.map(item => (
                                         <TableRow key={`onbar-${item.id}`} className="text-xs">
-                                            <TableCell colSpan={9} className="text-right italic text-muted-foreground pr-4">
+                                            <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right italic text-muted-foreground pr-4">
                                                 {item.brand}
                                             </TableCell>
                                             <TableCell colSpan={2} className="italic text-muted-foreground">
@@ -445,7 +445,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                 </>
                             )}
                              <TableRow className="border-t-2 border-primary/50">
-                                <TableCell colSpan={9} className="text-right font-extrabold text-xl text-primary">Grand Total Sales</TableCell>
+                                <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right font-extrabold text-xl text-primary">Grand Total Sales</TableCell>
                                 <TableCell colSpan={2} className="font-extrabold text-xl text-primary">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-6 w-6 mr-1 shrink-0" />

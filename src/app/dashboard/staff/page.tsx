@@ -225,7 +225,7 @@ export default function StaffPage() {
     
     if (!user?.shopId) {
         return (
-             <main className="flex-1 p-4 md:p-8 max-w-4xl mx-auto">
+             <main className="flex-1 p-4 md:p-8">
                  <h1 className="text-3xl font-bold tracking-tight mb-6">Staff Management</h1>
                  <Card>
                     <CardHeader>
@@ -242,7 +242,7 @@ export default function StaffPage() {
     }
 
     return (
-        <main className="flex-1 p-4 md:p-8 max-w-4xl mx-auto">
+        <main className="flex-1 p-4 md:p-8">
             <AlertDialog open={isDeleteCodeAlertOpen} onOpenChange={setDeleteCodeAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -283,7 +283,7 @@ export default function StaffPage() {
                         <CardTitle className="text-xl">Invite Staff</CardTitle>
                         <CardDescription>Generate a unique invite code for new staff members to join your team.</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex items-center gap-4">
+                    <CardContent className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                         <Button onClick={handleGenerateCode} disabled={generating} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
                             {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                             Generate New Invite Code
@@ -309,9 +309,9 @@ export default function StaffPage() {
                                 {inviteCodes.map(invite => {
                                     const expiration = getCodeExpiration(invite.createdAt);
                                     return (
-                                    <div key={invite.id} className="flex items-center justify-between gap-4 p-3 border rounded-lg bg-muted/30">
+                                    <div key={invite.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 border rounded-lg bg-muted/30">
                                         <span className="font-mono text-sm tracking-wider">{invite.code}</span>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 self-end">
                                             {!expiration.isExpired && <Badge className={`text-xs font-medium ${expiration.badgeColor}`}>{expiration.text}</Badge>}
                                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(invite.code)}>
                                                 <Copy className="h-4 w-4" />
@@ -334,86 +334,90 @@ export default function StaffPage() {
                 <div>
                     <h2 className="text-xl font-bold tracking-tight mb-4">Staff Members</h2>
                     <Card>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-12"></TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {staffList.length > 0 ? (
-                                    staffList.map(staff => (
-                                       <React.Fragment key={staff.id}>
-                                            <TableRow>
-                                                <TableCell>
-                                                    <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(staff.id)} className="h-8 w-8">
-                                                        {expandedRows.has(staff.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell className="font-medium">{staff.name}</TableCell>
-                                                <TableCell>{staff.email}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                                                        {staff.status}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right space-x-4">
-                                                    <Button variant="link" size="sm" className="p-0 h-auto font-medium text-blue-600" onClick={() => handleToggleStatus(staff)}>
-                                                        {staff.status === 'active' ? 'Block' : 'Unblock'}
-                                                    </Button>
-                                                    <Button variant="link" size="sm" className="p-0 h-auto font-medium text-destructive" onClick={() => confirmRemoveStaff(staff)}>
-                                                        Remove
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                            {expandedRows.has(staff.id) && (
-                                                 <TableRow key={`${staff.id}-details`} className="bg-muted/50 hover:bg-muted/50">
-                                                    <TableCell colSpan={5} className="p-4">
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                             <div className="flex items-center gap-2 text-sm">
-                                                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                                                <strong>Phone:</strong>
-                                                                <span>{staff.phone || 'N/A'}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-sm">
-                                                                <Cake className="h-4 w-4 text-muted-foreground" />
-                                                                <strong>DOB:</strong>
-                                                                <span>{staff.dob ? format(parseISO(staff.dob), 'PPP') : 'N/A'}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-sm">
-                                                                <User className="h-4 w-4 text-muted-foreground" />
-                                                                <strong>Aadhaar:</strong>
-                                                                <span>{staff.aadhaar || 'N/A'}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-sm">
-                                                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                                                <strong>PAN:</strong>
-                                                                <span>{staff.pan || 'N/A'}</span>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                 </TableRow>
-                                            )}
-                                        </React.Fragment>
-                                    ))
-                                ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">
-                                            No staff have joined your shop yet.
-                                        </TableCell>
+                                        <TableHead className="w-12"></TableHead>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead className="hidden md:table-cell">Email</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {staffList.length > 0 ? (
+                                        staffList.map(staff => (
+                                        <React.Fragment key={staff.id}>
+                                                <TableRow>
+                                                    <TableCell>
+                                                        <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(staff.id)} className="h-8 w-8">
+                                                            {expandedRows.has(staff.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                        </Button>
+                                                    </TableCell>
+                                                    <TableCell className="font-medium">{staff.name}</TableCell>
+                                                    <TableCell className="hidden md:table-cell">{staff.email}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                                            {staff.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right space-x-2 md:space-x-4">
+                                                        <Button variant="link" size="sm" className="p-0 h-auto font-medium text-blue-600" onClick={() => handleToggleStatus(staff)}>
+                                                            {staff.status === 'active' ? 'Block' : 'Unblock'}
+                                                        </Button>
+                                                        <Button variant="link" size="sm" className="p-0 h-auto font-medium text-destructive" onClick={() => confirmRemoveStaff(staff)}>
+                                                            Remove
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                                {expandedRows.has(staff.id) && (
+                                                    <TableRow key={`${staff.id}-details`} className="bg-muted/50 hover:bg-muted/50">
+                                                        <TableCell colSpan={5} className="p-4">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                                <div className="flex items-center gap-2 text-sm md:hidden">
+                                                                    <strong>Email:</strong>
+                                                                    <span className="truncate">{staff.email}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-sm">
+                                                                    <Phone className="h-4 w-4 text-muted-foreground" />
+                                                                    <strong>Phone:</strong>
+                                                                    <span>{staff.phone || 'N/A'}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-sm">
+                                                                    <Cake className="h-4 w-4 text-muted-foreground" />
+                                                                    <strong>DOB:</strong>
+                                                                    <span>{staff.dob ? format(parseISO(staff.dob), 'PPP') : 'N/A'}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-sm">
+                                                                    <User className="h-4 w-4 text-muted-foreground" />
+                                                                    <strong>Aadhaar:</strong>
+                                                                    <span>{staff.aadhaar || 'N/A'}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-sm">
+                                                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                                                    <strong>PAN:</strong>
+                                                                    <span>{staff.pan || 'N/A'}</span>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </React.Fragment>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="h-24 text-center">
+                                                No staff have joined your shop yet.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </Card>
                 </div>
             </div>
         </main>
     );
 }
-
-    

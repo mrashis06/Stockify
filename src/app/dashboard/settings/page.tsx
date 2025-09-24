@@ -116,7 +116,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto p-4 md:p-0">
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
       </header>

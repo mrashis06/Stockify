@@ -101,9 +101,9 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                 />
             )}
             
-            <header className="flex items-center justify-between mb-6">
+            <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
-                <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto">
                     <Plus className="mr-2 h-4 w-4" /> Open a Bottle
                 </Button>
             </header>
