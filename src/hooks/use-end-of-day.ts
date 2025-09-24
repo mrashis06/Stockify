@@ -39,31 +39,24 @@ export function useEndOfDay() {
 
       // Handle On-Bar Sales
       const onBarSnap = await getDocs(collection(db, 'onBarInventory'));
-      const onBarSales = new Map<string, number>();
       let onBarTotalValue = 0;
 
       onBarSnap.forEach(doc => {
         const item = doc.data() as OnBarItem;
-        if (item.salesVolume > 0 && item.inventoryId !== 'manual') {
-            const pegValue = (item.price / item.totalVolume) * item.salesVolume;
-            onBarTotalValue += pegValue;
-            
-            // Group on-bar sales by category for reporting
-            const masterItem = masterInventory.get(item.inventoryId);
-            if(masterItem) {
-                const category = masterItem.category || 'Uncategorized';
-                onBarSales.set(category, (onBarSales.get(category) || 0) + pegValue);
-            }
+        if (item.salesVolume > 0 && item.price > 0 && item.totalVolume > 0 && item.inventoryId !== 'manual') {
+            const pricePerMl = item.price / item.totalVolume;
+            const saleValue = item.salesVolume * pricePerMl;
+            onBarTotalValue += saleValue;
         }
-        // Reset salesVolume for the next day
+        // Reset salesVolume for the next day for all on-bar items
         batch.update(doc.ref, { salesVolume: 0 });
       });
 
       // Add On-Bar sales to today's daily doc for historical reporting
-      if (onBarSnap.docs.length > 0) {
+      if (onBarTotalValue > 0) {
           const onBarSaleLog = {
-              sales: onBarTotalValue,
-              price: 1,
+              sales: onBarTotalValue, // This is the total monetary value now
+              price: 1, // Price is 1 as sales is already the value
               category: "On-Bar Sales", // Special category for reports
           }
           batch.set(dailyDocRef, { 'on-bar-sales': onBarSaleLog }, { merge: true });
@@ -107,3 +100,5 @@ export function useEndOfDay() {
 
   return { isEndingDay, endOfDayProcess };
 }
+
+    

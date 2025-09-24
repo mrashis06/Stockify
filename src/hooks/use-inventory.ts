@@ -355,6 +355,7 @@ export function useInventory() {
                 inventoryId: inventoryItemId,
                 brand: masterItem.brand,
                 size: masterItem.size,
+                category: masterItem.category,
                 totalVolume: volume,
                 remainingVolume: volume,
                 salesVolume: 0,
@@ -373,3 +374,5 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, openBottleForOnBar };
 }
+
+    

@@ -2,9 +2,9 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Minus, Plus, GlassWater, Loader2, Wine, Beer, ChevronDown } from 'lucide-react';
+import { Minus, Plus, GlassWater, Loader2, Wine, Beer, ChevronDown, IndianRupee } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useOnBarInventory, OnBarItem } from '@/hooks/use-onbar-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
@@ -70,10 +70,26 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     }
+
+    const totalOnBarSales = useMemo(() => {
+        return onBarInventory.reduce((total, item) => {
+            if (item.salesVolume > 0 && item.price > 0 && item.totalVolume > 0) {
+                const pricePerMl = item.price / item.totalVolume;
+                return total + (item.salesVolume * pricePerMl);
+            }
+            return total;
+        }, 0);
+    }, [onBarInventory]);
     
     if (loading) {
         return null;
     }
+
+    const getPriceForPeg = (item: OnBarItem, pegSize: number) => {
+        if (!item.price || !item.totalVolume) return 0;
+        const pricePerMl = item.price / item.totalVolume;
+        return Math.round(pricePerMl * pegSize);
+    };
 
     return (
         <main className="flex-1 p-4 md:p-8">
@@ -91,6 +107,19 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     <Plus className="mr-2 h-4 w-4" /> Open a Bottle
                 </Button>
             </header>
+            
+             <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+                <CardHeader>
+                    <CardTitle className="text-lg font-medium text-primary">Today's On-Bar Sales</CardTitle>
+                    <CardDescription>Total value of pegs sold from open bottles today.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-3xl font-bold text-foreground flex items-center">
+                        <IndianRupee className="h-7 w-7 mr-2" />
+                        {totalOnBarSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                </CardContent>
+            </Card>
 
             {onBarInventory.length === 0 ? (
                 <div className="text-center py-16 border-2 border-dashed rounded-lg">
@@ -143,13 +172,16 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="center" className="w-56">
                                                     <DropdownMenuItem onClick={() => handleSell(item.id, 30)} disabled={item.remainingVolume < 30}>
-                                                        Sell 30ml
+                                                        <span>Sell 30ml</span>
+                                                        <span className="ml-auto text-muted-foreground text-xs">₹{getPriceForPeg(item, 30)}</span>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleSell(item.id, 60)} disabled={item.remainingVolume < 60}>
-                                                        Sell 60ml
+                                                        <span>Sell 60ml</span>
+                                                        <span className="ml-auto text-muted-foreground text-xs">₹{getPriceForPeg(item, 60)}</span>
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleSell(item.id, 90)} disabled={item.remainingVolume < 90}>
-                                                        Sell 90ml
+                                                        <span>Sell 90ml</span>
+                                                        <span className="ml-auto text-muted-foreground text-xs">₹{getPriceForPeg(item, 90)}</span>
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -183,3 +215,5 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
+
+    
