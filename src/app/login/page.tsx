@@ -25,7 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Package } from 'lucide-react';
+import { Loader2, Package, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,7 +50,10 @@ const LoginForm = ({
   handleEmailSignIn: (e: React.FormEvent, role: 'admin' | 'staff') => Promise<void>;
   authError: string;
   role: 'admin' | 'staff';
-}) => (
+}) => {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
    <form onSubmit={(e) => handleEmailSignIn(e, role)} className="grid gap-4">
       {authError && (
             <Alert variant="destructive" className="mb-2">
@@ -79,14 +82,27 @@ const LoginForm = ({
                   Forgot your password?
               </Link>
           </div>
-        <Input id={`password-${role}`} type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
+        <div className="relative">
+            <Input id={`password-${role}`} type={showPassword ? 'text' : 'password'} required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} className="pr-10" />
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
+                onClick={() => setShowPassword(prev => !prev)}
+            >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
+            </Button>
+        </div>
       </div>
       <Button type="submit" className="w-full" disabled={loading}>
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Login
       </Button>
     </form>
-)
+  )
+}
 
 function LoginContent() {
   const router = useRouter();
