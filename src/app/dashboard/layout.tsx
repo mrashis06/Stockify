@@ -57,8 +57,8 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
   
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
-      <header className="sticky top-0 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6 z-50">
-        <div className="flex items-center gap-2">
+       <header className="sticky top-0 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6 z-50">
+        <div className="flex items-center gap-4">
            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button
@@ -106,14 +106,14 @@ export default function DashboardLayout({ children, params, searchParams }: { ch
 
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 text-lg font-semibold"
+            className="flex items-center gap-2 text-lg font-semibold md:text-base"
           >
             <Package className="h-6 w-6 text-primary" />
             <span className="hidden sm:inline font-bold text-xl">Stockify</span>
           </Link>
         </div>
 
-        <nav className="hidden md:flex flex-1 items-center justify-center gap-6">
+        <nav className="hidden flex-col gap-6 text-sm font-medium md:flex md:flex-row md:items-center md:gap-5 lg:gap-6">
            <NavLink href="/" pageName='Home' onNavigate={handleNav}>
               <Home className="h-4 w-4" />
               Home

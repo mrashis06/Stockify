@@ -81,7 +81,6 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
         description: "Failed to sign in. Please check your credentials.",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -114,7 +113,6 @@ export default function LoginPage({ params, searchParams }: { params: { slug: st
           variant: "destructive",
         });
       }
-    } finally {
       setGoogleLoading(false);
     }
   };

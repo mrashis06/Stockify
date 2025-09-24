@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import React from 'react';
+import React, { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { ADMIN_UID } from '@/lib/constants';
+import { Loader2 } from 'lucide-react';
 
 export default function SignupPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const router = useRouter();
@@ -28,15 +29,18 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     if (!name) {
       toast({
         title: "Name is required",
         description: "Please enter your name.",
         variant: "destructive",
       });
+      setLoading(false);
       return;
     }
     if (password !== confirmPassword) {
@@ -45,6 +49,7 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
         description: "Passwords do not match. Please try again.",
         variant: "destructive",
       });
+      setLoading(false);
       return;
     }
     try {
@@ -69,6 +74,7 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
         description: "Failed to sign up. Please try again.",
         variant: "destructive",
       });
+      setLoading(false);
     }
   };
 
@@ -85,7 +91,7 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
           <form onSubmit={handleEmailSignUp} className="grid gap-4">
             <div className="grid gap-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" type="text" placeholder="John Doe" required value={name} onChange={(e) => setName(e.target.value)} />
+                <Input id="name" type="text" placeholder="John Doe" required value={name} onChange={(e) => setName(e.target.value)} disabled={loading} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email address</Label>
@@ -96,17 +102,19 @@ export default function SignupPage({ params, searchParams }: { params: { slug: s
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
               />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input id="confirm-password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <Input id="confirm-password" type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading} />
             </div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign Up
             </Button>
           </form>

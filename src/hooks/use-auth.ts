@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 export type AppUser = User & {
@@ -17,36 +17,28 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (authUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
       if (authUser) {
         const userDocRef = doc(db, 'users', authUser.uid);
+        const userDoc = await getDoc(userDocRef);
         
-        const userDocUnsubscribe = onSnapshot(userDocRef, (userDoc) => {
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              setUser({ 
-                ...authUser, 
-                displayName: userData.name || authUser.displayName,
-                role: userData.role,
-                name: userData.name || authUser.displayName,
-                dob: userData.dob,
-              });
-            } else {
-              setUser(authUser);
-            }
-            setLoading(false);
-        }, (error) => {
-            console.error("Error listening to user document:", error);
+        if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUser({ 
+              ...authUser, 
+              displayName: userData.name || authUser.displayName,
+              role: userData.role,
+              name: userData.name || authUser.displayName,
+              dob: userData.dob,
+            });
+        } else {
+            // This might happen for a moment during sign-up
             setUser(authUser);
-            setLoading(false);
-        });
-
-        return () => userDocUnsubscribe();
-
+        }
       } else {
         setUser(null);
-        setLoading(false);
       }
+      setLoading(false);
     });
 
     return () => unsubscribe();
