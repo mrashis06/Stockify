@@ -1,20 +1,37 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
+type Bubble = {
+    id: number;
+    cx: number;
+    cy: number;
+    r: number;
+    duration: string;
+    delay: string;
+    xEnd: string;
+};
+
 const AnimatedGlass = () => {
-    // Generate random values for bubbles
-    const bubbles = Array.from({ length: 15 }).map((_, i) => ({
-      id: i,
-      cx: 35 + Math.random() * 30, // Random x position within the liquid
-      cy: 180, // Start at the bottom
-      r: Math.random() * 1.5 + 0.5, // Random radius
-      duration: `${3 + Math.random() * 4}s`, // Random duration
-      delay: `${Math.random() * 5}s`, // Random delay
-      xEnd: `${(Math.random() - 0.5) * 20}px`, // Random horizontal drift
-    }));
+    const [bubbles, setBubbles] = useState<Bubble[]>([]);
+
+    useEffect(() => {
+        // Generate random values for bubbles only on the client
+        const generateBubbles = () => {
+            return Array.from({ length: 15 }).map((_, i) => ({
+                id: i,
+                cx: 35 + Math.random() * 30, // Random x position within the liquid
+                cy: 180, // Start at the bottom
+                r: Math.random() * 1.5 + 0.5, // Random radius
+                duration: `${3 + Math.random() * 4}s`, // Random duration
+                delay: `${Math.random() * 5}s`, // Random delay
+                xEnd: `${(Math.random() - 0.5) * 20}px`, // Random horizontal drift
+            }));
+        };
+        setBubbles(generateBubbles());
+    }, []);
 
     return (
         <div className="relative w-48 h-64 flex items-center justify-center">
