@@ -29,7 +29,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
-  const [isMobileMenuOpen, useState] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   useEffect(() => {
     if (!authLoading) {
@@ -53,7 +53,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   };
   
   const handleNav = (path: string, pageName: string) => {
-    useState(false);
+    setIsMobileMenuOpen(false);
     showLoader(pageName, path);
   }
   
@@ -83,7 +83,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen w-full flex-col bg-background">
        <header className="sticky top-0 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6 z-50">
         <div className="flex items-center gap-4">
-           <Sheet open={isMobileMenuOpen} onOpenChange={useState}>
+           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="outline"
@@ -172,4 +172,3 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
