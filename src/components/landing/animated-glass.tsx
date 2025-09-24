@@ -34,8 +34,8 @@ const AnimatedGlass = () => {
             <svg viewBox="0 0 100 150" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <linearGradient id="liquidGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" style={{ stopColor: '#FFD700', stopOpacity: 1 }} />
-                        <stop offset="100%" style={{ stopColor: '#F5B000', stopOpacity: 1 }} />
+                        <stop offset="0%" className="animate-[cycle-liquid-color_12s_ease-in-out_infinite]" />
+                        <stop offset="100%" className="animate-[cycle-liquid-color_12s_ease-in-out_infinite] [animation-delay:-6s]" />
                     </linearGradient>
                     <clipPath id="bottle-mask">
                          <path d="M 35,140 L 35,60 C 35,50 30,40 40,40 L 60,40 C 70,40 65,50 65,60 L 65,140 Z" />
@@ -50,25 +50,27 @@ const AnimatedGlass = () => {
                 </defs>
 
                 {/* Bottle Outline */}
-                <path d="M 35,140 L 35,60 C 35,50 30,40 40,40 L 60,40 C 70,40 65,50 65,60 L 65,140 Z" 
-                    fill="hsl(var(--card-foreground) / 0.05)" 
-                    stroke="hsl(var(--card-foreground) / 0.2)" 
-                    strokeWidth="0.5"
-                />
-                 {/* Neck */}
-                <path
-                    d="M40 40 L40 20 L60 20 L60 40 Z"
-                    fill="hsl(var(--card-foreground) / 0.05)"
-                    stroke="hsl(var(--card-foreground) / 0.2)" 
-                    strokeWidth="0.5"
-                />
-                {/* Cork */}
-                <path
-                    d="M42 0H58V20H42V0Z"
-                    className="fill-current text-amber-900/80"
-                    stroke="hsl(var(--card-foreground) / 0.2)" 
-                    strokeWidth="0.5"
-                />
+                <g className="drop-shadow-lg">
+                    <path d="M 35,140 L 35,60 C 35,50 30,40 40,40 L 60,40 C 70,40 65,50 65,60 L 65,140 Z" 
+                        fill="hsl(var(--card-foreground) / 0.05)" 
+                        stroke="hsl(var(--card-foreground) / 0.2)" 
+                        strokeWidth="0.5"
+                    />
+                     {/* Neck */}
+                    <path
+                        d="M40 40 L40 20 L60 20 L60 40 Z"
+                        fill="hsl(var(--card-foreground) / 0.05)"
+                        stroke="hsl(var(--card-foreground) / 0.2)" 
+                        strokeWidth="0.5"
+                    />
+                    {/* Cork */}
+                    <path
+                        d="M42 0H58V20H42V0Z"
+                        className="fill-current text-amber-900/80"
+                        stroke="hsl(var(--card-foreground) / 0.2)" 
+                        strokeWidth="0.5"
+                    />
+                </g>
 
 
                 {/* Liquid and Bubbles */}
@@ -105,6 +107,7 @@ const AnimatedGlass = () => {
                 </g>
 
                 {/* Highlights */}
+                <path d="M 38,135 Q 40,65 38,45" fill="none" stroke="white" strokeWidth="0.5" strokeOpacity="0.3"/>
                 <path d="M 32,138 Q 50,142 68,138" fill="none" stroke="white" strokeWidth="0.7" strokeOpacity="0.2"/>
             </svg>
             <div className="absolute inset-0 bg-amber-500/10 dark:bg-amber-400/20 rounded-full blur-2xl -z-10 animate-[pulse-glow_5s_ease-in-out_infinite]" />

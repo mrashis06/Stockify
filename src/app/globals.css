@@ -177,3 +177,10 @@
     transform: scale(1);
   }
 }
+
+@keyframes cycle-liquid-color {
+  0%, 100% { stop-color: #FFD700; } /* Amber */
+  25% { stop-color: #900C3F; } /* Red */
+  50% { stop-color: #2ECC71; } /* Green */
+  75% { stop-color: #EAECEE; } /* White/Transparent */
+}
