@@ -10,14 +10,17 @@ type LoadingStore = {
   progress: number;
   pageName: string;
   dataReady: boolean;
-  _interval: NodeJS.Timeout | null;
-  _path: string | null;
+  _internalState: {
+    intervalId: NodeJS.Timeout | null;
+    timeoutId: NodeJS.Timeout | null;
+    path: string | null;
+  };
 };
 
 type LoadingActions = {
     showLoader: (pageName: string, path: string) => void;
     hideLoader: () => void;
-    setDataReady: (isReady: boolean) => void;
+    setDataReady: () => void;
 };
 
 const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
@@ -25,64 +28,75 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
   progress: 0,
   pageName: '',
   dataReady: false,
-  _interval: null,
-  _path: null,
+  _internalState: {
+    intervalId: null,
+    timeoutId: null,
+    path: null,
+  },
+  
+  hideLoader: () => {
+    const { intervalId, timeoutId } = get()._internalState;
+    if (intervalId) clearInterval(intervalId);
+    if (timeoutId) clearTimeout(timeoutId);
+    set({
+      isLoading: false,
+      progress: 0,
+      dataReady: false,
+      _internalState: { intervalId: null, timeoutId: null, path: null },
+    });
+  },
+
+  setDataReady: () => {
+      set({ dataReady: true });
+      // If progress is already done, this allows hiding the loader.
+      if (get().progress >= 100) {
+          get().hideLoader();
+      }
+  },
+
   showLoader: (pageName, path) => {
-    if (get()._interval) {
-      clearInterval(get()._interval as NodeJS.Timeout);
-    }
+    const { hideLoader } = get();
+    hideLoader(); // Clear any existing loaders immediately
 
-    set({ isLoading: true, progress: 0, pageName, _path: path, dataReady: false });
-
-    const interval = setInterval(() => {
+    set({
+      isLoading: true,
+      progress: 0,
+      pageName,
+      dataReady: false,
+      _internalState: { ...get()._internalState, path: path },
+    });
+    
+    const intervalId = setInterval(() => {
       set(state => {
-        // Increment progress, but don't exceed 99 until we know data is ready
-        const newProgress = Math.min(state.progress + 5, 99);
-        
-        // If the page's data is ready, we can complete the animation to 100%
-        if (state.dataReady) {
-            clearInterval(interval);
-            // Animate the final step to 100%
-            set({ progress: 100 });
-            // Then hide the loader after a short delay for the animation to finish
-            setTimeout(() => {
-                get().hideLoader();
-            }, 300);
+        const newProgress = state.progress + 5;
+        if (newProgress >= 100) {
+          clearInterval(intervalId);
+          if (state.dataReady) {
+            // Data is ready and animation is done, hide immediately.
+            hideLoader();
+          }
+          // Otherwise, wait for setDataReady to call hideLoader.
+          return { progress: 100 };
         }
-        
         return { progress: newProgress };
       });
-    }, 80); // ~1.6 seconds to get to 99%
+    }, 80); // ~1.6 seconds to 100%
 
-    set({ _interval: interval });
-  },
-  hideLoader: () => {
-    // Clear any existing interval to prevent conflicts
-    if (get()._interval) {
-        clearInterval(get()._interval as NodeJS.Timeout);
-    }
-    set({ isLoading: false, progress: 0, _interval: null });
-  },
-  setDataReady: (isReady) => {
-    if (isReady && !get().dataReady) {
-        set({ dataReady: true });
-        
-        // This is the key part: if the animation is already near completion,
-        // and we just received data, we trigger the final step.
-        const currentState = get();
-        if (currentState._interval && currentState.progress >= 90) {
-            clearInterval(currentState._interval);
-            set({ progress: 100 });
-            setTimeout(() => {
-                get().hideLoader();
-            }, 300);
+    // Fallback timeout to prevent getting stuck
+    const timeoutId = setTimeout(() => {
+        const { isLoading, progress } = get();
+        if (isLoading && progress < 100) {
+            // Force completion if still loading after 2.5s
+            hideLoader();
         }
-    }
+    }, 2500);
+
+    set(state => ({
+      _internalState: { ...state._internalState, intervalId, timeoutId },
+    }));
   },
 }));
 
-
-// Create a context
 const LoadingContext = createContext<{
     isLoading: boolean;
     progress: number;
@@ -90,8 +104,6 @@ const LoadingContext = createContext<{
     showLoader: (pageName: string, path: string) => void;
 } | undefined>(undefined);
 
-
-// Create the provider component
 export const LoadingProvider = ({ children }: { children: React.ReactNode }) => {
     const store = useLoadingStore();
     const router = useRouter();
@@ -103,6 +115,22 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
             router.push(path);
         }
     };
+
+    // Handle browser back/forward navigation
+    useEffect(() => {
+        // This part is tricky with Next.js App Router.
+        // A simple solution is to ensure the loader is hidden on path changes
+        // that are not controlled by our `showLoader` function.
+        const handlePathChange = () => {
+             const { isLoading, _internalState } = useLoadingStore.getState();
+             if (isLoading && pathname !== _internalState.path) {
+                 // If the router path changes and it's not our target, something else happened (e.g. back button).
+                 // We can't easily predict the destination page name here, so we just hide the loader.
+                 useLoadingStore.getState().hideLoader();
+             }
+        };
+        handlePathChange();
+    }, [pathname]);
     
     return (
         <LoadingContext.Provider value={{ ...store, showLoader }}>
@@ -111,7 +139,6 @@ export const LoadingProvider = ({ children }: { children: React.ReactNode }) => 
     );
 };
 
-// Custom hook to use the loading context
 export const useLoading = () => {
     const context = useContext(LoadingContext);
     if (context === undefined) {
@@ -120,20 +147,12 @@ export const useLoading = () => {
     return context;
 };
 
-// This hook is for pages to signal when they are done loading data
 export const usePageLoading = (pageIsLoading: boolean) => {
     const { setDataReady, isLoading } = useLoadingStore();
     
     useEffect(() => {
         if (!pageIsLoading && isLoading) {
-            setDataReady(true);
+            setDataReady();
         }
-         // Reset dataReady state when the component unmounts or page starts loading again
-        return () => {
-            // Important: don't set to false if we are no longer in a loading state
-            if (useLoadingStore.getState().isLoading) {
-                 setDataReady(false);
-            }
-        };
     }, [pageIsLoading, isLoading, setDataReady]);
 };
