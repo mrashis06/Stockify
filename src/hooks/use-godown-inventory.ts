@@ -47,6 +47,7 @@ export function useGodownInventory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
+  // This hook now connects the component's loading state to the global loader
   usePageLoading(loading);
 
   useEffect(() => {
