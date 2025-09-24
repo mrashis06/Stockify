@@ -148,7 +148,10 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                             </CardHeader>
                              <CardContent className="flex-1 flex flex-col justify-between p-6">
                                 <div className="text-center flex-1 flex flex-col justify-center">
-                                    <p className="text-5xl font-bold tracking-tighter">{Math.max(0, remaining)}<span className="ml-2 text-xl font-normal text-muted-foreground">{unitLabel}</span></p>
+                                    <div className="flex justify-center items-baseline gap-2">
+                                        <span className="text-5xl font-bold tracking-tighter">{Math.max(0, remaining)}</span>
+                                        <span className="text-xl font-normal text-muted-foreground">{unitLabel}</span>
+                                    </div>
                                     <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1">Remaining</p>
                                     <div className="my-6">
                                         <div className="relative h-2 bg-muted rounded-full overflow-hidden">
