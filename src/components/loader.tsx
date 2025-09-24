@@ -111,7 +111,7 @@ export default function Loader() {
         <h2 className="text-xl font-bold text-foreground dark:drop-shadow-[0_0_8px_hsl(var(--foreground)/0.5)]">
           {dynamicText}
         </h2>
-        <p className="mt-2 text-sm text-foreground dark:text-white">
+        <p className="mt-2 text-sm text-black dark:text-white">
           Please wait while we prepare your workspace.
         </p>
       </div>
