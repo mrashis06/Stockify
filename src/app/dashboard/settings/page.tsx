@@ -111,7 +111,6 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
 
   const handleLogout = async () => {
     await signOut(auth);
-    router.refresh();
     router.push('/login');
   };
 

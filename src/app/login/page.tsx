@@ -6,7 +6,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   signInWithEmailAndPassword, 
   signOut,
-  AuthError
+  AuthError,
+  setPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -121,6 +123,7 @@ function LoginContent() {
     setLoading(true);
     setAuthError('');
     try {
+      await setPersistence(auth, browserSessionPersistence);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const authenticatedUser = userCredential.user;
 
