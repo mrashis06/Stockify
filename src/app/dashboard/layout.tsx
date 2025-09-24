@@ -3,7 +3,7 @@
 
 import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -24,12 +24,22 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Badge } from '@/components/ui/badge';
 import { useLoading } from '@/hooks/use-loading';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSupportDialogOpen, setIsSupportDialogOpen] = useState(false);
   
   useEffect(() => {
     if (!authLoading) {
@@ -71,6 +81,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
   
   const navItems = [
+      { href: "#", pageName: 'Back', icon: ArrowLeft, label: ""},
       { href: "/", pageName: 'Home', icon: Home, label: "Home" },
       { href: "/dashboard", pageName: 'Dashboard', icon: LayoutDashboard, label: "Dashboard" },
       { href: "/dashboard/inventory", pageName: 'Inventory', icon: Warehouse, label: "Inventory" },
@@ -83,6 +94,26 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
+       <AlertDialog open={isSupportDialogOpen} onOpenChange={setIsSupportDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <HelpCircle className="h-5 w-5 text-primary"/> Support Information
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                       For any help or issues, please contact the administrator using the details below.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="text-sm space-y-2">
+                    <p><strong>WhatsApp:</strong> <a href="tel:9123849124" className="text-primary underline">9123849124</a></p>
+                    <p><strong>Email:</strong> <a href="mailto:mrashis0603@gmail.com" className="text-primary underline">mrashis0603@gmail.com</a></p>
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogAction onClick={() => setIsSupportDialogOpen(false)}>Close</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
        <header className="sticky top-0 flex h-16 items-center justify-between gap-4 border-b bg-card px-4 md:px-6 z-50">
         <div className="flex items-center gap-4">
            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
@@ -103,10 +134,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </SheetHeader>
                 <nav className="grid gap-6 text-lg font-medium mt-8">
                      {navItems.map(item => (
-                        <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
-                            <item.icon className="h-5 w-5" />
-                            {item.label}
-                        </NavLink>
+                        item.label && (
+                           <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
+                                <item.icon className="h-5 w-5" />
+                                {item.label}
+                            </NavLink>
+                        )
                     ))}
                 </nav>
             </SheetContent>
@@ -122,15 +155,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="hidden flex-col gap-6 text-sm font-medium md:flex md:flex-row md:items-center md:gap-5 lg:gap-6">
-           <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
-              <ArrowLeft className="h-4 w-4" />
-              <span className="sr-only">Back</span>
-           </Button>
            {navItems.map(item => (
-              <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-              </NavLink>
+              item.href === "#" ? (
+                 <Button key={item.pageName} variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
+                    <item.icon className="h-4 w-4" />
+                    <span className="sr-only">{item.pageName}</span>
+                 </Button>
+              ) : item.label ? (
+                <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                </NavLink>
+              ) : null
             ))}
         </nav>
         
@@ -161,7 +197,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Link href="/dashboard/settings">
                 <DropdownMenuItem>Settings</DropdownMenuItem>
               </Link>
-              <DropdownMenuItem>Support</DropdownMenuItem>
+              {user.role === 'staff' && (
+                <DropdownMenuItem onSelect={() => setIsSupportDialogOpen(true)}>Support</DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
