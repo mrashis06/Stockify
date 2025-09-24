@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { format, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, eachDayOfInterval, isSameDay, parse } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc } from 'firebase/firestore';
@@ -33,6 +33,11 @@ interface jsPDFWithAutoTable extends jsPDF {
 
 type DailyLog = { [itemId: string]: { brand: string; size: string; sales: number; price: number; category: string } };
 
+type ReportDataEntry = {
+    date: string;
+    log: DailyLog;
+}
+
 type SoldItem = {
     productId: string;
     brand: string;
@@ -43,12 +48,15 @@ type SoldItem = {
     totalAmount: number;
 };
 
+type DatedSoldItem = SoldItem & { date: string };
+
+
 export default function ReportsPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const [date, setDate] = useState<DateRange | undefined>({
         from: new Date(),
         to: new Date(),
     });
-    const [reportData, setReportData] = useState<DailyLog[]>([]);
+    const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
     usePageLoading(loading);
@@ -59,7 +67,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             return;
         }
         setLoading(true);
-        const data: DailyLog[] = [];
+        const data: ReportDataEntry[] = [];
         const interval = {
             start: range.from,
             end: range.to || range.from,
@@ -72,7 +80,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                 const dailyDocRef = doc(db, 'dailyInventory', dateStr);
                 const docSnap = await getDoc(dailyDocRef);
                 if (docSnap.exists()) {
-                    data.push(docSnap.data() as DailyLog);
+                    data.push({ date: dateStr, log: docSnap.data() as DailyLog });
                 }
             }
             setReportData(data);
@@ -97,12 +105,12 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     };
 
 
-    const detailedSalesData = useMemo((): SoldItem[] => {
+    const aggregatedSalesData = useMemo((): SoldItem[] => {
         const salesMap = new Map<string, SoldItem>();
 
-        reportData.forEach(dailyLog => {
-            for (const productId in dailyLog) {
-                const item = dailyLog[productId];
+        reportData.forEach(entry => {
+            for (const productId in entry.log) {
+                const item = entry.log[productId];
                 if (item.sales && item.sales > 0 && item.price && item.brand) {
                     const existingEntry = salesMap.get(productId);
                     if (existingEntry) {
@@ -126,8 +134,30 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         return Array.from(salesMap.values()).sort((a, b) => a.brand.localeCompare(b.brand));
     }, [reportData]);
 
+    const datedSalesDataForExport = useMemo((): DatedSoldItem[] => {
+        const sales: DatedSoldItem[] = [];
+        reportData.forEach(entry => {
+             for (const productId in entry.log) {
+                const item = entry.log[productId];
+                if (item.sales && item.sales > 0 && item.price && item.brand) {
+                    sales.push({
+                        date: entry.date,
+                        productId,
+                        brand: item.brand,
+                        size: item.size,
+                        category: item.category,
+                        price: item.price,
+                        unitsSold: item.sales,
+                        totalAmount: item.sales * item.price,
+                    });
+                }
+            }
+        });
+        return sales.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.brand.localeCompare(b.brand));
+    }, [reportData]);
+
     const reportTotals = useMemo(() => {
-        return detailedSalesData.reduce(
+        return aggregatedSalesData.reduce(
             (totals, item) => {
                 totals.totalUnits += item.unitsSold;
                 totals.grandTotal += item.totalAmount;
@@ -135,26 +165,13 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             },
             { totalUnits: 0, grandTotal: 0 }
         );
-    }, [detailedSalesData]);
+    }, [aggregatedSalesData]);
 
 
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
         const tableColumn = ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
-        const tableRows: (string | number)[][] = [];
-
-        detailedSalesData.forEach(item => {
-            const rowData = [
-                item.brand,
-                item.size,
-                item.category,
-                `Rs. ${item.price.toFixed(2)}`,
-                item.unitsSold,
-                `Rs. ${item.totalAmount.toFixed(2)}`
-            ];
-            tableRows.push(rowData);
-        });
-
+        
         const startDate = date?.from ? format(date.from, 'PPP') : '';
         const endDate = date?.to ? format(date.to, 'PPP') : startDate;
         
@@ -163,45 +180,119 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             ? `Sales Statement for ${startDate}`
             : `Sales Statement: ${startDate} to ${endDate}`;
 
-        doc.autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            foot: [
-                ['Total', '', '', '', reportTotals.totalUnits, `Rs. ${reportTotals.grandTotal.toFixed(2)}`]
-            ],
-            startY: 20,
-            headStyles: {
-                fillColor: [22, 163, 74], 
-                textColor: [255, 255, 255],
-                fontStyle: 'bold'
-            },
-            footStyles: {
-                fillColor: [244, 244, 245],
-                textColor: [20, 20, 20],
-                fontStyle: 'bold',
-            },
-            didDrawPage: (data) => {
-                doc.setFontSize(16);
-                doc.setTextColor(40);
-                doc.text(title, data.settings.margin.left, 15);
-            },
+        let grandTotalUnits = 0;
+        let grandTotalAmount = 0;
+
+        const salesByDate = datedSalesDataForExport.reduce((acc, item) => {
+            (acc[item.date] = acc[item.date] || []).push(item);
+            return acc;
+        }, {} as Record<string, DatedSoldItem[]>);
+
+        let startY = 20;
+
+        doc.setFontSize(16);
+        doc.setTextColor(40);
+        doc.text(title, 14, 15);
+
+        Object.keys(salesByDate).sort().forEach(saleDate => {
+            const items = salesByDate[saleDate];
+            const tableRows: (string | number)[][] = [];
+            let dailyTotalUnits = 0;
+            let dailyTotalAmount = 0;
+
+            items.forEach(item => {
+                const rowData = [
+                    item.brand,
+                    item.size,
+                    item.category,
+                    item.price.toFixed(2),
+                    item.unitsSold,
+                    item.totalAmount.toFixed(2)
+                ];
+                tableRows.push(rowData);
+                dailyTotalUnits += item.unitsSold;
+                dailyTotalAmount += item.totalAmount;
+            });
+
+            grandTotalUnits += dailyTotalUnits;
+            grandTotalAmount += dailyTotalAmount;
+            
+            const dateObj = parse(saleDate, 'yyyy-MM-dd', new Date());
+
+            doc.autoTable({
+                head: [tableColumn],
+                body: tableRows,
+                foot: [
+                    ['Daily Total', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)]
+                ],
+                startY: startY + 5,
+                headStyles: {
+                    fillColor: [40, 40, 40], 
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold'
+                },
+                footStyles: {
+                    fillColor: [244, 244, 245],
+                    textColor: [20, 20, 20],
+                    fontStyle: 'bold',
+                },
+                didDrawPage: (data) => {
+                    if (data.pageNumber === 1 && startY === 20) { // Only for first page header
+                        doc.setFontSize(16);
+                        doc.setTextColor(40);
+                        doc.text(title, data.settings.margin.left, 15);
+                    }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'head' && data.column.dataKey === 'Total Amount') {
+                        data.cell.styles.halign = 'right';
+                    }
+                    if (data.section === 'body' && (data.column.dataKey === 'Price' || data.column.dataKey === 'Units Sold' || data.column.dataKey === 'Total Amount')) {
+                        data.cell.styles.halign = 'right';
+                    }
+                },
+                // Add a title for each day's table
+                willDrawPage: (data) => {
+                     doc.setFontSize(12);
+                     doc.setFont('helvetica', 'bold');
+                     doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, startY);
+                }
+            });
+
+            startY = (doc as any).lastAutoTable.finalY + 10;
         });
+
+        if (!isSingleDay) {
+            doc.autoTable({
+                body: [
+                    [`Grand Total`, ``, ``, ``, grandTotalUnits, grandTotalAmount.toFixed(2)]
+                ],
+                startY: startY,
+                theme: 'striped',
+                bodyStyles: {
+                    fontStyle: 'bold',
+                    fontSize: 12,
+                    fillColor: [22, 163, 74],
+                    textColor: [255,255,255]
+                }
+            })
+        }
         
         const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
         doc.save(`sales_statement_${fileDate}.pdf`);
     };
 
     const handleExportCSV = () => {
-        const header = ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
+        const header = ["Date", "Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
         let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
         
-        detailedSalesData.forEach(item => {
-            const row = [item.brand, item.size, item.category, item.price, item.unitsSold, item.totalAmount].join(",");
+        datedSalesDataForExport.forEach(item => {
+            const row = [item.date, item.brand, item.size, item.category, item.price, item.unitsSold, item.totalAmount].join(",");
             csvContent += row + "\n";
         });
 
         csvContent += "\n";
-        csvContent += `Total,,,${reportTotals.totalUnits},${reportTotals.grandTotal}\n`;
+        csvContent += `Grand Total,,,,${reportTotals.totalUnits},${reportTotals.grandTotal}\n`;
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -226,11 +317,11 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
           <p className="text-muted-foreground">Detailed sales transaction report</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={handleExportPDF} disabled={loading || detailedSalesData.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={handleExportPDF} disabled={loading || datedSalesDataForExport.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
                 <Download className="mr-2 h-4 w-4" />
                 Export to PDF
             </Button>
-             <Button onClick={handleExportCSV} disabled={loading || detailedSalesData.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white">
+             <Button onClick={handleExportCSV} disabled={loading || datedSalesDataForExport.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white">
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Export to CSV
             </Button>
@@ -290,6 +381,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                     <CardTitle>
                         Sales Details for {date?.from ? (isSameDay(date.from, date.to || date.from) ? format(date.from, 'PPP') : `${format(date.from, 'PPP')} to ${format(date.to || date.from, 'PPP')}`) : 'selected date'}
                     </CardTitle>
+                    <CardDescription>This is an aggregated summary for the selected period. Date-wise details are available in the exports.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <div className="overflow-x-auto">
@@ -305,8 +397,8 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {detailedSalesData.length > 0 ? (
-                                    detailedSalesData.map(item => (
+                                {aggregatedSalesData.length > 0 ? (
+                                    aggregatedSalesData.map(item => (
                                         <TableRow key={item.productId}>
                                             <TableCell className="font-medium">{item.brand}</TableCell>
                                             <TableCell>{item.size}</TableCell>
@@ -343,4 +435,5 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
+
 
