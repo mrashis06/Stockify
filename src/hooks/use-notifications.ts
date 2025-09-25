@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, getDoc, writeBatch, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from './use-auth';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,7 +11,7 @@ export type Notification = {
     id: string;
     title: string;
     description: string;
-    read: boolean;
+    readBy: string[]; // Array of user UIDs who have read it
     createdAt: any; // Firestore Timestamp
     type: 'low-stock' | 'info' | 'staff-request' | 'staff-broadcast';
     link?: string;
@@ -19,7 +19,7 @@ export type Notification = {
     author?: string; // Who sent the notification
 };
 
-export type NotificationData = Omit<Notification, 'id' | 'createdAt' | 'read'>;
+export type NotificationData = Omit<Notification, 'id' | 'createdAt' | 'readBy'>;
 
 export function useNotifications() {
     const { user } = useAuth();
@@ -37,7 +37,12 @@ export function useNotifications() {
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const allNotifications: Notification[] = [];
                 snapshot.forEach(doc => {
-                    allNotifications.push({ id: doc.id, ...doc.data() } as Notification);
+                    const data = doc.data();
+                    allNotifications.push({ 
+                        id: doc.id, 
+                        readBy: [], // Ensure readBy is always an array
+                        ...data,
+                     } as Notification);
                 });
 
                 // Filter based on user role
@@ -63,22 +68,14 @@ export function useNotifications() {
     }, [user]);
 
     const markAsRead = async (notificationId: string) => {
-        if (user && user.shopId) {
+        if (user && user.shopId && user.uid) {
             const notifRef = doc(db, `shops/${user.shopId}/notifications`, notificationId);
             try {
-                // To mark a broadcast as read for a specific user, we'd need a more complex system
-                // (e.g., a 'readBy' array on the notification). For simplicity, we'll mark the main doc.
-                // This means if one staff reads it, it appears read for all. This is a reasonable MVP tradeoff.
-                const notification = notifications.find(n => n.id === notificationId);
-                if(notification && notification.type === 'staff-broadcast' && user.role === 'staff') {
-                    // Don't mark broadcasts as globally read, just hide it client-side for this user.
-                    // A proper implementation would track read status per user.
-                    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
-                    return;
-                }
-                
-                await updateDoc(notifRef, { read: true });
-
+                // Add the current user's UID to the 'readBy' array.
+                // arrayUnion prevents duplicates.
+                await updateDoc(notifRef, { 
+                    readBy: arrayUnion(user.uid)
+                });
             } catch (error) {
                 console.error("Error marking notification as read:", error);
             }
@@ -96,7 +93,7 @@ export const createAdminNotification = async (shopId: string, data: Omit<Notific
         await addDoc(notificationRef, {
             ...data,
             target: 'admin',
-            read: false,
+            readBy: [],
             createdAt: serverTimestamp(),
         });
     } catch (error) {
@@ -105,7 +102,7 @@ export const createAdminNotification = async (shopId: string, data: Omit<Notific
 };
 
 // Function for creating staff-targeted broadcast notifications
-export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target'> & { title?: string }) => {
+export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target'>) => {
      try {
         const notificationRef = collection(db, `shops/${shopId}/notifications`);
         
@@ -113,10 +110,12 @@ export const createStaffBroadcast = async (shopId: string, data: Omit<Notificati
             ...data,
             title: data.title || "Message from Admin",
             target: 'staff',
-            read: false,
+            readBy: [],
             createdAt: serverTimestamp(),
         });
     } catch (error) {
         console.error("Failed to create staff broadcast:", error);
     }
 };
+
+    

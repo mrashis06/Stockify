@@ -35,9 +35,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Logo from '@/components/ui/logo';
-import { useNotifications } from '@/hooks/use-notifications';
+import { useNotifications, Notification } from '@/hooks/use-notifications';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDateFormat } from '@/hooks/use-date-format';
+import NotificationDialog from '@/components/dashboard/notification-dialog';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
@@ -47,9 +48,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { formatDate } = useDateFormat();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSupportDialogOpen, setIsSupportDialogOpen] = useState(false);
+  const [isNotificationDialogOpen, setNotificationDialogOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-  
+  const unreadCount = notifications.filter(n => !n.readBy.includes(user?.uid || '')).length;
+
   useEffect(() => {
     if (!authLoading) {
       if (!user) {
@@ -80,10 +83,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   }
 
-  const handleNotificationClick = (notificationId: string, link?: string) => {
-    markAsRead(notificationId);
-    if (link) {
-        router.push(link);
+  const handleNotificationClick = (notification: Notification) => {
+    if (user?.uid && !notification.readBy.includes(user.uid)) {
+        markAsRead(notification.id);
+    }
+
+    if (notification.type === 'staff-broadcast') {
+        setSelectedNotification(notification);
+        setNotificationDialogOpen(true);
+    } else if (notification.link) {
+        router.push(notification.link);
     }
   }
   
@@ -112,6 +121,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
+        {selectedNotification && (
+             <NotificationDialog 
+                isOpen={isNotificationDialogOpen}
+                onOpenChange={setNotificationDialogOpen}
+                notification={selectedNotification}
+             />
+        )}
        <AlertDialog open={isSupportDialogOpen} onOpenChange={setIsSupportDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -207,16 +223,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <DropdownMenuGroup>
                     {notifications.length > 0 ? (
                         <ScrollArea className="h-[300px]">
-                            {notifications.map(n => (
-                                <DropdownMenuItem key={n.id} onSelect={() => handleNotificationClick(n.id, n.link)} className="flex items-start gap-2 cursor-pointer">
-                                    {!n.read && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary" />}
-                                    <div className={n.read ? 'pl-4' : ''}>
+                            {notifications.map(n => {
+                                const isRead = n.readBy.includes(user?.uid || '');
+                                return (
+                                <DropdownMenuItem key={n.id} onSelect={() => handleNotificationClick(n)} className="flex items-start gap-2 cursor-pointer">
+                                    {!isRead && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary" />}
+                                    <div className={isRead ? 'pl-4' : ''}>
                                         <p className="font-semibold">{n.title}</p>
-                                        <p className="text-xs text-muted-foreground">{n.description}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{n.description}</p>
                                         <p className="text-xs text-muted-foreground mt-1">{formatDate(n.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
                                     </div>
                                 </DropdownMenuItem>
-                            ))}
+                            )})}
                         </ScrollArea>
                     ) : (
                         <div className="text-center text-sm text-muted-foreground p-4">
@@ -264,3 +282,5 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+    
