@@ -31,14 +31,9 @@ export function useNotifications() {
             setLoading(true);
             const notificationsRef = collection(db, `shops/${user.shopId}/notifications`);
             
-            let q;
-            if (user.role === 'admin') {
-                // Admin sees low-stock and other admin-targeted notifications
-                 q = query(notificationsRef, where('target', '==', 'admin'), orderBy('createdAt', 'desc'), limit(50));
-            } else {
-                // Staff sees staff-broadcasts
-                 q = query(notificationsRef, where('target', '==', 'staff'), orderBy('createdAt', 'desc'), limit(50));
-            }
+            // Simplified query to avoid composite index requirement.
+            // We will filter by target on the client-side.
+            const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(50));
 
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const allNotifications: Notification[] = [];
@@ -46,12 +41,25 @@ export function useNotifications() {
                     const data = doc.data();
                     allNotifications.push({ 
                         id: doc.id, 
-                        readBy: [], // Ensure readBy is always an array
+                        readBy: data.readBy || [], // Ensure readBy is always an array
                         ...data,
                      } as Notification);
                 });
 
-                setNotifications(allNotifications);
+                // Perform client-side filtering based on user role
+                const userRole = user.role;
+                const filteredNotifications = allNotifications.filter(n => {
+                    if (userRole === 'admin') {
+                        // Admin sees low-stock, info, and other admin-targeted notifications
+                        return n.target === 'admin';
+                    } else if (userRole === 'staff') {
+                        // Staff sees staff-broadcasts
+                        return n.target === 'staff';
+                    }
+                    return false; // Should not happen for logged-in users
+                });
+
+                setNotifications(filteredNotifications);
                 setLoading(false);
             }, (error) => {
                 console.error("Error fetching notifications:", error);
@@ -100,13 +108,13 @@ export const createAdminNotification = async (shopId: string, data: Omit<Notific
 };
 
 // Function for creating staff-targeted broadcast notifications
-export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target' | 'title'> & { title?: string }) => {
+export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target' | 'title'>) => {
      try {
         const notificationRef = collection(db, `shops/${shopId}/notifications`);
         
         await addDoc(notificationRef, {
             ...data,
-            title: data.title || "Message from Admin",
+            title: "Message from Admin",
             target: 'staff',
             readBy: [],
             createdAt: serverTimestamp(),
