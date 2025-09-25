@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLoading } from "@/hooks/use-loading";
 import AnimatedGlass from "@/components/landing/animated-glass";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
+import Logo from "@/components/ui/logo";
 
 const BottleSilhouette = () => (
     <svg width="60" height="150" viewBox="0 0 60 150" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-10 md:w-12">
@@ -35,7 +36,7 @@ const MiniBottleSilhouette = () => (
 )
 
 const WineGlassSilhouette = () => (
-    <svg width="80" height="110" viewBox="0 0 80 110" fill="none" xmlns="http://wwws.w3.org/2000/svg" className="h-auto w-12 md:w-16">
+    <svg width="80" height="110" viewBox="0 0 80 110" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-auto w-12 md:w-16">
         <path d="M10 0 C 10 -5, 70 -5, 70 0 L 75 30 C 75 50, 5 50, 5 30 L 10 0 Z" fill="currentColor"/>
         <path d="M38 50 H 42 V 100 H 38 V 50 Z" fill="currentColor"/>
         <path d="M20 100 H 60 V 105 H 20 V 100 Z" fill="currentColor" />
@@ -94,8 +95,8 @@ export default function Home({ params, searchParams }: { params: { slug: string 
 
         <section className="flex flex-col items-center justify-center text-center flex-grow pt-24 pb-16 w-full z-10">
           <div className="relative z-10 mx-auto max-w-4xl p-4 opacity-0 fade-in-slide-up">
-             <h1 className="text-4xl font-bold tracking-tight md:text-6xl text-foreground">
-              Welcome to Stockify
+            <h1 className="text-4xl font-bold tracking-tight md:text-6xl text-foreground flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+              Welcome to <Logo className="h-12 md:h-16 w-auto" />
             </h1>
             <p className="mt-4 text-lg text-muted-foreground md:text-xl opacity-0 fade-in [animation-delay:0.3s]">
               The perfect place to manage your liquor store inventory.
@@ -120,3 +121,4 @@ export default function Home({ params, searchParams }: { params: { slug: string 
     </div>
   );
 }
+
