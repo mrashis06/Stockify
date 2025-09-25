@@ -31,6 +31,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLoading } from '@/hooks/use-loading';
 import { ADMIN_UIDS } from '@/lib/constants';
+import Logo from '@/components/ui/logo';
 
 // Define LoginForm as a standalone component outside of LoginPage
 const LoginForm = ({
@@ -213,8 +214,8 @@ function LoginContent() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-sm">
         <CardHeader className="text-center">
-           <div className="flex justify-center mb-2">
-              <Package className="h-8 w-8 text-primary" />
+           <div className="flex justify-center mb-4">
+              <Logo className="h-10 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
           <CardDescription>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePathname } from "next/navigation";
+import Logo from "../ui/logo";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,8 +24,7 @@ const Navbar = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <Package className="h-6 w-6 text-primary" />
-          <span className="font-headline text-xl font-bold">Stockify</span>
+          <Logo className="h-8 w-auto" />
         </Link>
         <div className="hidden items-center gap-4 md:flex">
           {showLandingNavbar && <ThemeToggle />}
@@ -44,8 +44,7 @@ const Navbar = () => {
                 <SheetHeader className="border-b pb-4">
                     <SheetTitle>
                         <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
-                            <Package className="h-6 w-6 text-primary" />
-                            <span className="font-headline text-xl font-bold">Stockify</span>
+                            <Logo className="h-8 w-auto" />
                         </Link>
                     </SheetTitle>
                     <SheetDescription className="sr-only">

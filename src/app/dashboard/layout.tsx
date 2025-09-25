@@ -33,6 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import Logo from '@/components/ui/logo';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
@@ -147,8 +148,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             href="/dashboard"
             className="flex items-center gap-2 text-lg font-semibold md:text-base"
           >
-            <Package className="h-6 w-6 text-primary" />
-            <span className="hidden sm:inline font-bold text-xl">Stockify</span>
+            <Logo className="h-8 w-auto" />
           </Link>
         </div>
 
