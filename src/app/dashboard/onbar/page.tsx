@@ -2,27 +2,31 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee, Trash2 } from 'lucide-react';
+import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee, Trash2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { useOnBarInventory, OnBarItem } from '@/hooks/use-onbar-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { useInventory } from '@/hooks/use-inventory';
 import { usePageLoading } from '@/hooks/use-loading';
+import { useEndOfDay } from '@/hooks/use-end-of-day';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { onBarInventory, loading, sellCustomPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
     const { inventory: shopInventory } = useInventory();
+    const { isEndingDay, endOfDayProcess } = useEndOfDay();
     const { toast } = useToast();
     
     usePageLoading(loading);
@@ -30,6 +34,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
     const [isSellItemOpen, setIsSellItemOpen] = useState(false);
     const [sellingItem, setSellingItem] = useState<OnBarItem | null>(null);
+    const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
 
     const handleOpenSellDialog = (item: OnBarItem) => {
         setSellingItem(item);
@@ -74,6 +79,24 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     }
+    
+    const handleEndOfDay = async () => {
+        setIsEndOfDayDialogOpen(false);
+        try {
+            await endOfDayProcess();
+            toast({
+                title: 'End of Day Successful',
+                description: 'Today\'s inventory has been closed and tomorrow\'s has been prepared.'
+            });
+        } catch (error) {
+            console.error("End of day process failed:", error);
+            toast({
+                title: 'End of Day Failed',
+                description: (error as Error).message || 'An unexpected error occurred.',
+                variant: 'destructive',
+            });
+        }
+    };
 
     const totalOnBarSales = useMemo(() => {
         return onBarInventory.reduce((total, item) => total + (item.salesValue || 0), 0);
@@ -100,12 +123,35 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     onSell={handleSell}
                 />
             )}
+
+            <AlertDialog open={isEndOfDayDialogOpen} onOpenChange={setIsEndOfDayDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>End of Day Process</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to close today's inventory? This will finalize all sales and stock for today and prepare the inventory for tomorrow. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleEndOfDay} disabled={isEndingDay}>
+                             {isEndingDay ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Confirm End of Day
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             
             <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
-                <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto">
-                    <Plus className="mr-2 h-4 w-4" /> Open a Bottle
-                </Button>
+                <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
+                    <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                        <Plus className="mr-2 h-4 w-4" /> Open a Bottle
+                    </Button>
+                    <Button onClick={() => setIsEndOfDayDialogOpen(true)} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isEndingDay}>
+                        <LogOut className="mr-2 h-4 w-4" /> End of Day
+                    </Button>
+                </div>
             </header>
             
              <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
