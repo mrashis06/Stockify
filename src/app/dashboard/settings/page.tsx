@@ -63,7 +63,7 @@ const SettingsItem = ({ label, description, value, isToggle = false, onToggleCha
   );
   
   const UserProfileItem = ({ label, description, isLogout = false, onClick }: { label: string, description:string, isLogout?: boolean, onClick?: () => void }) => (
-      <div className="flex items-center justify-between py-4" onClick={onClick}>
+      <div className="flex items-center justify-between p-4" onClick={onClick}>
           <div className="flex flex-col">
               <span className={`font-medium ${isLogout ? 'text-destructive' : ''}`}>{label}</span>
               <span className="text-sm text-muted-foreground">{description}</span>
@@ -191,41 +191,44 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
       </Card>
 
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="divide-y p-0">
             <section>
-                <h2 className="text-xl font-semibold mb-2">App Preferences</h2>
-                <Separator />
-                <SettingsItem label="Language" description="Choose your preferred language for the app interface." value="English" />
-                <Separator />
-                <SettingsItem label="Currency" description="Select the currency for all financial displays." value="Indian Rupee (₹)" />
-                <Separator />
-                <SettingsItem label="Date Format" description="Choose your preferred date format for all date displays." value="DD/MM/YYYY" />
+                <h2 className="text-xl font-semibold mb-2 px-6 pt-6">App Preferences</h2>
+                <div className="px-6">
+                    <Separator />
+                    <SettingsItem label="Language" description="Choose your preferred language for the app interface." value="English" />
+                    <Separator />
+                    <SettingsItem label="Currency" description="Select the currency for all financial displays." value="Indian Rupee (₹)" />
+                    <Separator />
+                    <SettingsItem label="Date Format" description="Choose your preferred date format for all date displays." value="DD/MM/YYYY" />
+                </div>
             </section>
 
-            <section className="mt-8">
-                <h2 className="text-xl font-semibold mb-2">Notifications</h2>
-                <Separator />
-                <SettingsItem label="Low Stock Alerts" description="Receive alerts for low stock levels on specific items." value="" isToggle={true} defaultChecked={true} />
-                <Separator />
-                <SettingsItem label="New Order Notifications" description="Get notified when new orders are placed." value="" isToggle={true} defaultChecked={true} />
-                <Separator />
-                <SettingsItem label="Daily Summary" description="Receive daily summaries of sales and inventory changes." value="" isToggle={true} defaultChecked={false} />
+            <section className="pt-6">
+                <h2 className="text-xl font-semibold mb-2 px-6">Notifications</h2>
+                <div className="px-6">
+                    <Separator />
+                    <SettingsItem label="Low Stock Alerts" description="Receive alerts for low stock levels on specific items." value="" isToggle={true} defaultChecked={true} />
+                    <Separator />
+                    <SettingsItem label="New Order Notifications" description="Get notified when new orders are placed." value="" isToggle={true} defaultChecked={true} />
+                    <Separator />
+                    <SettingsItem label="Daily Summary" description="Receive daily summaries of sales and inventory changes." value="" isToggle={true} defaultChecked={false} />
+                </div>
             </section>
             
-            <section className="mt-8">
-                <h2 className="text-xl font-semibold mb-2">User Profile</h2>
-                <Separator />
-                <Link href="#" className="block hover:bg-muted/50 rounded-md">
-                    <UserProfileItem label="Account Settings" description="Manage your account details and security settings." />
-                </Link>
-                <Separator />
-                <Link href="#" className="block hover:bg-muted/50 rounded-md">
-                    <UserProfileItem label="Subscription Plan" description="View and manage your subscription plan." />
-                </Link>
-                <Separator />
-                 <Button variant="ghost" className="w-full justify-start p-0 h-auto hover:bg-muted/50 rounded-md" onClick={handleLogout}>
-                    <UserProfileItem label="Log Out" description="Log out from the application." isLogout={true} />
-                </Button>
+            <section className="pt-6">
+                <h2 className="text-xl font-semibold mb-2 px-6">User Profile</h2>
+                <div className="divide-y">
+                  <Link href="#" className="block hover:bg-muted/50 rounded-md cursor-pointer">
+                      <UserProfileItem label="Account Settings" description="Manage your account details and security settings." />
+                  </Link>
+                  <Link href="#" className="block hover:bg-muted/50 rounded-md cursor-pointer">
+                      <UserProfileItem label="Subscription Plan" description="View and manage your subscription plan." />
+                  </Link>
+                  <div className="block hover:bg-muted/50 rounded-md cursor-pointer" onClick={handleLogout}>
+                      <UserProfileItem label="Log Out" description="Log out from the application." isLogout={true} />
+                  </div>
+                </div>
             </section>
         </CardContent>
       </Card>
