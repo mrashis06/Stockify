@@ -126,7 +126,28 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const yesterdaysSales = useMemo(() => calculateTotalSales(yesterdaySalesData), [yesterdaySalesData]);
 
   const totalStock = processedInventory.reduce((acc, item) => acc + (item.closing ?? 0), 0);
-  const lowStockItems = processedInventory.filter(item => (item.closing ?? 0) < 10 && (item.closing ?? 0) > 0);
+  
+  const { lowStockItems, outOfStockItems } = useMemo(() => {
+    const lowStock: InventoryItem[] = [];
+    const outOfStock: InventoryItem[] = [];
+
+    processedInventory.forEach(item => {
+        const closingStock = item.closing ?? 0;
+        const wasJustAdded = (item.prevStock ?? 0) === 0 && (item.added ?? 0) > 0;
+
+        if (wasJustAdded) return;
+
+        if (closingStock === 0) {
+            outOfStock.push(item);
+        } else if (closingStock > 0 && closingStock < 10) {
+            lowStock.push(item);
+        }
+    });
+    
+    return { lowStockItems: lowStock, outOfStockItems: outOfStock };
+  }, [processedInventory]);
+
+  const totalAlerts = lowStockItems.length + outOfStockItems.length;
 
   if (loading) {
       // The loader will be displayed by the global state, so we can return null or a minimal placeholder.
@@ -139,6 +160,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         isOpen={isLowStockDialogOpen}
         onOpenChange={setIsLowStockDialogOpen}
         lowStockItems={lowStockItems}
+        outOfStockItems={outOfStockItems}
        />
       <h1 className="text-2xl font-bold tracking-tight mb-6">Dashboard</h1>
       
@@ -183,24 +205,31 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             </p>
           </CardContent>
         </Card>
-        <Card className={lowStockItems.length > 0 ? "bg-destructive/10 border-destructive/30" : ""}>
+        <Card className={totalAlerts > 0 ? "bg-destructive/10 border-destructive/30" : ""}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${lowStockItems.length > 0 ? 'text-destructive': ''}`}>Low Stock Alerts</CardTitle>
-            <TriangleAlert className={`h-4 w-4 ${lowStockItems.length > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
+            <CardTitle className={`text-sm font-medium ${totalAlerts > 0 ? 'text-destructive': ''}`}>Stock Alerts</CardTitle>
+            <TriangleAlert className={`h-4 w-4 ${totalAlerts > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${lowStockItems.length > 0 ? 'text-destructive' : ''}`}>{lowStockItems.length} Items</div>
+            <div className={`text-2xl font-bold ${totalAlerts > 0 ? 'text-destructive' : ''}`}>{totalAlerts} Items</div>
             <div className="mt-2 text-xs">
-                {lowStockItems.length > 0 ? lowStockItems.slice(0, 2).map(item => (
-                    <div key={item.id} className="flex justify-between">
-                        <span>{item.brand} ({item.size})</span>
-                        <span className="font-semibold text-destructive">{item.closing} left</span>
+                {lowStockItems.length > 0 && (
+                    <div className="flex justify-between">
+                        <span>Low Stock</span>
+                        <span className="font-semibold text-destructive">{lowStockItems.length} items</span>
                     </div>
-                )) : (
-                    <p className="text-xs text-muted-foreground">No items are low on stock.</p>
+                )}
+                 {outOfStockItems.length > 0 && (
+                    <div className="flex justify-between">
+                        <span>Out of Stock</span>
+                        <span className="font-semibold text-destructive">{outOfStockItems.length} items</span>
+                    </div>
+                )}
+                {totalAlerts === 0 && (
+                    <p className="text-xs text-muted-foreground">No stock alerts.</p>
                 )}
             </div>
-            {lowStockItems.length > 2 && 
+            {totalAlerts > 0 && 
                 <Button variant="link" size="sm" className="text-xs text-destructive/80 hover:underline mt-2 block text-right h-auto p-0" onClick={() => setIsLowStockDialogOpen(true)}>
                     View all
                 </Button>
