@@ -28,6 +28,8 @@ import { format, subDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { usePageLoading } from './use-loading';
 import type { GodownItem, TransferHistory } from './use-godown-inventory';
+import { createNotification } from './use-notifications';
+import { useAuth } from './use-auth';
 
 export type InventoryItem = {
   id: string;
@@ -49,10 +51,13 @@ const generateProductId = (brand: string, size: string) => {
     return `${brandFormatted}_${sizeFormatted}`;
 }
 
+const LOW_STOCK_THRESHOLD = 10;
+
 export function useInventory() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
   
   usePageLoading(loading);
 
@@ -249,6 +254,8 @@ export function useInventory() {
                     prevStock: prevStock, added: 0, sales: 0
                 };
             }
+
+            const oldClosingStock = (itemInDaily?.prevStock || 0) + (itemInDaily?.added || 0) - (itemInDaily?.sales || 0);
             
             // Handle stock return to godown
             if (field === 'added') {
@@ -306,6 +313,21 @@ export function useInventory() {
             dailyData[id].opening = (dailyData[id].prevStock || 0) + (dailyData[id].added || 0);
             dailyData[id].closing = dailyData[id].opening - (dailyData[id].sales || 0);
 
+            // Check for low stock alert
+            if (field === 'sales') {
+                 const newClosingStock = dailyData[id].closing;
+                 if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
+                    if(user && user.shopId) {
+                         createNotification(user.shopId, {
+                            title: 'Low Stock Alert',
+                            description: `${dailyData[id].brand} (${dailyData[id].size}) is running low. Only ${newClosingStock} units left.`,
+                            type: 'low-stock',
+                            link: '/dashboard/inventory'
+                        });
+                    }
+                 }
+            }
+
             transaction.set(dailyDocRef, dailyData, { merge: true });
         });
 
@@ -322,3 +344,5 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField };
 }
+
+    

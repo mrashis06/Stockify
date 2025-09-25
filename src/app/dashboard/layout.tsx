@@ -3,7 +3,7 @@
 
 import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -15,6 +15,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuGroup,
 } from '@/components/ui/dropdown-menu';
 import NavLink from './nav-link';
 import { useAuth } from '@/hooks/use-auth';
@@ -34,13 +35,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Logo from '@/components/ui/logo';
+import { useNotifications } from '@/hooks/use-notifications';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useDateFormat } from '@/hooks/use-date-format';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
+  const { notifications, markAsRead } = useNotifications();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
+  const { formatDate } = useDateFormat();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSupportDialogOpen, setIsSupportDialogOpen] = useState(false);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
   
   useEffect(() => {
     if (!authLoading) {
@@ -65,7 +73,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   
   const handleNav = (path: string, pageName: string) => {
     setIsMobileMenuOpen(false);
-    showLoader(pageName, path);
+    if (path.startsWith('/')) {
+        showLoader(pageName, path);
+    } else {
+        router.push(path);
+    }
+  }
+
+  const handleNotificationClick = (notificationId: string, link?: string) => {
+    markAsRead(notificationId);
+    if (link) {
+        router.push(link);
+    }
   }
   
   const isAdmin = user?.role === 'admin';
@@ -170,10 +189,44 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         
         <div className="flex items-center gap-2 sm:gap-4">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Bell className="h-5 w-5" />
-            <span className="sr-only">Toggle notifications</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                 <Button variant="ghost" size="icon" className="rounded-full relative">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                        <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+                            {unreadCount}
+                        </span>
+                    )}
+                    <span className="sr-only">Toggle notifications</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                    {notifications.length > 0 ? (
+                        <ScrollArea className="h-[300px]">
+                            {notifications.map(n => (
+                                <DropdownMenuItem key={n.id} onSelect={() => handleNotificationClick(n.id, n.link)} className="flex items-start gap-2 cursor-pointer">
+                                    {!n.read && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary" />}
+                                    <div className={n.read ? 'pl-4' : ''}>
+                                        <p className="font-semibold">{n.title}</p>
+                                        <p className="text-xs text-muted-foreground">{n.description}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{formatDate(n.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
+                                    </div>
+                                </DropdownMenuItem>
+                            ))}
+                        </ScrollArea>
+                    ) : (
+                        <div className="text-center text-sm text-muted-foreground p-4">
+                            No notifications yet.
+                        </div>
+                    )}
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
@@ -211,3 +264,5 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+    

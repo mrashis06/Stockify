@@ -17,6 +17,9 @@ export default function NavLink({ href, children, pageName, onNavigate }: NavLin
     const isActive = pathname === href;
 
     const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+        // Allow default behavior for external links or special schemes
+        if (!href.startsWith('/')) return;
+
         if (pathname !== href) {
             e.preventDefault();
             onNavigate(href, pageName);
@@ -36,3 +39,5 @@ export default function NavLink({ href, children, pageName, onNavigate }: NavLin
         </Link>
     )
 }
+
+    
