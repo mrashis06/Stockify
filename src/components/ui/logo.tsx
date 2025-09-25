@@ -55,10 +55,10 @@ const Logo = React.forwardRef<
                 <g clipPath="url(#circle-clip)">
                     <g className="liquid-slosh">
                         <path 
-                           d="M -5,25 
-                           C 10,20 35,30 50,25 
-                           T 95,25
-                           L 50,50 L -5,50 Z"
+                           d="M -5,28 
+                           C 10,22 20,32 30,26
+                           C 40,20 45,30 55,28
+                           L 55,50 L -5,50 Z"
                            fill="url(#liquid-gradient)"
                         />
                     </g>
@@ -77,3 +77,4 @@ const Logo = React.forwardRef<
 Logo.displayName = "Logo";
 
 export default Logo;
+
