@@ -9,33 +9,67 @@ const Logo = React.forwardRef<
     return (
         <svg
             ref={ref}
-            viewBox="0 0 235 50" // Adjusted for tighter kerning
+            viewBox="0 0 235 50"
             className={cn("text-foreground", className)}
             {...props}
         >
             <style>{`
-                .logo-fill-1 { fill: hsl(var(--foreground)); }
-                .logo-fill-2 { fill: hsl(var(--foreground)); }
+                .logo-fill { fill: hsl(var(--foreground)); }
                 .logo-o-stroke { stroke: hsl(var(--foreground)); }
-                .logo-o-fill { fill: #F57C00; } /* Amber/Orange color */
+
+                @keyframes cycle-liquid-color {
+                    0%, 100% { stop-color: #FFC107; } /* Amber */
+                    33% { stop-color: #9C27B0; } /* Purple/Wine */
+                    66% { stop-color: #E0E0E0; } /* Clear/Vodka */
+                }
+
+                @keyframes slosh {
+                    0%, 100% { transform: translateX(0); }
+                    50% { transform: translateX(-2px); }
+                }
+
+                .liquid-color-cycle {
+                    animation: cycle-liquid-color 15s ease-in-out infinite;
+                }
+                .liquid-slosh {
+                    animation: slosh 4s ease-in-out infinite;
+                }
             `}</style>
             
-            {/* Using text for crisp rendering. Manually kerned. */}
-            <text x="0" y="40" fontSize="50" fontWeight="bold" className="logo-fill-1">St</text>
+            {/* Manually kerned 'St' */}
+            <text x="0" y="40" fontSize="50" fontWeight="bold" className="logo-fill">St</text>
             
-            {/* The custom 'o' - positioned to tightly fit */}
+            {/* The custom animated 'o' */}
             <g transform="translate(60, 0)"> 
                 <defs>
-                    <clipPath id="half-fill">
-                        <rect x="0" y="22.5" width="45" height="22.5" />
+                    <clipPath id="circle-clip">
+                        <circle cx="22.5" cy="22.5" r="21.5" />
                     </clipPath>
+                    <linearGradient id="liquid-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                         <stop offset="0%" className="liquid-color-cycle" />
+                         <stop offset="100%" className="liquid-color-cycle" style={{ animationDelay: '-7.5s' }} />
+                    </linearGradient>
                 </defs>
+
+                {/* Liquid animation, clipped inside the circle */}
+                <g clipPath="url(#circle-clip)">
+                    <g className="liquid-slosh">
+                        <path 
+                           d="M -5,25 
+                           C 10,20 35,30 50,25 
+                           T 95,25
+                           L 50,50 L -5,50 Z"
+                           fill="url(#liquid-gradient)"
+                        />
+                    </g>
+                </g>
+                
+                {/* The circle outline */}
                 <circle cx="22.5" cy="22.5" r="21.5" className="logo-o-stroke" fill="none" strokeWidth="2.5" />
-                <circle cx="22.5" cy="22.5" r="21.5" className="logo-o-fill" clipPath="url(#half-fill)" />
             </g>
 
             {/* Manually kerned 'ckify' part */}
-            <text x="108" y="40" fontSize="50" fontWeight="bold" className="logo-fill-2">ckify</text>
+            <text x="108" y="40" fontSize="50" fontWeight="bold" className="logo-fill">ckify</text>
         </svg>
     );
 });
