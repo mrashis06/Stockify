@@ -20,6 +20,8 @@ import {
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import type { InventoryItem } from "@/hooks/use-inventory";
 import { usePageLoading } from "@/hooks/use-loading";
+import LowStockDialog from "@/components/dashboard/low-stock-dialog";
+import { Button } from "@/components/ui/button";
 
 
 const categories = [
@@ -37,6 +39,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const [todaySalesData, setTodaySalesData] = useState<any>({});
   const [yesterdaySalesData, setYesterdaySalesData] = useState<any>({});
   const { formatDate } = useDateFormat();
+  const [isLowStockDialogOpen, setIsLowStockDialogOpen] = useState(false);
   
   usePageLoading(loading);
 
@@ -123,7 +126,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const yesterdaysSales = useMemo(() => calculateTotalSales(yesterdaySalesData), [yesterdaySalesData]);
 
   const totalStock = processedInventory.reduce((acc, item) => acc + (item.closing ?? 0), 0);
-  const lowStockItems = processedInventory.filter(item => (item.closing ?? 0) < 10);
+  const lowStockItems = processedInventory.filter(item => (item.closing ?? 0) < 10 && (item.closing ?? 0) > 0);
 
   if (loading) {
       // The loader will be displayed by the global state, so we can return null or a minimal placeholder.
@@ -132,6 +135,11 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
   return (
     <main className="flex-1 p-4 md:p-8">
+       <LowStockDialog 
+        isOpen={isLowStockDialogOpen}
+        onOpenChange={setIsLowStockDialogOpen}
+        lowStockItems={lowStockItems}
+       />
       <h1 className="text-2xl font-bold tracking-tight mb-6">Dashboard</h1>
       
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8">
@@ -192,10 +200,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
                     <p className="text-xs text-muted-foreground">No items are low on stock.</p>
                 )}
             </div>
-            {lowStockItems.length > 0 && 
-                <Link href="/dashboard/inventory" className="text-xs text-destructive/80 hover:underline mt-2 block text-right">
+            {lowStockItems.length > 2 && 
+                <Button variant="link" size="sm" className="text-xs text-destructive/80 hover:underline mt-2 block text-right h-auto p-0" onClick={() => setIsLowStockDialogOpen(true)}>
                     View all
-                </Link>
+                </Button>
             }
           </CardContent>
         </Card>
