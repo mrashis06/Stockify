@@ -31,6 +31,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='white' stroke='%23374151' stroke-width='2' /><text x='50' y='55' font-size='24' font-family='Arial, sans-serif' fill='%23374151' text-anchor='middle' dominant-baseline='middle' font-style='italic'>Stockify</text><circle cx='66.5' cy='38' r='2' fill='orange' /></svg>" type="image/svg+xml" />
         {process.env.NEXT_PUBLIC_GA_ID && (
           <>
             <Script
