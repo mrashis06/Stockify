@@ -109,7 +109,7 @@ export default function StaffPage() {
         } else if (user) {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, loading]);
 
     const handleGenerateCode = async () => {
         if (!user || !user.shopId) {
@@ -215,8 +215,6 @@ export default function StaffPage() {
 
     const handleBroadcast = async (data: BroadcastFormValues) => {
         if (!user || !user.shopId) return;
-        const { isSubmitting } = broadcastForm.formState;
-        if (isSubmitting) return;
 
         try {
             await createStaffBroadcast(user.shopId, {
@@ -473,3 +471,5 @@ export default function StaffPage() {
         </main>
     );
 }
+
+    
