@@ -411,7 +411,7 @@ export default function StaffPage() {
                                 )}/>
                                 <Button type="submit" disabled={broadcastForm.formState.isSubmitting} className="w-full">
                                     {broadcastForm.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4"/>}
-                                    Send Broadcast
+                                    Send Message
                                 </Button>
                             </form>
                         </Form>
@@ -534,3 +534,4 @@ export default function StaffPage() {
     
 
     
+
