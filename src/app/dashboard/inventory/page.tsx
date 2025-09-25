@@ -197,14 +197,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         return filteredInventory.reduce((total, item) => total + (item.sales ?? 0) * item.price, 0);
     }, [filteredInventory]);
 
-    const totalOnBarSales = useMemo(() => {
-        return onBarInventory.reduce((total, item) => total + (item.salesValue || 0), 0);
-    }, [onBarInventory]);
-
-    const soldOnBarItems = useMemo(() => {
-        return onBarInventory.filter(item => item.salesVolume > 0);
-    }, [onBarInventory]);
-
   if (loading) {
     return null;
   }
@@ -411,47 +403,12 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                         })}
                         </TableBody>
                          <TableFooter>
-                            <TableRow>
-                                <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right font-bold text-lg">Total Bottle Sales</TableCell>
-                                <TableCell colSpan={2} className="font-bold text-lg">
-                                    <div className="flex items-center">
-                                        <IndianRupee className="h-5 w-5 mr-1 shrink-0" />
-                                        {totalAmount.toLocaleString('en-IN')}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow>
-                                <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right font-medium">Today's On-Bar Sales</TableCell>
-                                <TableCell colSpan={2} className="font-medium">
-                                    <div className="flex items-center">
-                                        <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                        {totalOnBarSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            {soldOnBarItems.length > 0 && (
-                                <>
-                                    {soldOnBarItems.map(item => (
-                                        <TableRow key={`onbar-${item.id}`} className="text-xs">
-                                            <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right italic text-muted-foreground pr-4">
-                                                {item.brand}
-                                            </TableCell>
-                                            <TableCell colSpan={2} className="italic text-muted-foreground">
-                                                {item.category === 'Beer' 
-                                                    ? `${item.salesVolume} units` 
-                                                    : <>{item.salesVolume}<span className="ml-1">ml</span></>
-                                                }
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </>
-                            )}
-                             <TableRow className="border-t-2 border-primary/50">
-                                <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right font-extrabold text-xl text-primary">Grand Total Sales</TableCell>
+                            <TableRow className="border-t-2 border-primary/50">
+                                <TableCell colSpan={showOpening && showClosing ? 9 : 8} className="text-right font-extrabold text-xl text-primary">Total Bottle Sales</TableCell>
                                 <TableCell colSpan={2} className="font-extrabold text-xl text-primary">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-6 w-6 mr-1 shrink-0" />
-                                        {(totalAmount + totalOnBarSales).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </div>
                                 </TableCell>
                             </TableRow>
