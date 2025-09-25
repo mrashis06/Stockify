@@ -203,8 +203,6 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                     <Separator />
                     <SettingsItem label="Language" description="Choose your preferred language for the app interface.">English</SettingsItem>
                     <Separator />
-                    <SettingsItem label="Currency" description="Select the currency for all financial displays.">Indian Rupee (₹)</SettingsItem>
-                    <Separator />
                     <SettingsItem label="Date Format" description="Choose your preferred date format for all date displays." isInteractive={true}>
                         <Select value={dateFormat} onValueChange={setDateFormat}>
                             <SelectTrigger>
