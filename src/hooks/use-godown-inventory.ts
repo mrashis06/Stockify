@@ -18,11 +18,17 @@ import {
   query,
   where,
   orderBy,
-  Timestamp
+  Timestamp,
+  arrayUnion
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
 import { usePageLoading } from './use-loading';
+
+export type TransferHistory = {
+  date: Timestamp;
+  quantity: number;
+};
 
 export type GodownItem = {
   id: string;
@@ -32,7 +38,7 @@ export type GodownItem = {
   category: string;
   quantity: number;
   dateAdded: Timestamp;
-  dateTransferred?: Timestamp;
+  transferHistory?: TransferHistory[];
 };
 
 // Generates a Firestore-safe ID from brand and size for grouping
@@ -65,7 +71,7 @@ export function useGodownInventory() {
   }, []);
 
 
-  const addGodownItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'dateTransferred'>) => {
+  const addGodownItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'transferHistory'>) => {
     setSaving(true);
     try {
         const productId = generateProductId(newItemData.brand, newItemData.size);
@@ -75,6 +81,7 @@ export function useGodownInventory() {
             ...newItemData,
             productId: productId,
             dateAdded: serverTimestamp(),
+            transferHistory: [],
         });
 
     } catch (error) {
@@ -161,6 +168,7 @@ export function useGodownInventory() {
 
 
             let remainingToTransfer = quantityToTransfer;
+            const transferTimestamp = Timestamp.now();
 
             for (const batch of godownBatches) {
                 if (remainingToTransfer <= 0) break;
@@ -168,10 +176,15 @@ export function useGodownInventory() {
                 const batchRef = doc(db, 'godownInventory', batch.id);
                 const transferAmount = Math.min(batch.quantity, remainingToTransfer);
 
-                const updateData: {quantity?: number, dateTransferred: Timestamp} = {
-                    dateTransferred: Timestamp.now()
+                const newHistoryEntry: TransferHistory = {
+                    date: transferTimestamp,
+                    quantity: transferAmount,
                 };
-
+                
+                const updateData: { quantity?: number; transferHistory: any } = {
+                    transferHistory: arrayUnion(newHistoryEntry)
+                };
+                
                 if (batch.quantity - transferAmount <= 0) {
                     transaction.delete(batchRef);
                 } else {

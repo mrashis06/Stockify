@@ -38,6 +38,7 @@ import {
 import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // A new type for our grouped data structure
 type GroupedGodownItem = {
@@ -69,7 +70,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const { toast } = useToast();
 
-    const handleAddItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'dateTransferred'>) => {
+    const handleAddItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'transferHistory'>) => {
         try {
             await addGodownItem(newItemData);
             toast({ title: 'Success', description: 'New batch added to godown.' });
@@ -180,10 +181,12 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                 isOpen={isTransferOpen}
                 onOpenChange={setIsTransferOpen}
                 item={{
-                    ...transferringItem,
                     // The dialog expects a GodownItem-like structure with quantity
                     // We'll pass the grouped item but the dialog only uses productId and totalQuantity
                     id: transferringItem.productId, 
+                    brand: transferringItem.brand,
+                    size: transferringItem.size,
+                    category: transferringItem.category,
                     quantity: transferringItem.totalQuantity,
                     dateAdded: new Date(), // Dummy value, not used in dialog
                 }}
@@ -264,7 +267,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                                                     <TableHeader>
                                                         <TableRow>
                                                             <TableHead className="text-foreground">Date Added</TableHead>
-                                                            <TableHead className="text-foreground">Last Transferred</TableHead>
+                                                            <TableHead className="text-foreground">Transfer History</TableHead>
                                                             <TableHead className="text-foreground w-40">Quantity</TableHead>
                                                             <TableHead className="text-foreground w-24 text-right">Actions</TableHead>
                                                         </TableRow>
@@ -273,7 +276,17 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                                                         {item.batches.map(batch => (
                                                             <TableRow key={batch.id}>
                                                                 <TableCell>{batch.dateAdded ? format(batch.dateAdded.toDate(), 'PPP') : 'N/A'}</TableCell>
-                                                                <TableCell>{batch.dateTransferred ? format(batch.dateTransferred.toDate(), 'PPP') : 'N/A'}</TableCell>
+                                                                <TableCell>
+                                                                    {batch.transferHistory && batch.transferHistory.length > 0 ? (
+                                                                         <ScrollArea className="h-20 w-48 rounded-md border p-2 text-xs">
+                                                                            {batch.transferHistory.sort((a,b) => b.date.toMillis() - a.date.toMillis()).map((th, index) => (
+                                                                                <div key={index} className="mb-1">
+                                                                                    {th.quantity} units on {format(th.date.toDate(), 'P')}
+                                                                                </div>
+                                                                            ))}
+                                                                         </ScrollArea>
+                                                                    ) : "N/A"}
+                                                                </TableCell>
                                                                 <TableCell>
                                                                     <Input
                                                                         type="number"
