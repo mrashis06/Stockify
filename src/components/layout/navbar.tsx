@@ -24,7 +24,7 @@ const Navbar = () => {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <Logo className="h-8 w-auto" />
+          <Logo className="h-9 w-auto" />
         </Link>
         <div className="hidden items-center gap-4 md:flex">
           {showLandingNavbar && <ThemeToggle />}
@@ -44,7 +44,7 @@ const Navbar = () => {
                 <SheetHeader className="border-b pb-4">
                     <SheetTitle>
                         <Link href="/" className="flex items-center gap-2" onClick={() => setIsOpen(false)}>
-                            <Logo className="h-8 w-auto" />
+                            <Logo className="h-9 w-auto" />
                         </Link>
                     </SheetTitle>
                     <SheetDescription className="sr-only">
