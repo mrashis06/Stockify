@@ -9,7 +9,7 @@ const Logo = React.forwardRef<
     return (
         <svg
             ref={ref}
-            viewBox="0 0 240 50" // Adjusted for tight kerning
+            viewBox="0 0 235 50" // Adjusted for tighter kerning
             className={cn("text-foreground", className)}
             {...props}
         >
@@ -24,7 +24,7 @@ const Logo = React.forwardRef<
             <text x="0" y="40" fontSize="50" fontWeight="bold" className="logo-fill-1">St</text>
             
             {/* The custom 'o' - positioned to tightly fit */}
-            <g transform="translate(62, 0)">
+            <g transform="translate(60, 0)"> 
                 <defs>
                     <clipPath id="half-fill">
                         <rect x="0" y="22.5" width="45" height="22.5" />
@@ -35,7 +35,7 @@ const Logo = React.forwardRef<
             </g>
 
             {/* Manually kerned 'ckify' part */}
-            <text x="111" y="40" fontSize="50" fontWeight="bold" className="logo-fill-2">ckify</text>
+            <text x="108" y="40" fontSize="50" fontWeight="bold" className="logo-fill-2">ckify</text>
         </svg>
     );
 });
