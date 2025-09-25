@@ -9,29 +9,32 @@ const Logo = React.forwardRef<
     return (
         <svg
             ref={ref}
-            viewBox="0 0 240 60"
+            viewBox="0 0 240 50" // Adjusted viewBox for better alignment
             className={cn("text-foreground", className)}
             {...props}
         >
             <style>{`
-                .logo-fill-1 { fill: hsl(var(--logo-color-1)); }
-                .logo-fill-2 { fill: hsl(var(--logo-color-2)); }
-                .logo-fill-3 { fill: hsl(var(--logo-color-3)); }
-                .logo-o-fill { fill: #F57C00; }
-                .logo-bubble-fill { fill: #FFE0B2; }
+                .logo-fill-1 { fill: hsl(var(--foreground)); }
+                .logo-fill-2 { fill: hsl(var(--foreground)); }
+                .logo-o-stroke { stroke: hsl(var(--foreground)); }
+                .logo-o-fill { fill: #F57C00; } /* Amber/Orange color */
             `}</style>
-            <text x="0" y="48" fontSize="50" fontWeight="bold" className="logo-fill-1">St</text>
+            
+            {/* Using a text element for consistent font rendering and alignment */}
+            <text x="0" y="40" fontSize="50" fontWeight="bold" className="logo-fill-1">St</text>
             
             {/* The custom 'o' */}
-            <g transform="translate(68, 8)">
-                <circle cx="21" cy="21" r="21" className="logo-o-fill" />
-                <path d="M 2,21 a 19,19 0 0,1 38,0" fill="none" stroke="#FFFFFF" strokeWidth="1" opacity="0.3" />
-                <circle cx="12" cy="25" r="3" className="logo-bubble-fill" opacity="0.8"/>
-                <circle cx="21" cy="18" r="2" className="logo-bubble-fill" opacity="0.7"/>
-                <circle cx="30" cy="28" r="2.5" className="logo-bubble-fill" opacity="0.9"/>
+            <g transform="translate(68, 0)">
+                <defs>
+                    <clipPath id="half-fill">
+                        <rect x="0" y="22.5" width="45" height="22.5" />
+                    </clipPath>
+                </defs>
+                <circle cx="22.5" cy="22.5" r="21.5" className="logo-o-stroke" fill="none" strokeWidth="2.5" />
+                <circle cx="22.5" cy="22.5" r="21.5" className="logo-o-fill" clipPath="url(#half-fill)" />
             </g>
 
-            <text x="120" y="48" fontSize="50" fontWeight="bold" className="logo-fill-2">ckify</text>
+            <text x="120" y="40" fontSize="50" fontWeight="bold" className="logo-fill-2">ckify</text>
         </svg>
     );
 });

@@ -183,3 +183,8 @@
   50% { stop-color: #2ECC71; } /* Green */
   75% { stop-color: #EAECEE; } /* White/Transparent */
 }
+
+/* For aligning the custom SVG 'o' in the logo */
+.logo-container > svg {
+  vertical-align: -0.125em;
+}

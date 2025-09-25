@@ -98,7 +98,9 @@ export default function Home({ params, searchParams }: { params: { slug: string 
             <h1 className="text-4xl font-bold tracking-tight md:text-6xl text-foreground">
               Welcome to
             </h1>
-            <Logo className="h-16 md:h-20 w-auto mt-2" />
+            <div className="mt-2 logo-container">
+              <Logo className="h-16 md:h-20 w-auto" />
+            </div>
             <p className="mt-4 text-lg text-muted-foreground md:text-xl opacity-0 fade-in [animation-delay:0.3s]">
               The perfect place to manage your liquor store inventory.
             </p>
