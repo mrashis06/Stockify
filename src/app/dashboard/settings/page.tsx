@@ -222,11 +222,8 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                   <Link href="#" className="block hover:bg-muted/50 rounded-md cursor-pointer">
                       <UserProfileItem label="Account Settings" description="Manage your account details and security settings." />
                   </Link>
-                  <Link href="#" className="block hover:bg-muted/50 rounded-md cursor-pointer">
-                      <UserProfileItem label="Subscription Plan" description="View and manage your subscription plan." />
-                  </Link>
                   <div className="block hover:bg-muted/50 rounded-md cursor-pointer" onClick={handleLogout}>
-                      <UserProfileItem label="Log Out" description="Log out from the application." isLogout={true} />
+                      <UserProfileItem label="Log Out" description="Log out from the application." isLogout={true} onClick={handleLogout} />
                   </div>
                 </div>
             </section>
