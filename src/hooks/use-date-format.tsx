@@ -16,7 +16,7 @@ type DateFormat = typeof supportedDateFormats[number]['format'];
 type DateFormatContextType = {
   dateFormat: DateFormat;
   setDateFormat: (format: DateFormat) => void;
-  formatDate: (date: Date | string | number) => string;
+  formatDate: (date: Date | string | number, formatOverride?: string) => string;
 };
 
 const DateFormatContext = createContext<DateFormatContextType | undefined>(undefined);
@@ -36,10 +36,10 @@ export const DateFormatProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('dateFormat', newFormat);
   };
   
-  const formatDate = useCallback((date: Date | string | number): string => {
+  const formatDate = useCallback((date: Date | string | number, formatOverride?: string): string => {
     try {
         let dateObj = date instanceof Date ? date : typeof date === 'string' ? parseISO(date) : new Date(date);
-        return formatDateFns(dateObj, dateFormat);
+        return formatDateFns(dateObj, formatOverride || dateFormat);
     } catch (error) {
         console.error("Invalid date for formatting:", date);
         return 'Invalid Date';
