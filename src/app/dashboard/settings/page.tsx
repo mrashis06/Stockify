@@ -13,6 +13,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useDateFormat, supportedDateFormats } from '@/hooks/use-date-format';
+import { useNotificationSettings } from '@/hooks/use-notification-settings';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,6 +82,8 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
   const { user, updateUser } = useAuth();
   const { toast } = useToast();
   const { dateFormat, setDateFormat, formatDate } = useDateFormat();
+  const { settings, setSetting } = useNotificationSettings();
+
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(formSchema),
@@ -223,15 +226,15 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                 <div className="px-6">
                     <Separator />
                     <SettingsItem label="Low Stock Alerts" description="Receive alerts for low stock levels on specific items." isInteractive={true}>
-                        <Switch defaultChecked={true} />
+                         <Switch checked={settings.lowStockAlerts} onCheckedChange={(checked) => setSetting('lowStockAlerts', checked)} />
                     </SettingsItem>
                     <Separator />
                     <SettingsItem label="New Order Notifications" description="Get notified when new orders are placed." isInteractive={true}>
-                        <Switch defaultChecked={true} />
+                        <Switch checked={settings.newOrderNotifications} onCheckedChange={(checked) => setSetting('newOrderNotifications', checked)} />
                     </SettingsItem>
                     <Separator />
                     <SettingsItem label="Daily Summary" description="Receive daily summaries of sales and inventory changes." isInteractive={true}>
-                         <Switch defaultChecked={false} />
+                         <Switch checked={settings.dailySummary} onCheckedChange={(checked) => setSetting('dailySummary', checked)} />
                     </SettingsItem>
                 </div>
             </section>

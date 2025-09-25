@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/hooks/use-auth';
 import { LoadingProvider } from '@/hooks/use-loading';
 import { DateFormatProvider } from '@/hooks/use-date-format';
+import { NotificationSettingsProvider } from '@/hooks/use-notification-settings';
 import Loader from '@/components/loader';
 import Script from "next/script";
 import { Analytics } from '@vercel/analytics/react';
@@ -59,11 +60,13 @@ export default function RootLayout({
         >
           <AuthProvider>
             <LoadingProvider>
-              <DateFormatProvider>
-                {children}
-                <Loader />
-                <Toaster />
-              </DateFormatProvider>
+                <DateFormatProvider>
+                    <NotificationSettingsProvider>
+                        {children}
+                        <Loader />
+                        <Toaster />
+                    </NotificationSettingsProvider>
+                </DateFormatProvider>
             </LoadingProvider>
           </AuthProvider>
         </ThemeProvider>

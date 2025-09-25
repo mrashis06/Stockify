@@ -30,6 +30,7 @@ import { usePageLoading } from './use-loading';
 import type { GodownItem, TransferHistory } from './use-godown-inventory';
 import { createNotification } from './use-notifications';
 import { useAuth } from './use-auth';
+import { useNotificationSettings } from './use-notification-settings';
 
 export type InventoryItem = {
   id: string;
@@ -58,6 +59,7 @@ export function useInventory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
+  const { settings: notificationSettings } = useNotificationSettings();
   
   usePageLoading(loading);
 
@@ -316,7 +318,7 @@ export function useInventory() {
             // Check for low stock alert
             if (field === 'sales') {
                  const newClosingStock = dailyData[id].closing;
-                 if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
+                 if (notificationSettings.lowStockAlerts && newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
                     if(user && user.shopId) {
                          createNotification(user.shopId, {
                             title: 'Low Stock Alert',
@@ -344,5 +346,3 @@ export function useInventory() {
 
   return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField };
 }
-
-    
