@@ -148,7 +148,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             href="/dashboard"
             className="flex items-center gap-2 text-lg font-semibold md:text-base"
           >
-            <Logo className="h-8 w-auto" />
+            <Logo className="h-9 w-auto" />
           </Link>
         </div>
 
