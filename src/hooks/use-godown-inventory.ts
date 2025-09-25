@@ -132,6 +132,7 @@ export function useGodownInventory() {
             );
             
             const godownItemsSnapshot = await getDocs(godownItemsQuery);
+            // Sort in-code to avoid needing a composite index
             const godownBatches = godownItemsSnapshot.docs
               .map(d => ({ id: d.id, ...d.data() } as GodownItem))
               .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());

@@ -261,13 +261,14 @@ export function useInventory() {
 
                     const godownQuery = query(
                         collection(db, "godownInventory"),
-                        where("productId", "==", id),
-                        orderBy("dateAdded", "desc")
+                        where("productId", "==", id)
                     );
                     
                     const godownDocs = await getDocs(godownQuery);
+                    // Sort in-code to avoid index requirement
+                    const sortedGodownDocs = godownDocs.docs.sort((a, b) => b.data().dateAdded.toMillis() - a.data().dateAdded.toMillis());
                     
-                    for (const docSnap of godownDocs.docs) {
+                    for (const docSnap of sortedGodownDocs) {
                         if (amountToReturn <= 0) break;
                         const batch = { id: docSnap.id, ...docSnap.data() } as GodownItem;
                         const batchRef = doc(db, "godownInventory", batch.id);
