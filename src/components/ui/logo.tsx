@@ -9,7 +9,7 @@ const Logo = React.forwardRef<
     return (
         <svg
             ref={ref}
-            viewBox="0 0 240 50" // Adjusted viewBox for better alignment
+            viewBox="0 0 240 50" // Adjusted for tight kerning
             className={cn("text-foreground", className)}
             {...props}
         >
@@ -20,11 +20,11 @@ const Logo = React.forwardRef<
                 .logo-o-fill { fill: #F57C00; } /* Amber/Orange color */
             `}</style>
             
-            {/* Using a text element for consistent font rendering and alignment */}
+            {/* Using text for crisp rendering. Manually kerned. */}
             <text x="0" y="40" fontSize="50" fontWeight="bold" className="logo-fill-1">St</text>
             
-            {/* The custom 'o' */}
-            <g transform="translate(68, 0)">
+            {/* The custom 'o' - positioned to tightly fit */}
+            <g transform="translate(62, 0)">
                 <defs>
                     <clipPath id="half-fill">
                         <rect x="0" y="22.5" width="45" height="22.5" />
@@ -34,7 +34,8 @@ const Logo = React.forwardRef<
                 <circle cx="22.5" cy="22.5" r="21.5" className="logo-o-fill" clipPath="url(#half-fill)" />
             </g>
 
-            <text x="120" y="40" fontSize="50" fontWeight="bold" className="logo-fill-2">ckify</text>
+            {/* Manually kerned 'ckify' part */}
+            <text x="111" y="40" fontSize="50" fontWeight="bold" className="logo-fill-2">ckify</text>
         </svg>
     );
 });
