@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTr
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePathname } from "next/navigation";
 import Logo from "../ui/logo";
+import { Separator } from "../ui/separator";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,16 +52,19 @@ const Navbar = () => {
                         Main navigation menu for Stockify.
                     </SheetDescription>
                 </SheetHeader>
-              <div className="flex h-full flex-col">
+              <div className="flex h-full flex-col justify-between">
                 <nav className="flex-1 overflow-y-auto pt-6">
                     <div className="flex flex-col gap-4">
                         {showLandingNavbar && <ThemeToggle />}
                     </div>
                 </nav>
-                <div className="mt-auto flex flex-col gap-4 border-t pt-6">
-                  <Button asChild>
-                    <Link href="/login" onClick={() => setIsOpen(false)}>Get Started</Link>
-                  </Button>
+                <div className="flex flex-col gap-4 border-t pt-6">
+                    <Link href="#" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                        Privacy Policy
+                    </Link>
+                    <Link href="#" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                        Terms of Service
+                    </Link>
                 </div>
               </div>
             </SheetContent>
