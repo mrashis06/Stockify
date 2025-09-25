@@ -89,10 +89,10 @@ export default function StaffPage() {
                     staff.push({ id: doc.id, ...doc.data() } as StaffMember);
                 });
                 setStaffList(staff);
-                if(loading) setLoading(false);
+                setLoading(false);
             }, (error) => {
                 console.error("Staff listener error: ", error);
-                if(loading) setLoading(false);
+                setLoading(false);
             });
 
             const unsubscribeInvites = onSnapshot(invitesQuery, (snapshot) => {
@@ -424,7 +424,9 @@ export default function StaffPage() {
                                     <div key={b.id} className="flex justify-between items-start gap-4 p-3 border rounded-lg">
                                         <div>
                                             <p className="text-sm">{b.description}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">{formatDate(b.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
+                                            {b.createdAt && (
+                                                <p className="text-xs text-muted-foreground mt-1">{formatDate(b.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
+                                            )}
                                         </div>
                                         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => confirmDeleteBroadcast(b)}>
                                             <Trash2 className="h-4 w-4 text-destructive/80" />
@@ -528,5 +530,7 @@ export default function StaffPage() {
             </div>
         </main>
     );
+
+    
 
     
