@@ -95,12 +95,9 @@ export default function Home({ params, searchParams }: { params: { slug: string 
 
         <section className="flex flex-col items-center justify-center text-center flex-grow pt-24 pb-16 w-full z-10">
           <div className="relative z-10 mx-auto max-w-4xl p-4 opacity-0 fade-in-slide-up">
-            <h1 className="text-4xl font-bold tracking-tight md:text-6xl text-foreground">
-              Welcome to
+            <h1 className="text-4xl font-bold tracking-tight md:text-5xl text-foreground flex items-center justify-center gap-3">
+              Welcome to <Logo className="h-12 md:h-14 w-auto logo-container" />
             </h1>
-            <div className="mt-2 logo-container">
-              <Logo className="h-16 md:h-20 w-auto" />
-            </div>
             <p className="mt-4 text-lg text-muted-foreground md:text-xl opacity-0 fade-in [animation-delay:0.3s]">
               The perfect place to manage your liquor store inventory.
             </p>
