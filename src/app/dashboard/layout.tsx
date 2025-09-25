@@ -82,7 +82,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       { href: "#", pageName: 'Back', icon: ArrowLeft, label: ""},
       { href: "/", pageName: 'Home', icon: Home, label: "Home" },
       { href: "/dashboard", pageName: 'Dashboard', icon: LayoutDashboard, label: "Dashboard" },
-      { href: "/dashboard/inventory", pageName: 'Inventory', icon: Warehouse, label: "Inventory" },
+      { href: "/dashboard/inventory", pageName: 'OffCounter', icon: Warehouse, label: "OffCounter" },
       { href: "/dashboard/godown", pageName: 'Godown', icon: Archive, label: "Godown" },
       { href: "/dashboard/onbar", pageName: 'OnBar', icon: GlassWater, label: "OnBar" },
       ...(isAdmin ? [{ href: "/dashboard/staff", pageName: 'Staff', icon: Users, label: "Staff" }] : []),
