@@ -39,25 +39,28 @@ export function useEndOfDay() {
 
       // Handle On-Bar Sales
       const onBarSnap = await getDocs(collection(db, 'onBarInventory'));
-      let onBarTotalValue = 0;
+      const onBarSalesLog: { [key: string]: any } = {};
 
       onBarSnap.forEach(doc => {
         const item = doc.data() as OnBarItem;
         if (item.salesValue && item.salesValue > 0) {
-            onBarTotalValue += item.salesValue;
+            const onBarLogId = `on-bar-${item.id}`;
+            onBarSalesLog[onBarLogId] = {
+                brand: item.brand,
+                size: item.size,
+                category: item.category,
+                price: item.price,
+                salesVolume: item.salesVolume,
+                salesValue: item.salesValue,
+            };
         }
         // Reset sales volumes and values for the next day
         batch.update(doc.ref, { salesVolume: 0, salesValue: 0 });
       });
 
       // Add On-Bar sales to today's daily doc for historical reporting
-      if (onBarTotalValue > 0) {
-          const onBarSaleLog = {
-              sales: onBarTotalValue, // This is the total monetary value now
-              price: 1, // Price is 1 as sales is already the value
-              category: "On-Bar Sales", // Special category for reports
-          }
-          batch.set(dailyDocRef, { 'on-bar-sales': onBarSaleLog }, { merge: true });
+      if (Object.keys(onBarSalesLog).length > 0) {
+          batch.set(dailyDocRef, onBarSalesLog, { merge: true });
       }
 
       // Iterate over the master inventory to carry over bottle stock

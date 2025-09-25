@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { format, eachDayOfInterval, isSameDay, parse, isAfter, startOfDay } from 'date-fns';
-import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater } from 'lucide-react';
+import { format, eachDayOfInterval, isSameDay, parse, startOfDay } from 'date-fns';
+import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -26,12 +26,16 @@ import {
 } from "@/components/ui/table"
 import { toast } from '@/hooks/use-toast';
 import { usePageLoading } from '@/hooks/use-loading';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
 
-type DailyLog = { [itemId: string]: { brand: string; size: string; sales: number; price: number; category: string } };
+type OffCounterLog = { brand: string; size: string; sales: number; price: number; category: string };
+type OnBarLog = { brand: string; size: string; category: string; salesVolume: number; salesValue: number; price: number };
+
+type DailyLog = { [itemId: string]: OffCounterLog | OnBarLog };
 
 type ReportDataEntry = {
     date: string;
@@ -48,7 +52,14 @@ type SoldItem = {
     totalAmount: number;
 };
 
-type DatedSoldItem = SoldItem & { date: string };
+type OnBarSoldItem = {
+    productId: string;
+    brand: string;
+    size: string;
+    category: string;
+    unitsSold: number; // Volume in ml or units for beer
+    totalAmount: number;
+}
 
 
 export default function ReportsPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
@@ -56,15 +67,13 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         from: new Date(),
         to: new Date(),
     });
+    const [reportType, setReportType] = useState<'offcounter' | 'onbar'>('offcounter');
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
     usePageLoading(loading);
 
     const handleDateSelect = (range: DateRange | undefined) => {
-        // This logic allows for intuitive single-day and range selection.
-        // If the user selects a start date and then clicks it again, it confirms a single-day selection.
-        // If they click a different end date, it creates a range.
         setDate(range);
     };
 
@@ -75,7 +84,6 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         }
         setLoading(true);
         const data: ReportDataEntry[] = [];
-        // Ensure start of day to avoid timezone issues.
         const interval = {
             start: startOfDay(range.from),
             end: startOfDay(range.to || range.from),
@@ -104,12 +112,11 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         if (date?.from) {
             fetchReportData(date);
         } else {
-            // Set a default date range on initial load
             const today = new Date();
             setDate({ from: today, to: today });
             fetchReportData({ from: today, to: today });
         }
-    }, []); // Removed `date` from dependencies to let handleFilter trigger fetches
+    }, []); 
 
     const handleFilter = () => {
         if (date?.from) {
@@ -119,246 +126,143 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         }
     };
 
-    const { aggregatedBottleSalesData, totalOnBarSales } = useMemo(() => {
-        const salesMap = new Map<string, SoldItem>();
-        let onBarTotal = 0;
+    const { offCounterSalesData, onBarSalesData } = useMemo(() => {
+        const offCounterMap = new Map<string, SoldItem>();
+        const onBarMap = new Map<string, OnBarSoldItem>();
 
         reportData.forEach(entry => {
             for (const productId in entry.log) {
-                const item = entry.log[productId];
-                 if (productId === 'on-bar-sales') {
-                    onBarTotal += item.sales || 0;
-                    continue;
-                }
-                if (item.sales && item.sales > 0 && item.price && item.brand) {
-                    const existingEntry = salesMap.get(productId);
-                    if (existingEntry) {
-                        existingEntry.unitsSold += item.sales;
-                        existingEntry.totalAmount += item.sales * item.price;
+                const item = entry.log[productId] as any;
+                if (item.sales && item.sales > 0 && item.price && item.brand && !productId.startsWith('on-bar-')) { // OffCounter
+                    const existing = offCounterMap.get(productId);
+                    if (existing) {
+                        existing.unitsSold += item.sales;
+                        existing.totalAmount += item.sales * item.price;
                     } else {
-                        salesMap.set(productId, {
-                            productId,
-                            brand: item.brand,
-                            size: item.size,
-                            category: item.category,
-                            price: item.price,
-                            unitsSold: item.sales,
-                            totalAmount: item.sales * item.price,
+                        offCounterMap.set(productId, {
+                            productId, brand: item.brand, size: item.size, category: item.category,
+                            price: item.price, unitsSold: item.sales, totalAmount: item.sales * item.price,
                         });
                     }
+                } else if (item.salesValue && item.salesValue > 0 && productId.startsWith('on-bar-')) { // OnBar
+                     const existing = onBarMap.get(productId);
+                     if (existing) {
+                         existing.unitsSold += item.salesVolume;
+                         existing.totalAmount += item.salesValue;
+                     } else {
+                         onBarMap.set(productId, {
+                             productId, brand: item.brand, size: item.size, category: item.category,
+                             unitsSold: item.salesVolume, totalAmount: item.salesValue
+                         });
+                     }
                 }
             }
         });
 
-        const aggregatedBottleSalesData = Array.from(salesMap.values()).sort((a, b) => a.brand.localeCompare(b.brand));
-        return { aggregatedBottleSalesData, totalOnBarSales: onBarTotal };
-    }, [reportData]);
-    
-
-    const datedSalesDataForExport = useMemo((): DatedSoldItem[] => {
-        const sales: DatedSoldItem[] = [];
-        reportData.forEach(entry => {
-             for (const productId in entry.log) {
-                const item = entry.log[productId];
-                if (productId === 'on-bar-sales') {
-                    sales.push({
-                        date: entry.date,
-                        productId: 'on-bar-sales',
-                        brand: 'On-Bar Sales',
-                        size: 'N/A',
-                        category: 'On-Bar',
-                        price: item.sales, // Total value for the day
-                        unitsSold: 1, // Represents one consolidated entry
-                        totalAmount: item.sales,
-                    });
-                    continue;
-                }
-                if (item.sales && item.sales > 0 && item.price && item.brand) {
-                    sales.push({
-                        date: entry.date,
-                        productId,
-                        brand: item.brand,
-                        size: item.size,
-                        category: item.category,
-                        price: item.price,
-                        unitsSold: item.sales,
-                        totalAmount: item.sales * item.price,
-                    });
-                }
-            }
-        });
-        return sales.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.brand.localeCompare(b.brand));
+        return {
+            offCounterSalesData: Array.from(offCounterMap.values()).sort((a, b) => a.brand.localeCompare(b.brand)),
+            onBarSalesData: Array.from(onBarMap.values()).sort((a, b) => a.brand.localeCompare(b.brand)),
+        };
     }, [reportData]);
 
     const reportTotals = useMemo(() => {
-        const bottleTotals = aggregatedBottleSalesData.reduce(
-            (totals, item) => {
-                totals.totalUnits += item.unitsSold;
-                totals.grandTotal += item.totalAmount;
-                return totals;
-            },
-            { totalUnits: 0, grandTotal: 0 }
-        );
-        return {
-            bottleTotalUnits: bottleTotals.totalUnits,
-            bottleGrandTotal: bottleTotals.grandTotal,
-            overallGrandTotal: bottleTotals.grandTotal + totalOnBarSales,
-        }
-    }, [aggregatedBottleSalesData, totalOnBarSales]);
+        const data = reportType === 'offcounter' ? offCounterSalesData : onBarSalesData;
+        const totalAmount = data.reduce((sum, item) => sum + item.totalAmount, 0);
+        const totalUnits = reportType === 'offcounter' 
+            ? (data as SoldItem[]).reduce((sum, item) => sum + item.unitsSold, 0)
+            : null; // Units are mixed (ml/pcs), so we don't sum them for OnBar
 
-    const salesByDateForExport = useMemo(() => {
-        return datedSalesDataForExport.reduce((acc, item) => {
-            (acc[item.date] = acc[item.date] || []).push(item);
-            return acc;
-        }, {} as Record<string, DatedSoldItem[]>);
-    }, [datedSalesDataForExport]);
+        return { totalAmount, totalUnits };
+    }, [reportType, offCounterSalesData, onBarSalesData]);
 
 
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
-        const tableColumn = ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
+        const isOffCounter = reportType === 'offcounter';
         
-        const startDate = date?.from ? format(date.from, 'PPP') : '';
-        const endDate = date?.to ? format(date.to, 'PPP') : startDate;
-        
-        const isSingleDay = !date?.to || isSameDay(date?.from || new Date(), date.to);
-        const title = isSingleDay
-            ? `Sales Statement for ${startDate}`
-            : `Sales Statement: ${startDate} to ${endDate}`;
-
-        let grandTotalAmount = 0;
-
-        let startY = 15;
-        
-        doc.setFontSize(16);
-        doc.text(title, 14, startY);
-        startY += 10;
-        
-        Object.keys(salesByDateForExport).sort().forEach((saleDate, index) => {
-            const items = salesByDateForExport[saleDate];
-            const tableRows: (string | number)[][] = [];
-            let dailyTotalAmount = 0;
-            let dailyBottleUnits = 0;
-
-            items.forEach(item => {
-                const isOnBar = item.productId === 'on-bar-sales';
-                const rowData = [
-                    item.brand,
-                    item.size,
-                    item.category,
-                    isOnBar ? 'N/A' : item.price.toFixed(2),
-                    isOnBar ? 'N/A' : item.unitsSold,
-                    item.totalAmount.toFixed(2)
-                ];
-                tableRows.push(rowData);
-                dailyTotalAmount += item.totalAmount;
-                if (!isOnBar) {
-                    dailyBottleUnits += item.unitsSold;
-                }
-            });
-
-            grandTotalAmount += dailyTotalAmount;
+        const tableColumn = isOffCounter 
+            ? ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]
+            : ["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"];
             
-            const dateObj = parse(saleDate, 'yyyy-MM-dd', new Date());
+        const dataToExport = isOffCounter ? offCounterSalesData : onBarSalesData;
 
-            const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : startY;
-
-            doc.autoTable({
-                head: [tableColumn],
-                body: tableRows,
-                foot: [
-                    ['Daily Total', '', '', '', dailyBottleUnits || 'N/A', dailyTotalAmount.toFixed(2)]
-                ],
-                startY: finalY + (index > 0 ? 15 : 0),
-                headStyles: {
-                    fillColor: [40, 40, 40], 
-                    textColor: [255, 255, 255],
-                    fontStyle: 'bold'
-                },
-                footStyles: {
-                    fillColor: [244, 244, 245],
-                    textColor: [20, 20, 20],
-                    fontStyle: 'bold',
-                },
-                didDrawPage: (data) => {
-                },
-                willDrawPage: (data) => {
-                     doc.setFontSize(12);
-                     doc.setFont('helvetica', 'bold');
-                     doc.text(`Sales for ${format(dateObj, 'PPP')}`, data.settings.margin.left, data.cursor ? data.cursor.y - 5 : startY - 5);
-                     if (data.cursor) {
-                       data.cursor.y += 2; 
-                     }
-                }
-            });
+        const tableRows = dataToExport.map(item => {
+            if (isOffCounter) {
+                const offItem = item as SoldItem;
+                return [offItem.brand, offItem.size, offItem.category, offItem.price.toFixed(2), offItem.unitsSold, offItem.totalAmount.toFixed(2)];
+            } else {
+                const onBarItem = item as OnBarSoldItem;
+                const unitLabel = onBarItem.category === 'Beer' ? 'units' : 'ml';
+                return [onBarItem.brand, onBarItem.size, onBarItem.category, `${onBarItem.unitsSold} ${unitLabel}`, onBarItem.totalAmount.toFixed(2)];
+            }
         });
 
-        if (Object.keys(salesByDateForExport).length > 1 || totalOnBarSales > 0) { 
-            const finalY = (doc as any).lastAutoTable.finalY;
-            doc.autoTable({
-                startY: finalY + 10,
-                body: [],
-                foot: [
-                    ['Grand Total', '', '', '', '', grandTotalAmount.toFixed(2)]
-                ],
-                 footStyles: {
-                    fillColor: [22, 163, 74],
-                    textColor: [255, 255, 255],
-                    fontStyle: 'bold',
-                    fontSize: 12,
-                },
-                columnStyles: { 0: { halign: 'left' } },
-            });
-        }
+        const startDate = date?.from ? format(date.from, 'PPP') : '';
+        const endDate = date?.to ? format(date.to, 'PPP') : startDate;
+        const isSingleDay = !date?.to || isSameDay(date?.from || new Date(), date.to);
+        const dateRangeStr = isSingleDay ? `for ${startDate}` : `from ${startDate} to ${endDate}`;
+        const reportTitle = `${isOffCounter ? 'Off-Counter' : 'On-Bar'} Sales Statement ${dateRangeStr}`;
+
+        doc.setFontSize(16);
+        doc.text(reportTitle, 14, 15);
         
-        const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
-        doc.save(`sales_statement_${fileDate}.pdf`);
+        const foot = isOffCounter
+            ? [['Grand Total', '', '', '', reportTotals.totalUnits, reportTotals.totalAmount.toFixed(2)]]
+            : [['Grand Total', '', '', '', reportTotals.totalAmount.toFixed(2)]];
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            foot,
+            startY: 25,
+            headStyles: { fillColor: [40, 40, 40] },
+            footStyles: { fillColor: [22, 163, 74], textColor: [255,255,255], fontStyle: 'bold' },
+        });
+        
+        const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : 'report';
+        doc.save(`${reportType}_sales_${fileDate}.pdf`);
     };
 
     const handleExportCSV = () => {
-        const header = ["Date", "Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"];
-        let csvContent = "data:text/csv;charset=utf-8," + header.join(",") + "\n";
+        const isOffCounter = reportType === 'offcounter';
+        const headers = isOffCounter 
+            ? ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]
+            : ["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"];
         
-        let grandTotalAmount = 0;
-
-        Object.keys(salesByDateForExport).sort().forEach(saleDate => {
-            const items = salesByDateForExport[saleDate];
-            let dailyTotalAmount = 0;
-
-            items.forEach(item => {
-                const isOnBar = item.productId === 'on-bar-sales';
-                const row = [
-                    item.date,
-                    `"${item.brand.replace(/"/g, '""')}"`,
-                    `"${item.size}"`,
-                    item.category,
-                    isOnBar ? 'N/A' : item.price.toFixed(2),
-                    isOnBar ? 'N/A' : item.unitsSold,
-                    item.totalAmount.toFixed(2)
+        let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+        
+        const dataToExport = isOffCounter ? offCounterSalesData : onBarSalesData;
+        
+        dataToExport.forEach(item => {
+            let row;
+            if (isOffCounter) {
+                const offItem = item as SoldItem;
+                 row = [
+                    `"${offItem.brand.replace(/"/g, '""')}"`, `"${offItem.size}"`, offItem.category, 
+                    offItem.price.toFixed(2), offItem.unitsSold, offItem.totalAmount.toFixed(2)
                 ].join(",");
-                csvContent += row + "\n";
-                
-                dailyTotalAmount += item.totalAmount;
-            });
-
-            const dailyTotalRow = [`Daily Total for ${saleDate}`, '', '', '', '', '', dailyTotalAmount.toFixed(2)].join(",");
-            csvContent += dailyTotalRow + "\n\n";
-
-            grandTotalAmount += dailyTotalAmount;
+            } else {
+                 const onBarItem = item as OnBarSoldItem;
+                 const unitLabel = onBarItem.category === 'Beer' ? 'units' : 'ml';
+                 row = [
+                    `"${onBarItem.brand.replace(/"/g, '""')}"`, `"${onBarItem.size}"`, onBarItem.category, 
+                    `"${onBarItem.unitsSold} ${unitLabel}"`, onBarItem.totalAmount.toFixed(2)
+                 ].join(",");
+            }
+            csvContent += row + "\n";
         });
-
-        if (Object.keys(salesByDateForExport).length > 1 || totalOnBarSales > 0) {
-            const grandTotalRow = ["Grand Total", "", "", "", "", "", grandTotalAmount.toFixed(2)].join(",");
-            csvContent += grandTotalRow + "\n";
-        }
-
+        
+        const totalRow = isOffCounter
+            ? ["Grand Total", "", "", "", reportTotals.totalUnits, reportTotals.totalAmount.toFixed(2)].join(",")
+            : ["Grand Total", "", "", "", reportTotals.totalAmount.toFixed(2)].join(",");
+        csvContent += "\n" + totalRow + "\n";
+        
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        
-        const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
-        link.setAttribute("download", `sales_statement_${fileDate}.csv`);
+        const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : 'report';
+        link.setAttribute("download", `${reportType}_sales_${fileDate}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -368,148 +272,152 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     return null;
   }
 
+  const activeData = reportType === 'offcounter' ? offCounterSalesData : onBarSalesData;
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sales Statement</h1>
-          <p className="text-muted-foreground">Detailed sales transaction report</p>
+          <p className="text-muted-foreground">Detailed sales transaction reports</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button onClick={handleExportPDF} disabled={loading || datedSalesDataForExport.length === 0} className="bg-red-600 hover:bg-red-700 text-white">
+            <Button onClick={handleExportPDF} disabled={loading || activeData.length === 0} className="bg-red-600 hover:bg-red-700 text-white">
                 <Download className="mr-2 h-4 w-4" />
                 Export to PDF
             </Button>
-             <Button onClick={handleExportCSV} disabled={loading || datedSalesDataForExport.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
+             <Button onClick={handleExportCSV} disabled={loading || activeData.length === 0} className="bg-green-600 hover:bg-green-700 text-white">
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
                 Export to CSV
             </Button>
         </div>
       </header>
       
-      <div className="grid gap-4 md:grid-cols-2">
-         <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Generate Report</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        variant={"outline"}
-                        className={cn(
-                        "w-full sm:w-[300px] justify-start text-left font-normal",
-                        !date && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date?.from ? (
-                            date.to && !isSameDay(date.from, date.to) ? (
-                                <>
-                                {format(date.from, "LLL dd, y")} -{" "}
-                                {format(date.to, "LLL dd, y")}
-                                </>
-                            ) : (
-                                format(date.from, "LLL dd, y")
-                            )
-                        ) : (
-                            <span>Pick a date</span>
-                        )}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={date?.from}
-                        selected={date}
-                        onSelect={handleDateSelect}
-                        numberOfMonths={1}
-                        disabled={{ after: new Date() }}
-                    />
-                    </PopoverContent>
-                </Popover>
-                <Button onClick={handleFilter} disabled={loading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
-                    Generate
-                </Button>
-            </CardContent>
-        </Card>
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">On-Bar Sales Total</CardTitle>
-                <GlassWater className="h-4 w-4 text-muted-foreground" />
+            <CardHeader>
+                <CardTitle>Report Generation</CardTitle>
             </CardHeader>
-            <CardContent>
-                 <div className="text-2xl font-bold flex items-center">
-                    <IndianRupee className="h-6 w-6 mr-1" />
-                    {totalOnBarSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <CardContent className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                        <Button
+                            variant={"outline"}
+                            className={cn("w-full sm:w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                        >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {date?.from ? ( date.to && !isSameDay(date.from, date.to) ? (<>
+                                {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>
+                            ) : (format(date.from, "LLL dd, y"))) : (<span>Pick a date</span>)}
+                        </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                            initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={handleDateSelect}
+                            numberOfMonths={1} disabled={{ after: new Date() }}
+                        />
+                        </PopoverContent>
+                    </Popover>
+                    <Button onClick={handleFilter} disabled={loading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
+                        Generate
+                    </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                    Total value from peg sales in the selected period.
-                </p>
+                 <div className="flex-grow md:flex-grow-0 md:ml-auto">
+                    <Select value={reportType} onValueChange={(value) => setReportType(value as 'offcounter' | 'onbar')}>
+                        <SelectTrigger className="w-full md:w-[220px]">
+                            <SelectValue placeholder="Select Report Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="offcounter">
+                                <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4" />
+                                    <span>Off-Counter Sales</span>
+                                </div>
+                            </SelectItem>
+                            <SelectItem value="onbar">
+                                 <div className="flex items-center gap-2">
+                                    <GlassWater className="h-4 w-4" />
+                                    <span>On-Bar Sales</span>
+                                </div>
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                 </div>
             </CardContent>
         </Card>
-      </div>
 
       <Card>
         <CardHeader>
             <CardTitle>
-                Sales Details for {date?.from ? (isSameDay(date.from, date.to || date.from) ? format(date.from, 'PPP') : `${format(date.from, 'PPP')} to ${format(date.to || date.from, 'PPP')}`) : 'selected date'}
+                {reportType === 'offcounter' ? 'Off-Counter Sales Details' : 'On-Bar Sales Details'}
             </CardTitle>
-            <CardDescription>This is an aggregated summary for the selected period. Date-wise details are available in the exports.</CardDescription>
+            <CardDescription>An aggregated summary of sales for the selected period.</CardDescription>
         </CardHeader>
         <CardContent>
                 <div className="overflow-x-auto">
                 <Table>
                     <TableHeader>
-                        <TableRow>
-                            <TableHead>Brand</TableHead>
-                            <TableHead>Size</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead className="text-right">Price</TableHead>
-                            <TableHead className="text-right">Units Sold</TableHead>
-                            <TableHead className="text-right">Total Amount</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {aggregatedBottleSalesData.length > 0 ? (
-                            aggregatedBottleSalesData.map(item => (
-                                <TableRow key={item.productId}>
-                                    <TableCell className="font-medium">{item.brand}</TableCell>
-                                    <TableCell>{item.size}</TableCell>
-                                    <TableCell>{item.category}</TableCell>
-                                    <TableCell className="text-right">{item.price.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{item.unitsSold}</TableCell>
-                                    <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
+                        {reportType === 'offcounter' ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
-                                    No bottle sales data for the selected period.
-                                </TableCell>
+                                <TableHead>Brand</TableHead>
+                                <TableHead>Size</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead className="text-right">Price</TableHead>
+                                <TableHead className="text-right">Units Sold</TableHead>
+                                <TableHead className="text-right">Total Amount</TableHead>
+                            </TableRow>
+                        ) : (
+                             <TableRow>
+                                <TableHead>Brand</TableHead>
+                                <TableHead>Size</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead className="text-right">Units/Volume Sold</TableHead>
+                                <TableHead className="text-right">Total Amount</TableHead>
                             </TableRow>
                         )}
-                        {totalOnBarSales > 0 && (
-                             <TableRow className="bg-primary/5">
-                                <TableCell className="font-medium">On-Bar Sales</TableCell>
-                                <TableCell>N/A</TableCell>
-                                <TableCell>On-Bar</TableCell>
-                                <TableCell colSpan={2} className="text-right text-muted-foreground">Aggregated Peg Sales</TableCell>
-                                <TableCell className="text-right font-medium">
-                                    {totalOnBarSales.toFixed(2)}
+                    </TableHeader>
+                    <TableBody>
+                        {activeData.length > 0 ? (
+                           reportType === 'offcounter' ? (
+                                (activeData as SoldItem[]).map(item => (
+                                    <TableRow key={item.productId}>
+                                        <TableCell className="font-medium">{item.brand}</TableCell>
+                                        <TableCell>{item.size}</TableCell>
+                                        <TableCell>{item.category}</TableCell>
+                                        <TableCell className="text-right">{item.price.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">{item.unitsSold}</TableCell>
+                                        <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                ))
+                           ) : (
+                                (activeData as OnBarSoldItem[]).map(item => (
+                                    <TableRow key={item.productId}>
+                                        <TableCell className="font-medium">{item.brand}</TableCell>
+                                        <TableCell>{item.size}</TableCell>
+                                        <TableCell>{item.category}</TableCell>
+                                        <TableCell className="text-right">{`${item.unitsSold} ${item.category === 'Beer' ? 'units' : 'ml'}`}</TableCell>
+                                        <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                ))
+                           )
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={reportType === 'offcounter' ? 6 : 5} className="h-24 text-center">
+                                    No {reportType === 'offcounter' ? 'Off-Counter' : 'On-Bar'} sales data for this period.
                                 </TableCell>
                             </TableRow>
                         )}
                     </TableBody>
                     <TableFooter>
                         <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-bold text-right text-base">Grand Total (All Sales)</TableCell>
-                            <TableCell className="font-bold text-right text-base">{reportTotals.bottleTotalUnits}</TableCell>
-                            <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
+                            <TableCell colSpan={reportType === 'offcounter' ? 4 : 3} className="font-bold text-right text-base">Grand Total</TableCell>
+                            {reportType === 'offcounter' && (
+                                <TableCell className="font-bold text-right text-base">{reportTotals.totalUnits}</TableCell>
+                            )}
+                            <TableCell colSpan={reportType === 'offcounter' ? 1 : 2} className="font-bold text-right text-base flex items-center justify-end gap-1">
                                 <IndianRupee className="h-4 w-4" />
-                                {reportTotals.overallGrandTotal.toFixed(2)}
+                                {reportTotals.totalAmount.toFixed(2)}
                             </TableCell>
                         </TableRow>
                     </TableFooter>
@@ -520,7 +428,3 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     </div>
   );
 }
-
-    
-
-    
