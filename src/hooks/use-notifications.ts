@@ -2,23 +2,24 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, getDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from './use-auth';
 import { v4 as uuidv4 } from 'uuid';
 
 export type Notification = {
     id: string;
-    uid: string; // The user ID of the recipient (admin)
     title: string;
     description: string;
     read: boolean;
     createdAt: any; // Firestore Timestamp
-    type: 'low-stock' | 'info' | 'staff-request';
+    type: 'low-stock' | 'info' | 'staff-request' | 'staff-broadcast';
     link?: string;
+    target?: 'admin' | 'staff'; // Specify who the notification is for
+    author?: string; // Who sent the notification
 };
 
-export type NotificationData = Omit<Notification, 'id' | 'uid' | 'createdAt' | 'read'>;
+export type NotificationData = Omit<Notification, 'id' | 'createdAt' | 'read'>;
 
 export function useNotifications() {
     const { user } = useAuth();
@@ -26,10 +27,18 @@ export function useNotifications() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (user && user.role === 'admin' && user.shopId) {
+        if (user && user.shopId) {
             setLoading(true);
             const notificationsRef = collection(db, `shops/${user.shopId}/notifications`);
-            const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(50));
+            
+            let q;
+            if (user.role === 'admin') {
+                // Admin sees low-stock and other admin-targeted notifications
+                 q = query(notificationsRef, where('target', '==', 'admin'), orderBy('createdAt', 'desc'), limit(50));
+            } else {
+                // Staff see broadcasts
+                 q = query(notificationsRef, where('target', '==', 'staff'), orderBy('createdAt', 'desc'), limit(50));
+            }
 
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const fetchedNotifications: Notification[] = [];
@@ -45,7 +54,6 @@ export function useNotifications() {
 
             return () => unsubscribe();
         } else {
-            // Not an admin or no shopId, so no notifications to fetch
             setNotifications([]);
             setLoading(false);
         }
@@ -55,7 +63,19 @@ export function useNotifications() {
         if (user && user.shopId) {
             const notifRef = doc(db, `shops/${user.shopId}/notifications`, notificationId);
             try {
+                // To mark a broadcast as read for a specific user, we'd need a more complex system
+                // (e.g., a 'readBy' array on the notification). For simplicity, we'll mark the main doc.
+                // This means if one staff reads it, it appears read for all. This is a reasonable MVP tradeoff.
+                const notification = notifications.find(n => n.id === notificationId);
+                if(notification && notification.type === 'staff-broadcast' && user.role === 'staff') {
+                    // Don't mark broadcasts as globally read, just hide it client-side for this user.
+                    // A proper implementation would track read status per user.
+                    setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
+                    return;
+                }
+                
                 await updateDoc(notifRef, { read: true });
+
             } catch (error) {
                 console.error("Error marking notification as read:", error);
             }
@@ -65,32 +85,34 @@ export function useNotifications() {
     return { notifications, loading, markAsRead };
 }
 
-// Function to create a notification, can be called from anywhere
-export const createNotification = async (shopId: string, data: NotificationData) => {
+// Function for creating admin-targeted notifications
+export const createAdminNotification = async (shopId: string, data: Omit<NotificationData, 'target'>) => {
     try {
-        const shopRef = doc(db, 'shops', shopId);
-        const shopSnap = await getDoc(shopRef);
-
-        if (!shopSnap.exists()) {
-            throw new Error("Shop not found");
-        }
-
-        const ownerId = shopSnap.data().ownerId;
-        if (!ownerId) {
-             throw new Error("Shop owner not found");
-        }
-
         const notificationRef = collection(db, `shops/${shopId}/notifications`);
         
         await addDoc(notificationRef, {
             ...data,
-            uid: ownerId, // Target the shop owner
+            target: 'admin',
             read: false,
             createdAt: serverTimestamp(),
         });
     } catch (error) {
-        console.error("Failed to create notification:", error);
+        console.error("Failed to create admin notification:", error);
     }
 };
 
-    
+// Function for creating staff-targeted broadcast notifications
+export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target'>) => {
+     try {
+        const notificationRef = collection(db, `shops/${shopId}/notifications`);
+        
+        await addDoc(notificationRef, {
+            ...data,
+            target: 'staff',
+            read: false,
+            createdAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error("Failed to create staff broadcast:", error);
+    }
+};

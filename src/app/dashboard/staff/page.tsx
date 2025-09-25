@@ -6,32 +6,23 @@ import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTim
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useDateFormat } from '@/hooks/use-date-format';
-import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, XCircle, ChevronDown, ChevronUp, Phone, Cake, FileText, User } from 'lucide-react';
+import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, XCircle, ChevronDown, ChevronUp, Phone, Cake, FileText, User, Send } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { differenceInDays, parseISO } from 'date-fns';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { createStaffBroadcast } from '@/hooks/use-notifications';
 
 
 type StaffMember = {
@@ -52,6 +43,13 @@ type InviteCode = {
     createdAt: Timestamp;
 }
 
+const broadcastSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(100, 'Title is too long'),
+  message: z.string().min(1, 'Message is required').max(500, 'Message is too long'),
+});
+
+type BroadcastFormValues = z.infer<typeof broadcastSchema>;
+
 const CODE_EXPIRATION_DAYS = 7;
 
 export default function StaffPage() {
@@ -68,6 +66,11 @@ export default function StaffPage() {
     const [isRemoveStaffAlertOpen, setIsRemoveStaffAlertOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+    const broadcastForm = useForm<BroadcastFormValues>({
+        resolver: zodResolver(broadcastSchema),
+        defaultValues: { title: '', message: '' },
+    });
 
     useEffect(() => {
         if (user && user.shopId) {
@@ -96,12 +99,6 @@ export default function StaffPage() {
                  if(loading) setLoading(false);
             }, (error) => {
                 console.error("Invites listener error: ", error);
-                // This toast is commented out as it might relate to the index issue.
-                // toast({
-                //     title: "Database Error",
-                //     description: "Could not fetch invite codes. A database index might be required.",
-                //     variant: "destructive",
-                // });
                 setLoading(false);
             });
 
@@ -216,6 +213,26 @@ export default function StaffPage() {
         setExpandedRows(newSet);
     };
 
+    const handleBroadcast = async (data: BroadcastFormValues) => {
+        if (!user || !user.shopId) return;
+        const { isSubmitting } = broadcastForm.formState;
+        if (isSubmitting) return;
+
+        try {
+            await createStaffBroadcast(user.shopId, {
+                title: data.title,
+                description: data.message,
+                type: 'staff-broadcast',
+                author: user.name || 'Admin',
+            });
+            toast({ title: 'Broadcast Sent', description: 'Your message has been sent to all staff members.' });
+            broadcastForm.reset();
+        } catch (error) {
+            toast({ title: 'Error', description: 'Failed to send broadcast.', variant: 'destructive' });
+            console.error("Broadcast error:", error);
+        }
+    };
+
 
     if (loading) {
         return (
@@ -279,146 +296,179 @@ export default function StaffPage() {
             </AlertDialog>
 
             <h1 className="text-3xl font-bold tracking-tight mb-8">Staff Management</h1>
-            <div className="space-y-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-xl">Invite Staff</CardTitle>
-                        <CardDescription>Generate a unique invite code for new staff members to join your team.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                        <Button onClick={handleGenerateCode} disabled={generating} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
-                            {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-                            Generate New Invite Code
-                        </Button>
-                        {lastGeneratedCode && (
-                            <div className="flex items-center justify-between gap-2 p-2 border rounded-lg bg-muted/50 w-full">
-                                <span className="font-mono text-sm tracking-widest">{lastGeneratedCode}</span>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(lastGeneratedCode)}>
-                                    <Copy className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-xl">Pending Invite Codes</CardTitle>
-                        <CardDescription>View and manage unused invite codes. Codes expire after 7 days.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {inviteCodes.length > 0 ? (
-                            <div className="space-y-2">
-                                {inviteCodes.map(invite => {
-                                    const expiration = getCodeExpiration(invite.createdAt);
-                                    return (
-                                    <div key={invite.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 border rounded-lg bg-muted/30">
-                                        <span className="font-mono text-sm tracking-wider">{invite.code}</span>
-                                        <div className="flex items-center gap-2 self-end">
-                                            {!expiration.isExpired && <Badge className={`text-xs font-medium ${expiration.badgeColor}`}>{expiration.text}</Badge>}
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(invite.code)}>
-                                                <Copy className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 hover:text-destructive" onClick={() => confirmDeleteCode(invite)}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )})}
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-center h-24 border-2 border-dashed rounded-lg">
-                                <p className="text-sm text-muted-foreground text-center">No pending invites.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            
-                <div>
-                    <h2 className="text-xl font-bold tracking-tight mb-4">Staff Members</h2>
+            <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+                <div className="space-y-8">
                     <Card>
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-12"></TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead className="hidden md:table-cell">Email</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {staffList.length > 0 ? (
-                                        staffList.map(staff => (
-                                        <React.Fragment key={staff.id}>
-                                                <TableRow>
-                                                    <TableCell>
-                                                        <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(staff.id)} className="h-8 w-8">
-                                                            {expandedRows.has(staff.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                                        </Button>
-                                                    </TableCell>
-                                                    <TableCell className="font-medium">{staff.name}</TableCell>
-                                                    <TableCell className="hidden md:table-cell">{staff.email}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                                                            {staff.status}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right space-x-2 md:space-x-4">
-                                                        <Button variant="link" size="sm" className="p-0 h-auto font-medium text-blue-600" onClick={() => handleToggleStatus(staff)}>
-                                                            {staff.status === 'active' ? 'Block' : 'Unblock'}
-                                                        </Button>
-                                                        <Button variant="link" size="sm" className="p-0 h-auto font-medium text-destructive" onClick={() => confirmRemoveStaff(staff)}>
-                                                            Remove
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                                {expandedRows.has(staff.id) && (
-                                                    <TableRow key={`${staff.id}-details`} className="bg-muted/50 hover:bg-muted/50">
-                                                        <TableCell colSpan={5} className="p-4">
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                                <div className="flex items-center gap-2 text-sm md:hidden">
-                                                                    <strong>Email:</strong>
-                                                                    <span className="truncate">{staff.email}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 text-sm">
-                                                                    <Phone className="h-4 w-4 text-muted-foreground" />
-                                                                    <strong>Phone:</strong>
-                                                                    <span>{staff.phone || 'N/A'}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 text-sm">
-                                                                    <Cake className="h-4 w-4 text-muted-foreground" />
-                                                                    <strong>DOB:</strong>
-                                                                    <span>{staff.dob ? formatDate(staff.dob) : 'N/A'}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 text-sm">
-                                                                    <User className="h-4 w-4 text-muted-foreground" />
-                                                                    <strong>Aadhaar:</strong>
-                                                                    <span>{staff.aadhaar || 'N/A'}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 text-sm">
-                                                                    <FileText className="h-4 w-4 text-muted-foreground" />
-                                                                    <strong>PAN:</strong>
-                                                                    <span>{staff.pan || 'N/A'}</span>
-                                                                </div>
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </React.Fragment>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">
-                                                No staff have joined your shop yet.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
+                        <CardHeader>
+                            <CardTitle className="text-xl">Invite Staff</CardTitle>
+                            <CardDescription>Generate a unique invite code for new staff members to join your team.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                            <Button onClick={handleGenerateCode} disabled={generating} className="bg-green-600 hover:bg-green-700 text-white shrink-0">
+                                {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                                Generate New Invite Code
+                            </Button>
+                            {lastGeneratedCode && (
+                                <div className="flex items-center justify-between gap-2 p-2 border rounded-lg bg-muted/50 w-full">
+                                    <span className="font-mono text-sm tracking-widest">{lastGeneratedCode}</span>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(lastGeneratedCode)}>
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle className="text-xl">Pending Invite Codes</CardTitle>
+                            <CardDescription>View and manage unused invite codes. Codes expire after 7 days.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {inviteCodes.length > 0 ? (
+                                <div className="space-y-2">
+                                    {inviteCodes.map(invite => {
+                                        const expiration = getCodeExpiration(invite.createdAt);
+                                        return (
+                                        <div key={invite.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 border rounded-lg bg-muted/30">
+                                            <span className="font-mono text-sm tracking-wider">{invite.code}</span>
+                                            <div className="flex items-center gap-2 self-end">
+                                                {!expiration.isExpired && <Badge className={`text-xs font-medium ${expiration.badgeColor}`}>{expiration.text}</Badge>}
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopyCode(invite.code)}>
+                                                    <Copy className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 hover:text-destructive" onClick={() => confirmDeleteCode(invite)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )})}
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center h-24 border-2 border-dashed rounded-lg">
+                                    <p className="text-sm text-muted-foreground text-center">No pending invites.</p>
+                                </div>
+                            )}
+                        </CardContent>
                     </Card>
                 </div>
+
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="text-xl">Broadcast to Staff</CardTitle>
+                        <CardDescription>Send a notification to all active staff members.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Form {...broadcastForm}>
+                            <form onSubmit={broadcastForm.handleSubmit(handleBroadcast)} className="space-y-4">
+                                <FormField control={broadcastForm.control} name="title" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Title</FormLabel>
+                                        <FormControl><Input placeholder="e.g., Team Meeting" {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}/>
+                                <FormField control={broadcastForm.control} name="message" render={({ field }) => (
+                                     <FormItem>
+                                        <FormLabel>Message</FormLabel>
+                                        <FormControl><Textarea placeholder="Your message here..." {...field} rows={4} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}/>
+                                <Button type="submit" disabled={broadcastForm.formState.isSubmitting} className="w-full">
+                                    {broadcastForm.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4"/>}
+                                    Send Broadcast
+                                </Button>
+                            </form>
+                        </Form>
+                    </CardContent>
+                </Card>
+            </div>
+            
+            <div className="mt-8">
+                <h2 className="text-xl font-bold tracking-tight mb-4">Staff Members</h2>
+                <Card>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-12"></TableHead>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead className="hidden md:table-cell">Email</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {staffList.length > 0 ? (
+                                    staffList.map(staff => (
+                                    <React.Fragment key={staff.id}>
+                                            <TableRow>
+                                                <TableCell>
+                                                    <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(staff.id)} className="h-8 w-8">
+                                                        {expandedRows.has(staff.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell className="font-medium">{staff.name}</TableCell>
+                                                <TableCell className="hidden md:table-cell">{staff.email}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={staff.status === 'active' ? 'default' : 'destructive'} className={staff.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                                                        {staff.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right space-x-2 md:space-x-4">
+                                                    <Button variant="link" size="sm" className="p-0 h-auto font-medium text-blue-600" onClick={() => handleToggleStatus(staff)}>
+                                                        {staff.status === 'active' ? 'Block' : 'Unblock'}
+                                                    </Button>
+                                                    <Button variant="link" size="sm" className="p-0 h-auto font-medium text-destructive" onClick={() => confirmRemoveStaff(staff)}>
+                                                        Remove
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                            {expandedRows.has(staff.id) && (
+                                                <TableRow key={`${staff.id}-details`} className="bg-muted/50 hover:bg-muted/50">
+                                                    <TableCell colSpan={5} className="p-4">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                            <div className="flex items-center gap-2 text-sm md:hidden">
+                                                                <strong>Email:</strong>
+                                                                <span className="truncate">{staff.email}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-sm">
+                                                                <Phone className="h-4 w-4 text-muted-foreground" />
+                                                                <strong>Phone:</strong>
+                                                                <span>{staff.phone || 'N/A'}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-sm">
+                                                                <Cake className="h-4 w-4 text-muted-foreground" />
+                                                                <strong>DOB:</strong>
+                                                                <span>{staff.dob ? formatDate(staff.dob) : 'N/A'}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-sm">
+                                                                <User className="h-4 w-4 text-muted-foreground" />
+                                                                <strong>Aadhaar:</strong>
+                                                                <span>{staff.aadhaar || 'N-A'}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-sm">
+                                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                                <strong>PAN:</strong>
+                                                                <span>{staff.pan || 'N-A'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </React.Fragment>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center">
+                                            No staff have joined your shop yet.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </Card>
             </div>
         </main>
     );

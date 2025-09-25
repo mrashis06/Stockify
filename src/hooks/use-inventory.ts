@@ -28,7 +28,7 @@ import { format, subDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { usePageLoading } from './use-loading';
 import type { GodownItem, TransferHistory } from './use-godown-inventory';
-import { createNotification } from './use-notifications';
+import { createAdminNotification } from './use-notifications';
 import { useAuth } from './use-auth';
 import { useNotificationSettings } from './use-notification-settings';
 
@@ -320,7 +320,7 @@ export function useInventory() {
                  const newClosingStock = dailyData[id].closing;
                  if (notificationSettings.lowStockAlerts && newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
                     if(user && user.shopId) {
-                         createNotification(user.shopId, {
+                         createAdminNotification(user.shopId, {
                             title: 'Low Stock Alert',
                             description: `${dailyData[id].brand} (${dailyData[id].size}) is running low. Only ${newClosingStock} units left.`,
                             type: 'low-stock',
