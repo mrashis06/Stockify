@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -31,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import AddBrandReviewStep from './add-brand-review-step';
 
 const formSchema = z.object({
   brand: z.string().min(1, 'Brand name is required'),
@@ -40,7 +42,7 @@ const formSchema = z.object({
   prevStock: z.coerce.number().int().min(0, 'Initial stock must be a non-negative integer'),
 });
 
-type AddBrandFormValues = z.infer<typeof formSchema>;
+export type AddBrandFormValues = z.infer<typeof formSchema>;
 
 type AddBrandDialogProps = {
   isOpen: boolean;
@@ -51,6 +53,9 @@ type AddBrandDialogProps = {
 const categories = ['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine', 'Gin', 'Tequila', 'IML'];
 
 export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: AddBrandDialogProps) {
+  const [step, setStep] = useState<'form' | 'review'>('form');
+  const [formData, setFormData] = useState<AddBrandFormValues | null>(null);
+
   const form = useForm<AddBrandFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -62,109 +67,133 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     },
   });
 
-  const onSubmit = (data: AddBrandFormValues) => {
-    onAddBrand(data);
-    onOpenChange(false);
+  const handleFormSubmit = (data: AddBrandFormValues) => {
+    setFormData(data);
+    setStep('review');
+  };
+
+  const handleConfirmSubmit = () => {
+    if (formData) {
+      onAddBrand(formData);
+      onOpenChange(false); // Close dialog on final submission
+    }
   };
   
+  // Reset state when dialog is closed
   useEffect(() => {
     if (!isOpen) {
       form.reset();
+      setStep('form');
+      setFormData(null);
     }
   }, [isOpen, form]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Brand</DialogTitle>
+          <DialogTitle>{step === 'form' ? 'Add New Brand' : 'Review Details'}</DialogTitle>
+          <DialogDescription>
+            {step === 'form' 
+              ? 'Enter the details for the new brand.' 
+              : 'Please review the information before saving.'
+            }
+          </DialogDescription>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
-            <FormField
-              control={form.control}
-              name="brand"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Brand Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Old Monk" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="size"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Size</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., 750ml" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="price"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Price (₹)</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="e.g., 190" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+        
+        {step === 'form' ? (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="grid gap-4 py-4">
+              <FormField
+                control={form.control}
+                name="brand"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Brand Name</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
+                      <Input placeholder="e.g., Old Monk" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="prevStock"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Initial Stock</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="e.g., 50" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-               <DialogClose asChild>
-                <Button type="button" variant="secondary">
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button type="submit" className="bg-green-600 hover:bg-green-700">Add Brand</Button>
-            </DialogFooter>
-          </form>
-        </Form>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="size"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Size</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., 750ml" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Price (₹)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g., 190" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="prevStock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Initial Stock</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="e.g., 50" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="secondary">Cancel</Button>
+                </DialogClose>
+                <Button type="submit">Proceed to Review</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        ) : formData ? (
+          <AddBrandReviewStep 
+            formData={formData}
+            onEdit={() => setStep('form')}
+            onConfirm={handleConfirmSubmit}
+            onCancel={() => onOpenChange(false)}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
