@@ -31,21 +31,24 @@ export function useNotifications() {
             setLoading(true);
             const notificationsRef = collection(db, `shops/${user.shopId}/notifications`);
             
-            let q;
-            if (user.role === 'admin') {
-                // Admin sees low-stock and other admin-targeted notifications
-                 q = query(notificationsRef, where('target', '==', 'admin'), orderBy('createdAt', 'desc'), limit(50));
-            } else {
-                // Staff see broadcasts
-                 q = query(notificationsRef, where('target', '==', 'staff'), orderBy('createdAt', 'desc'), limit(50));
-            }
+            // Query for all recent notifications and filter client-side
+            const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(50));
 
             const unsubscribe = onSnapshot(q, (snapshot) => {
-                const fetchedNotifications: Notification[] = [];
+                const allNotifications: Notification[] = [];
                 snapshot.forEach(doc => {
-                    fetchedNotifications.push({ id: doc.id, ...doc.data() } as Notification);
+                    allNotifications.push({ id: doc.id, ...doc.data() } as Notification);
                 });
-                setNotifications(fetchedNotifications);
+
+                // Filter based on user role
+                const filteredNotifications = allNotifications.filter(n => {
+                    if (user.role === 'admin') {
+                        return n.target === 'admin';
+                    }
+                    return n.target === 'staff';
+                });
+
+                setNotifications(filteredNotifications);
                 setLoading(false);
             }, (error) => {
                 console.error("Error fetching notifications:", error);
