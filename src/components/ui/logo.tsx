@@ -24,15 +24,17 @@ const Logo = React.forwardRef<
                 }
 
                 @keyframes slosh {
-                    0%, 100% { transform: translateX(0); }
-                    50% { transform: translateX(-2px); }
+                    0%, 100% { transform: translate(0, 0) rotate(0); }
+                    25% { transform: translate(-3px, 1px) rotate(-2deg); }
+                    50% { transform: translate(2px, -1px) rotate(1deg); }
+                    75% { transform: translate(-1px, 2px) rotate(-1deg); }
                 }
 
                 .liquid-color-cycle {
                     animation: cycle-liquid-color 15s ease-in-out infinite;
                 }
                 .liquid-slosh {
-                    animation: slosh 4s ease-in-out infinite;
+                    animation: slosh 3s ease-in-out infinite;
                 }
             `}</style>
             
@@ -56,8 +58,8 @@ const Logo = React.forwardRef<
                     <g className="liquid-slosh">
                         <path 
                            d="M -5,28 
-                           C 10,22 20,32 30,26
-                           C 40,20 45,30 55,28
+                           C 10,25 20,32 30,28
+                           C 40,22 45,32 55,28
                            L 55,50 L -5,50 Z"
                            fill="url(#liquid-gradient)"
                         />
@@ -77,4 +79,5 @@ const Logo = React.forwardRef<
 Logo.displayName = "Logo";
 
 export default Logo;
+
 
