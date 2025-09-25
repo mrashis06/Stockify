@@ -3,7 +3,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, ChevronDown, ChevronUp } from 'lucide-react';
-import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,6 +37,7 @@ import {
 import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
+import { useDateFormat } from '@/hooks/use-date-format';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 // A new type for our grouped data structure
@@ -61,6 +61,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     } = useGodownInventory();
     
     usePageLoading(loading);
+    const { formatDate } = useDateFormat();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
@@ -275,13 +276,13 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                                                     <TableBody>
                                                         {item.batches.map(batch => (
                                                             <TableRow key={batch.id}>
-                                                                <TableCell>{batch.dateAdded ? format(batch.dateAdded.toDate(), 'PPP') : 'N/A'}</TableCell>
+                                                                <TableCell>{batch.dateAdded ? formatDate(batch.dateAdded.toDate()) : 'N/A'}</TableCell>
                                                                 <TableCell>
                                                                     {batch.transferHistory && batch.transferHistory.length > 0 ? (
                                                                          <ScrollArea className="h-20 w-48 rounded-md border p-2 text-xs">
                                                                             {batch.transferHistory.sort((a,b) => b.date.toMillis() - a.date.toMillis()).map((th, index) => (
                                                                                 <div key={index} className="mb-1">
-                                                                                    {th.quantity} units on {format(th.date.toDate(), 'P')}
+                                                                                    {th.quantity} units on {formatDate(th.date.toDate())}
                                                                                 </div>
                                                                             ))}
                                                                          </ScrollArea>

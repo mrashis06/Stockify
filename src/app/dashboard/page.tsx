@@ -7,7 +7,8 @@ import Link from 'next/link';
 import { useEffect, useState, useMemo } from "react";
 import { doc, onSnapshot, collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { format, subDays } from 'date-fns';
+import { subDays } from 'date-fns';
+import { useDateFormat } from "@/hooks/use-date-format";
 
 import {
   Card,
@@ -35,12 +36,13 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const [loading, setLoading] = useState(true);
   const [todaySalesData, setTodaySalesData] = useState<any>({});
   const [yesterdaySalesData, setYesterdaySalesData] = useState<any>({});
+  const { formatDate } = useDateFormat();
   
   usePageLoading(loading);
 
   useEffect(() => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    const today = formatDate(new Date(), 'yyyy-MM-dd');
+    const yesterday = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
     const dailyDocRef = doc(db, 'dailyInventory', today);
 
     const unsubscribe = onSnapshot(dailyDocRef, async (dailySnap) => {
@@ -90,7 +92,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [formatDate]);
 
   const processedInventory = useMemo(() => {
     return inventory.map(item => {

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { format, eachDayOfInterval, isSameDay, parse, startOfDay } from 'date-fns';
+import { eachDayOfInterval, isSameDay, parse, startOfDay } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc } from 'firebase/firestore';
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table"
 import { toast } from '@/hooks/use-toast';
 import { usePageLoading } from '@/hooks/use-loading';
+import { useDateFormat } from '@/hooks/use-date-format';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface jsPDFWithAutoTable extends jsPDF {
@@ -63,6 +64,7 @@ type OnBarSoldItem = {
 
 
 export default function ReportsPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+    const { formatDate } = useDateFormat();
     const [date, setDate] = useState<DateRange | undefined>({
         from: new Date(),
         to: new Date(),
@@ -92,7 +94,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
 
         try {
             for (const day of days) {
-                const dateStr = format(day, 'yyyy-MM-dd');
+                const dateStr = formatDate(day, 'yyyy-MM-dd');
                 const dailyDocRef = doc(db, 'dailyInventory', dateStr);
                 const docSnap = await getDoc(dailyDocRef);
                 if (docSnap.exists()) {
@@ -106,7 +108,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [formatDate]);
     
     useEffect(() => {
         if (date?.from) {
@@ -197,8 +199,8 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             }
         });
 
-        const startDate = date?.from ? format(date.from, 'PPP') : '';
-        const endDate = date?.to ? format(date.to, 'PPP') : startDate;
+        const startDate = date?.from ? formatDate(date.from) : '';
+        const endDate = date?.to ? formatDate(date.to) : startDate;
         const isSingleDay = !date?.to || isSameDay(date?.from || new Date(), date.to);
         const dateRangeStr = isSingleDay ? `for ${startDate}` : `from ${startDate} to ${endDate}`;
         const reportTitle = `${isOffCounter ? 'Off-Counter' : 'On-Bar'} Sales Statement ${dateRangeStr}`;
@@ -219,7 +221,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
             footStyles: { fillColor: [22, 163, 74], textColor: [255,255,255], fontStyle: 'bold' },
         });
         
-        const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : 'report';
+        const fileDate = date?.from ? formatDate(date.from, 'yyyy-MM-dd') : 'report';
         doc.save(`${reportType}_sales_${fileDate}.pdf`);
     };
 
@@ -261,7 +263,7 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        const fileDate = date?.from ? format(date.from, 'yyyy-MM-dd') : 'report';
+        const fileDate = date?.from ? formatDate(date.from, 'yyyy-MM-dd') : 'report';
         link.setAttribute("download", `${reportType}_sales_${fileDate}.csv`);
         document.body.appendChild(link);
         link.click();
@@ -307,8 +309,8 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
                         >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {date?.from ? ( date.to && !isSameDay(date.from, date.to) ? (<>
-                                {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>
-                            ) : (format(date.from, "LLL dd, y"))) : (<span>Pick a date</span>)}
+                                {formatDate(date.from)} - {formatDate(date.to)}</>
+                            ) : (formatDate(date.from))) : (<span>Pick a date</span>)}
                         </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">

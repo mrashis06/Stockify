@@ -5,13 +5,14 @@ import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { CalendarIcon, ChevronRight, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
+import { useDateFormat, supportedDateFormats } from '@/hooks/use-date-format';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +35,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 const formSchema = z.object({
@@ -45,25 +47,27 @@ const formSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof formSchema>;
 
-const SettingsItem = ({ label, description, value, isToggle = false, onToggleChange, defaultChecked }: { label: string, description: string, value: string, isToggle?: boolean, onToggleChange?: (checked: boolean) => void, defaultChecked?: boolean }) => (
+const SettingsItem = ({ label, description, children, isInteractive = false }: { label: string; description: string; children: React.ReactNode, isInteractive?: boolean }) => (
     <div className="flex items-center justify-between py-4">
       <div className="flex flex-col">
         <span className="font-medium">{label}</span>
         <span className="text-sm text-muted-foreground">{description}</span>
       </div>
-      {isToggle ? (
-          <Switch onCheckedChange={onToggleChange} defaultChecked={defaultChecked} />
+      {isInteractive ? (
+        <div className="w-[180px]">
+          {children}
+        </div>
       ) : (
-          <div className="flex items-center text-muted-foreground">
-          <span>{value}</span>
-          <ChevronRight className="h-4 w-4 ml-2" />
-          </div>
+        <div className="flex items-center text-muted-foreground">
+          <span>{children}</span>
+          {!isInteractive && <ChevronRight className="h-4 w-4 ml-2" />}
+        </div>
       )}
     </div>
-  );
+);
   
   const UserProfileItem = ({ label, description, isLogout = false, onClick }: { label: string, description:string, isLogout?: boolean, onClick?: () => void }) => (
-      <div className="flex items-center justify-between p-4" onClick={onClick}>
+      <div className="flex items-center justify-between p-4 cursor-pointer" onClick={onClick}>
           <div className="flex flex-col">
               <span className={`font-medium ${isLogout ? 'text-destructive' : ''}`}>{label}</span>
               <span className="text-sm text-muted-foreground">{description}</span>
@@ -76,6 +80,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
   const router = useRouter();
   const { user, updateUser } = useAuth();
   const { toast } = useToast();
+  const { dateFormat, setDateFormat, formatDate } = useDateFormat();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(formSchema),
@@ -100,7 +105,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
     try {
         const updateData = {
             name: data.name,
-            dob: format(data.dob, 'yyyy-MM-dd')
+            dob: data.dob.toISOString().split('T')[0] // format as YYYY-MM-DD
         }
         await updateUser(user.uid, updateData);
         toast({ title: 'Success', description: 'Profile updated successfully.' });
@@ -157,7 +162,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                                     )}
                                     >
                                     {field.value ? (
-                                        format(field.value, "PPP")
+                                        formatDate(field.value)
                                     ) : (
                                         <span>Pick a date</span>
                                     )}
@@ -196,11 +201,22 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                 <h2 className="text-xl font-semibold mb-2 px-6 pt-6">App Preferences</h2>
                 <div className="px-6">
                     <Separator />
-                    <SettingsItem label="Language" description="Choose your preferred language for the app interface." value="English" />
+                    <SettingsItem label="Language" description="Choose your preferred language for the app interface.">English</SettingsItem>
                     <Separator />
-                    <SettingsItem label="Currency" description="Select the currency for all financial displays." value="Indian Rupee (₹)" />
+                    <SettingsItem label="Currency" description="Select the currency for all financial displays.">Indian Rupee (₹)</SettingsItem>
                     <Separator />
-                    <SettingsItem label="Date Format" description="Choose your preferred date format for all date displays." value="DD/MM/YYYY" />
+                    <SettingsItem label="Date Format" description="Choose your preferred date format for all date displays." isInteractive={true}>
+                        <Select value={dateFormat} onValueChange={setDateFormat}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select format" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {supportedDateFormats.map(f => (
+                                    <SelectItem key={f.format} value={f.format}>{f.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </SettingsItem>
                 </div>
             </section>
 
@@ -208,21 +224,27 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                 <h2 className="text-xl font-semibold mb-2 px-6">Notifications</h2>
                 <div className="px-6">
                     <Separator />
-                    <SettingsItem label="Low Stock Alerts" description="Receive alerts for low stock levels on specific items." value="" isToggle={true} defaultChecked={true} />
+                    <SettingsItem label="Low Stock Alerts" description="Receive alerts for low stock levels on specific items." isInteractive={true}>
+                        <Switch defaultChecked={true} />
+                    </SettingsItem>
                     <Separator />
-                    <SettingsItem label="New Order Notifications" description="Get notified when new orders are placed." value="" isToggle={true} defaultChecked={true} />
+                    <SettingsItem label="New Order Notifications" description="Get notified when new orders are placed." isInteractive={true}>
+                        <Switch defaultChecked={true} />
+                    </SettingsItem>
                     <Separator />
-                    <SettingsItem label="Daily Summary" description="Receive daily summaries of sales and inventory changes." value="" isToggle={true} defaultChecked={false} />
+                    <SettingsItem label="Daily Summary" description="Receive daily summaries of sales and inventory changes." isInteractive={true}>
+                         <Switch defaultChecked={false} />
+                    </SettingsItem>
                 </div>
             </section>
             
             <section className="pt-6">
                 <h2 className="text-xl font-semibold mb-2 px-6">User Profile</h2>
                 <div className="divide-y">
-                  <Link href="#" className="block hover:bg-muted/50 rounded-md cursor-pointer">
+                  <Link href="#" className="block hover:bg-muted/50 rounded-md">
                       <UserProfileItem label="Account Settings" description="Manage your account details and security settings." />
                   </Link>
-                  <div className="block hover:bg-muted/50 rounded-md cursor-pointer" onClick={handleLogout}>
+                  <div className="block hover:bg-muted/50 rounded-md" onClick={handleLogout}>
                       <UserProfileItem label="Log Out" description="Log out from the application." isLogout={true} onClick={handleLogout} />
                   </div>
                 </div>

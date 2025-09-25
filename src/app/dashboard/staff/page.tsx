@@ -5,9 +5,10 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
+import { useDateFormat } from '@/hooks/use-date-format';
 import { Loader2, UserPlus, KeyRound, Copy, Trash2, ShieldOff, Shield, XCircle, ChevronDown, ChevronUp, Phone, Cake, FileText, User } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { differenceInDays, format, parseISO } from 'date-fns';
+import { differenceInDays, parseISO } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -56,6 +57,7 @@ const CODE_EXPIRATION_DAYS = 7;
 export default function StaffPage() {
     const { user, updateUser } = useAuth();
     const { toast } = useToast();
+    const { formatDate } = useDateFormat();
     const [staffList, setStaffList] = useState<StaffMember[]>([]);
     const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
     const [loading, setLoading] = useState(true);
@@ -387,7 +389,7 @@ export default function StaffPage() {
                                                                 <div className="flex items-center gap-2 text-sm">
                                                                     <Cake className="h-4 w-4 text-muted-foreground" />
                                                                     <strong>DOB:</strong>
-                                                                    <span>{staff.dob ? format(parseISO(staff.dob), 'PPP') : 'N/A'}</span>
+                                                                    <span>{staff.dob ? formatDate(staff.dob) : 'N/A'}</span>
                                                                 </div>
                                                                 <div className="flex items-center gap-2 text-sm">
                                                                     <User className="h-4 w-4 text-muted-foreground" />

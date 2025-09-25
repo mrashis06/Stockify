@@ -10,7 +10,6 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +29,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useDateFormat } from '@/hooks/use-date-format';
 import { ADMIN_UIDS } from '@/lib/constants';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -55,6 +55,7 @@ type SignupFormValues = z.infer<typeof formSchema>;
 export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { formatDate } = useDateFormat();
   const [loading, setLoading] = useState(false);
   
   const form = useForm<SignupFormValues>({
@@ -84,7 +85,7 @@ export default function SignupPage() {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        dob: format(data.dob, 'yyyy-MM-dd'),
+        dob: data.dob.toISOString().split('T')[0],
         aadhaar: data.aadhaar,
         pan: data.pan.toUpperCase(),
         role: role,
@@ -146,7 +147,7 @@ export default function SignupPage() {
                             <Popover><PopoverTrigger asChild>
                                 <FormControl>
                                 <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                    {field.value ? formatDate(field.value) : <span>Pick a date</span>}
                                     <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
                                 </FormControl>
