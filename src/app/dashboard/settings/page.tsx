@@ -224,22 +224,18 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
             <section className="pt-6">
                 <h2 className="text-xl font-semibold mb-2 px-6">Notifications</h2>
                 <div className="px-6">
-                    {user?.role === 'admin' && (
-                        <>
-                            <Separator />
-                            <SettingsItem label="Low Stock Alerts" description="Receive alerts for low stock levels on specific items." isInteractive={true}>
-                                <Switch checked={settings.lowStockAlerts} onCheckedChange={(checked) => setSetting('lowStockAlerts', checked)} />
-                            </SettingsItem>
-                            <Separator />
-                            <SettingsItem label="New Order Notifications" description="Get notified when new orders are placed." isInteractive={true}>
-                                <Switch checked={settings.newOrderNotifications} onCheckedChange={(checked) => setSetting('newOrderNotifications', checked)} />
-                            </SettingsItem>
-                            <Separator />
-                            <SettingsItem label="Daily Summary" description="Receive daily summaries of sales and inventory changes." isInteractive={true}>
-                                <Switch checked={settings.dailySummary} onCheckedChange={(checked) => setSetting('dailySummary', checked)} />
-                            </SettingsItem>
-                        </>
-                    )}
+                    <Separator />
+                    <SettingsItem label="Low Stock Alerts" description="Receive alerts for low stock levels on specific items." isInteractive={true}>
+                        <Switch checked={settings.lowStockAlerts} onCheckedChange={(checked) => setSetting('lowStockAlerts', checked)} />
+                    </SettingsItem>
+                    <Separator />
+                    <SettingsItem label="New Order Notifications" description="Get notified when new orders are placed." isInteractive={true}>
+                        <Switch checked={settings.newOrderNotifications} onCheckedChange={(checked) => setSetting('newOrderNotifications', checked)} />
+                    </SettingsItem>
+                    <Separator />
+                    <SettingsItem label="Daily Summary" description="Receive daily summaries of sales and inventory changes." isInteractive={true}>
+                        <Switch checked={settings.dailySummary} onCheckedChange={(checked) => setSetting('dailySummary', checked)} />
+                    </SettingsItem>
                      {user?.role === 'staff' && (
                         <>
                             <Separator />
