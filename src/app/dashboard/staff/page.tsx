@@ -530,8 +530,4 @@ export default function StaffPage() {
             </div>
         </main>
     );
-
-    
-
-    
-
+}
