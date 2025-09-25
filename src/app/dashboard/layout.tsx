@@ -148,13 +148,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </AlertDialogHeader>
                 <div className="text-sm space-y-4">
                     <div>
-                        <p className="font-semibold">Ashish Kumar</p>
+                        <p className="font-semibold">Ashish Kumar Rai</p>
                         <p><strong>WhatsApp:</strong> <a href="https://wa.me/919123849124" target="_blank" rel="noopener noreferrer" className="text-primary underline">+91 9123849124</a></p>
                         <p><strong>Email:</strong> <a href="mailto:mrashis0603@gmail.com" className="text-primary underline">mrashis0603@gmail.com</a></p>
                     </div>
                     <Separator />
                     <div>
-                        <p className="font-semibold">Vijay Rai</p>
+                        <p className="font-semibold">Vijay Kumar Rai</p>
                         <p><strong>WhatsApp:</strong> <a href="https://wa.me/918240339330" target="_blank" rel="noopener noreferrer" className="text-primary underline">+91 8240339330</a></p>
                         <p><strong>Email:</strong> <a href="mailto:vijayrai28385@gmail.com" className="text-primary underline">vijayrai28385@gmail.com</a></p>
                     </div>
