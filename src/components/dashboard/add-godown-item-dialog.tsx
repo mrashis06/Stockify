@@ -56,7 +56,7 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
       brand: '',
       size: '',
       category: '',
-      quantity: undefined,
+      quantity: '' as any,
     },
   });
 
