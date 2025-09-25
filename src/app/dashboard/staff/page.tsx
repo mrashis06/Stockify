@@ -77,9 +77,10 @@ export default function StaffPage() {
 
     useEffect(() => {
         if (user && user.shopId) {
+            setLoading(true);
             const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
             const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"));
-            const broadcastsQuery = query(collection(db, `shops/${user.shopId}/notifications`), where('type', '==', 'staff-broadcast'), orderBy('createdAt', 'desc'), limit(5));
+            const broadcastsQuery = query(collection(db, `shops/${user.shopId}/notifications`), orderBy('createdAt', 'desc'), limit(5));
 
 
             const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
@@ -105,7 +106,9 @@ export default function StaffPage() {
             });
             
              const unsubscribeBroadcasts = onSnapshot(broadcastsQuery, (snapshot) => {
-                const broadcasts: Notification[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+                const broadcasts: Notification[] = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() } as Notification))
+                    .filter(n => n.type === 'staff-broadcast');
                 setRecentBroadcasts(broadcasts);
             });
 
@@ -117,7 +120,7 @@ export default function StaffPage() {
         } else if (user) {
             setLoading(false);
         }
-    }, [user, loading]);
+    }, [user]);
 
     const handleGenerateCode = async () => {
         if (!user || !user.shopId) {
@@ -525,4 +528,5 @@ export default function StaffPage() {
             </div>
         </main>
     );
-}
+
+    
