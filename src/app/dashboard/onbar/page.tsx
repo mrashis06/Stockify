@@ -111,8 +111,6 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             <AddOnBarItemDialog
                 isOpen={isAddItemOpen}
                 onOpenChange={setIsAddItemOpen}
-                shopInventory={shopInventory}
-                onBarInventory={onBarInventory}
             />
 
             {sellingItem && (
