@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, getDoc, writeBatch, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, getDoc, writeBatch, arrayUnion, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from './use-auth';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,8 +31,14 @@ export function useNotifications() {
             setLoading(true);
             const notificationsRef = collection(db, `shops/${user.shopId}/notifications`);
             
-            // Query for all recent notifications and filter client-side
-            const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(50));
+            let q;
+            if (user.role === 'admin') {
+                // Admin sees low-stock and other admin-targeted notifications
+                 q = query(notificationsRef, where('target', '==', 'admin'), orderBy('createdAt', 'desc'), limit(50));
+            } else {
+                // Staff sees staff-broadcasts
+                 q = query(notificationsRef, where('target', '==', 'staff'), orderBy('createdAt', 'desc'), limit(50));
+            }
 
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const allNotifications: Notification[] = [];
@@ -45,15 +51,7 @@ export function useNotifications() {
                      } as Notification);
                 });
 
-                // Filter based on user role
-                const filteredNotifications = allNotifications.filter(n => {
-                    if (user.role === 'admin') {
-                        return n.target === 'admin';
-                    }
-                    return n.target === 'staff';
-                });
-
-                setNotifications(filteredNotifications);
+                setNotifications(allNotifications);
                 setLoading(false);
             }, (error) => {
                 console.error("Error fetching notifications:", error);
@@ -102,7 +100,7 @@ export const createAdminNotification = async (shopId: string, data: Omit<Notific
 };
 
 // Function for creating staff-targeted broadcast notifications
-export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target'>) => {
+export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target' | 'title'> & { title?: string }) => {
      try {
         const notificationRef = collection(db, `shops/${shopId}/notifications`);
         
@@ -118,4 +116,12 @@ export const createStaffBroadcast = async (shopId: string, data: Omit<Notificati
     }
 };
 
-    
+export const deleteStaffBroadcast = async (shopId: string, notificationId: string) => {
+    try {
+        const notifRef = doc(db, `shops/${shopId}/notifications`, notificationId);
+        await deleteDoc(notifRef);
+    } catch (error) {
+        console.error("Failed to delete staff broadcast:", error);
+        throw error;
+    }
+};

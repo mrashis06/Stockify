@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, Timestamp, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, deleteDoc, Timestamp, writeBatch, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useDateFormat } from '@/hooks/use-date-format';
@@ -22,7 +22,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { createStaffBroadcast } from '@/hooks/use-notifications';
+import { createStaffBroadcast, deleteStaffBroadcast, Notification } from '@/hooks/use-notifications';
+import { Separator } from '@/components/ui/separator';
 
 
 type StaffMember = {
@@ -57,6 +58,7 @@ export default function StaffPage() {
     const { formatDate } = useDateFormat();
     const [staffList, setStaffList] = useState<StaffMember[]>([]);
     const [inviteCodes, setInviteCodes] = useState<InviteCode[]>([]);
+    const [recentBroadcasts, setRecentBroadcasts] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [isDeleteCodeAlertOpen, setDeleteCodeAlertOpen] = useState(false);
@@ -65,6 +67,8 @@ export default function StaffPage() {
     const [isRemoveStaffAlertOpen, setIsRemoveStaffAlertOpen] = useState(false);
     const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [isDeleteBroadcastAlertOpen, setIsDeleteBroadcastAlertOpen] = useState(false);
+    const [selectedBroadcast, setSelectedBroadcast] = useState<Notification | null>(null);
 
     const broadcastForm = useForm<BroadcastFormValues>({
         resolver: zodResolver(broadcastSchema),
@@ -75,6 +79,8 @@ export default function StaffPage() {
         if (user && user.shopId) {
             const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
             const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"));
+            const broadcastsQuery = query(collection(db, `shops/${user.shopId}/notifications`), where('type', '==', 'staff-broadcast'), orderBy('createdAt', 'desc'), limit(5));
+
 
             const unsubscribeStaff = onSnapshot(staffQuery, (snapshot) => {
                 const staff: StaffMember[] = [];
@@ -82,10 +88,10 @@ export default function StaffPage() {
                     staff.push({ id: doc.id, ...doc.data() } as StaffMember);
                 });
                 setStaffList(staff);
-                setLoading(false);
+                if(loading) setLoading(false);
             }, (error) => {
                 console.error("Staff listener error: ", error);
-                setLoading(false);
+                if(loading) setLoading(false);
             });
 
             const unsubscribeInvites = onSnapshot(invitesQuery, (snapshot) => {
@@ -94,20 +100,24 @@ export default function StaffPage() {
                     codes.push({ id: doc.id, ...doc.data() } as InviteCode);
                 });
                 setInviteCodes(codes);
-                 setLoading(false);
             }, (error) => {
                 console.error("Invites listener error: ", error);
-                setLoading(false);
+            });
+            
+             const unsubscribeBroadcasts = onSnapshot(broadcastsQuery, (snapshot) => {
+                const broadcasts: Notification[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+                setRecentBroadcasts(broadcasts);
             });
 
             return () => {
                 unsubscribeStaff();
                 unsubscribeInvites();
+                unsubscribeBroadcasts();
             };
         } else if (user) {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, loading]);
 
     const handleGenerateCode = async () => {
         if (!user || !user.shopId) {
@@ -216,7 +226,6 @@ export default function StaffPage() {
 
         try {
             await createStaffBroadcast(user.shopId, {
-                title: `Message from ${user.name || 'Admin'}`,
                 description: data.message,
                 type: 'staff-broadcast',
                 author: user.name || 'Admin',
@@ -226,6 +235,24 @@ export default function StaffPage() {
         } catch (error) {
             toast({ title: 'Error', description: 'Failed to send broadcast.', variant: 'destructive' });
             console.error("Broadcast error:", error);
+        }
+    };
+    
+    const confirmDeleteBroadcast = (broadcast: Notification) => {
+        setSelectedBroadcast(broadcast);
+        setIsDeleteBroadcastAlertOpen(true);
+    };
+
+    const handleDeleteBroadcast = async () => {
+        if (!user || !user.shopId || !selectedBroadcast) return;
+        try {
+            await deleteStaffBroadcast(user.shopId, selectedBroadcast.id);
+            toast({ title: 'Success', description: 'Broadcast message deleted.' });
+        } catch(error) {
+            toast({ title: 'Error', description: 'Failed to delete message.', variant: 'destructive' });
+        } finally {
+            setIsDeleteBroadcastAlertOpen(false);
+            setSelectedBroadcast(null);
         }
     };
 
@@ -286,6 +313,22 @@ export default function StaffPage() {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleRemoveStaff} className="bg-destructive hover:bg-destructive/90">
                             Remove
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={isDeleteBroadcastAlertOpen} onOpenChange={setIsDeleteBroadcastAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Broadcast Message?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                           This will permanently delete the message for all staff. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteBroadcast} className="bg-destructive hover:bg-destructive/90">
+                            Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -369,6 +412,27 @@ export default function StaffPage() {
                                 </Button>
                             </form>
                         </Form>
+                         <Separator className="my-6" />
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-medium text-muted-foreground">Recent Broadcasts</h3>
+                            {recentBroadcasts.length > 0 ? (
+                                <div className="space-y-3">
+                                {recentBroadcasts.map(b => (
+                                    <div key={b.id} className="flex justify-between items-start gap-4 p-3 border rounded-lg">
+                                        <div>
+                                            <p className="text-sm">{b.description}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">{formatDate(b.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => confirmDeleteBroadcast(b)}>
+                                            <Trash2 className="h-4 w-4 text-destructive/80" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">No recent broadcasts.</p>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
             </div>

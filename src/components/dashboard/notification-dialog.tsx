@@ -45,5 +45,3 @@ export default function NotificationDialog({ isOpen, onOpenChange, notification 
     </Dialog>
   );
 }
-
-    
