@@ -105,12 +105,13 @@ export const createAdminNotification = async (shopId: string, data: Omit<Notific
 };
 
 // Function for creating staff-targeted broadcast notifications
-export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target'>) => {
+export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target'> & { title?: string }) => {
      try {
         const notificationRef = collection(db, `shops/${shopId}/notifications`);
         
         await addDoc(notificationRef, {
             ...data,
+            title: data.title || "Message from Admin",
             target: 'staff',
             read: false,
             createdAt: serverTimestamp(),

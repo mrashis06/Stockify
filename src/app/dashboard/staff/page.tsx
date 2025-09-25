@@ -44,7 +44,6 @@ type InviteCode = {
 }
 
 const broadcastSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(100, 'Title is too long'),
   message: z.string().min(1, 'Message is required').max(500, 'Message is too long'),
 });
 
@@ -69,12 +68,11 @@ export default function StaffPage() {
 
     const broadcastForm = useForm<BroadcastFormValues>({
         resolver: zodResolver(broadcastSchema),
-        defaultValues: { title: '', message: '' },
+        defaultValues: { message: '' },
     });
 
     useEffect(() => {
         if (user && user.shopId) {
-            setLoading(true);
             const staffQuery = query(collection(db, "users"), where("shopId", "==", user.shopId), where("role", "==", "staff"));
             const invitesQuery = query(collection(db, "invites"), where("shopId", "==", user.shopId), where("status", "==", "pending"));
 
@@ -218,7 +216,7 @@ export default function StaffPage() {
 
         try {
             await createStaffBroadcast(user.shopId, {
-                title: data.title,
+                title: `Message from ${user.name || 'Admin'}`,
                 description: data.message,
                 type: 'staff-broadcast',
                 author: user.name || 'Admin',
@@ -358,13 +356,6 @@ export default function StaffPage() {
                     <CardContent>
                         <Form {...broadcastForm}>
                             <form onSubmit={broadcastForm.handleSubmit(handleBroadcast)} className="space-y-4">
-                                <FormField control={broadcastForm.control} name="title" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Title</FormLabel>
-                                        <FormControl><Input placeholder="e.g., Team Meeting" {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}/>
                                 <FormField control={broadcastForm.control} name="message" render={({ field }) => (
                                      <FormItem>
                                         <FormLabel>Message</FormLabel>
