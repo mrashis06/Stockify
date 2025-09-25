@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://stockify.bar/</loc>
+    <lastmod>2024-01-01</lastmod>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://stockify.bar/dashboard</loc>
+    <lastmod>2024-01-01</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://stockify.bar/dashboard/inventory</loc>
+    <lastmod>2024-01-01</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://stockify.bar/dashboard/sales</loc>
+    <lastmod>2024-01-01</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://stockify.bar/dashboard/reports</loc>
+    <lastmod>2024-01-01</lastmod>
+    <priority>0.8</priority>
+  </url>
+</urlset>

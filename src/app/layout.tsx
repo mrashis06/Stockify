@@ -6,6 +6,12 @@ import { AuthProvider } from '@/hooks/use-auth';
 import { LoadingProvider } from '@/hooks/use-loading';
 import Loader from '@/components/loader';
 
+export const metadata = {
+  title: 'Stockify - Liquor Store Inventory Management',
+  description: 'Stockify helps liquor shops manage inventory, staff, reports, and sales with ease.',
+  keywords: 'Liquor, Inventory, Bar, Stock Management, Staff, Reports',
+};
+
 export default function RootLayout({
   children,
   params,
@@ -16,17 +22,10 @@ export default function RootLayout({
   searchParams?: { [key: string]: string | string[] | undefined };
 }>) {
 
-  const metadata = {
-    title: 'Stockify - Liquor Store Inventory Management',
-    description: 'Smart Inventory Management for Your Liquor Store',
-  };
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
-        <title>{metadata.title}</title>
-        <meta name="description" content={metadata.description} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
