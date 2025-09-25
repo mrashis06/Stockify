@@ -40,6 +40,7 @@ import { useNotificationSettings } from '@/hooks/use-notification-settings';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDateFormat } from '@/hooks/use-date-format';
 import NotificationDialog from '@/components/dashboard/notification-dialog';
+import { Separator } from '@/components/ui/separator';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
@@ -142,12 +143,21 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                       <HelpCircle className="h-5 w-5 text-primary"/> Support Information
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                       For any help or issues, please contact the administrator using the details below.
+                       For any help or issues, please contact the administrators using the details below.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <div className="text-sm space-y-2">
-                    <p><strong>WhatsApp:</strong> <a href="tel:9123849124" className="text-primary underline">9123849124</a></p>
-                    <p><strong>Email:</strong> <a href="mailto:mrashis0603@gmail.com" className="text-primary underline">mrashis0603@gmail.com</a></p>
+                <div className="text-sm space-y-4">
+                    <div>
+                        <p className="font-semibold">Ashish Kumar</p>
+                        <p><strong>WhatsApp:</strong> <a href="https://wa.me/919123849124" target="_blank" rel="noopener noreferrer" className="text-primary underline">+91 9123849124</a></p>
+                        <p><strong>Email:</strong> <a href="mailto:mrashis0603@gmail.com" className="text-primary underline">mrashis0603@gmail.com</a></p>
+                    </div>
+                    <Separator />
+                    <div>
+                        <p className="font-semibold">Vijay Rai</p>
+                        <p><strong>WhatsApp:</strong> <a href="https://wa.me/918240339330" target="_blank" rel="noopener noreferrer" className="text-primary underline">+91 8240339330</a></p>
+                        <p><strong>Email:</strong> <a href="mailto:vijayrai28385@gmail.com" className="text-primary underline">vijayrai28385@gmail.com</a></p>
+                    </div>
                 </div>
                 <AlertDialogFooter>
                     <AlertDialogAction onClick={() => setIsSupportDialogOpen(false)}>Close</AlertDialogAction>
@@ -289,3 +299,5 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+    
