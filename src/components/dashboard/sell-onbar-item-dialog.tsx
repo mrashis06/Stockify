@@ -56,7 +56,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
   
   const form = useForm<SellFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: isBeer ? { quantity: 1 } : { servingSize: 30, salePrice: 0 },
+    defaultValues: isBeer ? { quantity: undefined } : { servingSize: undefined, salePrice: undefined },
   });
   
   const quantity = form.watch(isBeer ? 'quantity' : undefined);
@@ -74,7 +74,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
   
   useEffect(() => {
     if (isOpen) {
-      form.reset(isBeer ? { quantity: 1 } : { servingSize: 30, salePrice: 0 });
+      form.reset(isBeer ? { quantity: undefined } : { servingSize: 30, salePrice: undefined });
     }
   }, [isOpen, item, form, isBeer]);
 
@@ -102,7 +102,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
                     <FormItem>
                       <FormLabel>Quantity to Sell (units)</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} autoFocus />
+                        <Input type="number" placeholder="Enter quantity" {...field} autoFocus />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -121,7 +121,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
                     <FormItem>
                       <FormLabel>Serving Size (ml)</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} autoFocus />
+                        <Input type="number" placeholder="e.g. 30" {...field} autoFocus />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -136,7 +136,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
                        <div className="relative">
                             <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <FormControl>
-                              <Input type="number" {...field} className="pl-10" />
+                              <Input type="number" placeholder="Enter price" {...field} className="pl-10" />
                             </FormControl>
                        </div>
                       <FormMessage />

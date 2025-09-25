@@ -49,14 +49,14 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      quantity: 1,
+      quantity: undefined,
     },
   });
 
   // Reset form when item changes or dialog opens
   useEffect(() => {
     if (isOpen) {
-      form.reset({ quantity: 1 });
+      form.reset({ quantity: undefined });
       // The schema is dependent on `item.quantity`, so it's re-created on each render.
       // We may need to ensure the form re-evaluates against the new schema.
       // `form.trigger()` can help, or simply relying on the re-render.
@@ -99,7 +99,7 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
                 <FormItem>
                   <FormLabel>Quantity to Transfer</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} autoFocus />
+                    <Input type="number" placeholder="Enter quantity" {...field} autoFocus />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

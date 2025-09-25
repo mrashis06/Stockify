@@ -170,7 +170,7 @@ function TrackedForm({ shopInventory, onBarInventory, onOpenChange }: { shopInve
                             <FormItem>
                             <FormLabel>Quantity to Open</FormLabel>
                             <FormControl>
-                                <Input type="number" min="1" max={selectedItem.closing} placeholder="e.g., 1" {...field} />
+                                <Input type="number" min="1" max={selectedItem.closing} placeholder="Enter quantity" {...field} />
                             </FormControl>
                             <FormMessage />
                             </FormItem>
@@ -283,7 +283,7 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
                             <FormItem>
                             <FormLabel>Quantity of Units</FormLabel>
                             <FormControl>
-                                <Input type="number" min="1" placeholder="e.g., 6" {...field} />
+                                <Input type="number" min="1" placeholder="Enter quantity" {...field} />
                             </FormControl>
                             <FormMessage />
                             </FormItem>
@@ -330,13 +330,13 @@ function ManualForm({ onOpenChange }: { onOpenChange: (isOpen: boolean) => void 
 
 
 export default function AddOnBarItemDialog({ isOpen, onOpenChange, shopInventory, onBarInventory }: AddOnBarItemDialogProps) {
-  const trackedForm = useForm<TrackedFormValues>({ resolver: zodResolver(trackedSchema), defaultValues: { inventoryItemId: '', quantity: 1 } });
-  const manualForm = useForm<ManualFormValues>({ resolver: zodResolver(manualSchema), defaultValues: { brand: '', size: '', category: '', totalVolume: 750, quantity: 1, price: 0 } });
+  const trackedForm = useForm<TrackedFormValues>({ resolver: zodResolver(trackedSchema), defaultValues: { inventoryItemId: '', quantity: undefined } });
+  const manualForm = useForm<ManualFormValues>({ resolver: zodResolver(manualSchema), defaultValues: { brand: '', size: '', category: '', totalVolume: 750, quantity: undefined, price: 0 } });
   
   useEffect(() => {
     if (!isOpen) {
-      trackedForm.reset({ inventoryItemId: '', quantity: 1 });
-      manualForm.reset({ brand: '', size: '', category: '', totalVolume: 750, quantity: 1, price: 0 });
+      trackedForm.reset({ inventoryItemId: '', quantity: undefined });
+      manualForm.reset({ brand: '', size: '', category: '', totalVolume: 750, quantity: undefined, price: 0 });
     }
   }, [isOpen, trackedForm, manualForm]);
 

@@ -56,7 +56,7 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
       brand: '',
       size: '',
       category: '',
-      quantity: 1,
+      quantity: undefined,
     },
   });
 
@@ -134,7 +134,7 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
                 <FormItem>
                   <FormLabel>Quantity</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 100" {...field} />
+                    <Input type="number" placeholder="Enter quantity" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
