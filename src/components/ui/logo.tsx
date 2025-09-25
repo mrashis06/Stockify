@@ -9,7 +9,7 @@ const Logo = React.forwardRef<
     return (
         <svg
             ref={ref}
-            viewBox="0 0 240 60"
+            viewBox="0 0 225 60"
             className={cn("text-foreground", className)}
             {...props}
         >
@@ -21,7 +21,7 @@ const Logo = React.forwardRef<
             `}</style>
             <text x="0" y="45" fontSize="50" fontWeight="bold" className="logo-fill-1">St</text>
             
-            <g transform="translate(60, 5) rotate(15 25 25)">
+            <g transform="translate(58, 2.5) rotate(15 25 25)">
                 <rect x="0" y="0" width="50" height="50" rx="5" ry="5" fill="none" strokeWidth="3" className="logo-glass-stroke" />
                 <path d="M 5 30 C 15 20, 35 20, 45 30 L 45 45 L 5 45 Z" fill="#F57C00" />
                 <circle cx="15" cy="38" r="3" fill="#FFE0B2" />
@@ -29,8 +29,8 @@ const Logo = React.forwardRef<
                 <circle cx="38" cy="40" r="2" fill="#FFE0B2" />
             </g>
 
-            <text x="118" y="45" fontSize="50" fontWeight="bold" className="logo-fill-2">ck</text>
-            <text x="180" y="45" fontSize="50" fontWeight="bold" className="logo-fill-3">ify</text>
+            <text x="110" y="45" fontSize="50" fontWeight="bold" className="logo-fill-2">ck</text>
+            <text x="170" y="45" fontSize="50" fontWeight="bold" className="logo-fill-3">ify</text>
         </svg>
     );
 });
