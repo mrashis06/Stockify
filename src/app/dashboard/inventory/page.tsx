@@ -382,7 +382,8 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                         <Input
                                             type="number"
                                             className="h-8 w-20 bg-card"
-                                            placeholder={(item.added ?? 0).toString()}
+                                            defaultValue={item.added || ''}
+                                            placeholder="0"
                                             onBlur={(e) => handleFieldChange(item.id, 'added', e.target.value || '0')}
                                             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                         />
@@ -392,7 +393,8 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                         <Input
                                             type="number"
                                             className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
-                                            placeholder={(item.sales ?? 0).toString()}
+                                            defaultValue={item.sales || ''}
+                                            placeholder="0"
                                             onBlur={(e) => handleFieldChange(item.id, 'sales', e.target.value || '0')}
                                             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                         />
@@ -462,7 +464,3 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
-
-    

@@ -49,14 +49,14 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      quantity: undefined,
+      quantity: '' as any, // Use empty string to keep it controlled
     },
   });
 
   // Reset form when item changes or dialog opens
   useEffect(() => {
     if (isOpen) {
-      form.reset({ quantity: undefined });
+      form.reset({ quantity: '' as any });
       // The schema is dependent on `item.quantity`, so it's re-created on each render.
       // We may need to ensure the form re-evaluates against the new schema.
       // `form.trigger()` can help, or simply relying on the re-render.
@@ -67,7 +67,7 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   const onSubmit = (data: TransferFormValues) => {
     // The `id` on the item passed to this dialog is actually the `productId`
     onTransfer(item.id, data.quantity);
-    form.reset(); // Reset the form to default values after successful submission
+    form.reset({ quantity: '' as any }); // Reset the form to default values after successful submission
   };
   
   // This is redundant with the above useEffect, but harmless.
