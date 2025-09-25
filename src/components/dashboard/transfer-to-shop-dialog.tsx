@@ -53,12 +53,13 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
     },
   });
 
-  // Reset form when item changes
+  // Reset form when item changes or dialog opens
   useEffect(() => {
     if (isOpen) {
       form.reset({ quantity: 1 });
-      // Update validation schema based on the new item's max quantity
-      form.trigger(); 
+      // The schema is dependent on `item.quantity`, so it's re-created on each render.
+      // We may need to ensure the form re-evaluates against the new schema.
+      // `form.trigger()` can help, or simply relying on the re-render.
     }
   }, [isOpen, item, form]);
 
@@ -66,8 +67,10 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   const onSubmit = (data: TransferFormValues) => {
     // The `id` on the item passed to this dialog is actually the `productId`
     onTransfer(item.id, data.quantity);
+    form.reset(); // Reset the form to default values after successful submission
   };
   
+  // This is redundant with the above useEffect, but harmless.
   useEffect(() => {
     if (!isOpen) {
       form.reset();
