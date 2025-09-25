@@ -84,7 +84,7 @@ export default function StaffPage() {
                     staff.push({ id: doc.id, ...doc.data() } as StaffMember);
                 });
                 setStaffList(staff);
-                if(loading) setLoading(false);
+                setLoading(false);
             }, (error) => {
                 console.error("Staff listener error: ", error);
                 setLoading(false);
@@ -96,7 +96,7 @@ export default function StaffPage() {
                     codes.push({ id: doc.id, ...doc.data() } as InviteCode);
                 });
                 setInviteCodes(codes);
-                 if(loading) setLoading(false);
+                 setLoading(false);
             }, (error) => {
                 console.error("Invites listener error: ", error);
                 setLoading(false);
@@ -109,7 +109,7 @@ export default function StaffPage() {
         } else if (user) {
             setLoading(false);
         }
-    }, [user, loading]);
+    }, [user]);
 
     const handleGenerateCode = async () => {
         if (!user || !user.shopId) {
@@ -471,5 +471,3 @@ export default function StaffPage() {
         </main>
     );
 }
-
-    
