@@ -7,6 +7,7 @@ type NotificationSettings = {
   lowStockAlerts: boolean;
   newOrderNotifications: boolean;
   dailySummary: boolean;
+  staffBroadcasts: boolean; // For staff to toggle admin messages
 };
 
 type SettingKey = keyof NotificationSettings;
@@ -22,6 +23,7 @@ const defaultSettings: NotificationSettings = {
     lowStockAlerts: true,
     newOrderNotifications: true,
     dailySummary: false,
+    staffBroadcasts: true, // On by default for staff
 };
 
 export const NotificationSettingsProvider = ({ children }: { children: ReactNode }) => {

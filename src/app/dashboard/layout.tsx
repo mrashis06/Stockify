@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import Logo from '@/components/ui/logo';
 import { useNotifications, Notification } from '@/hooks/use-notifications';
+import { useNotificationSettings } from '@/hooks/use-notification-settings';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDateFormat } from '@/hooks/use-date-format';
 import NotificationDialog from '@/components/dashboard/notification-dialog';
@@ -43,6 +44,7 @@ import NotificationDialog from '@/components/dashboard/notification-dialog';
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
   const { notifications, markAsRead } = useNotifications();
+  const { settings } = useNotificationSettings();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
   const { formatDate } = useDateFormat();
@@ -51,7 +53,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [isNotificationDialogOpen, setNotificationDialogOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
 
-  const unreadCount = notifications.filter(n => !n.readBy.includes(user?.uid || '')).length;
+  const displayedNotifications = user?.role === 'staff' && !settings.staffBroadcasts 
+    ? [] 
+    : notifications;
+    
+  const unreadCount = displayedNotifications.filter(n => !n.readBy.includes(user?.uid || '')).length;
+
 
   useEffect(() => {
     if (!authLoading) {
@@ -221,9 +228,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <DropdownMenuLabel>Notifications</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                    {notifications.length > 0 ? (
+                    {displayedNotifications.length > 0 ? (
                         <ScrollArea className="h-[300px]">
-                            {notifications.map(n => {
+                            {displayedNotifications.map(n => {
                                 const isRead = n.readBy.includes(user?.uid || '');
                                 return (
                                 <DropdownMenuItem key={n.id} onSelect={() => handleNotificationClick(n)} className="flex items-start gap-2 cursor-pointer">
