@@ -28,6 +28,7 @@ import { usePageLoading } from './use-loading';
 export type TransferHistory = {
   date: Timestamp;
   quantity: number;
+  batchId: string; // Add batchId to track origin
 };
 
 export type GodownItem = {
@@ -179,6 +180,7 @@ export function useGodownInventory() {
                 const newHistoryEntry: TransferHistory = {
                     date: transferTimestamp,
                     quantity: transferAmount,
+                    batchId: batch.id, // Add batchId to history
                 };
                 
                 const updateData: { quantity?: number; transferHistory: any } = {

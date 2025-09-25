@@ -18,11 +18,16 @@ import {
   query,
   where,
   Timestamp,
+  orderBy,
+  limit,
+  arrayRemove,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { usePageLoading } from './use-loading';
+import type { GodownItem, TransferHistory } from './use-godown-inventory';
 
 export type InventoryItem = {
   id: string;
@@ -219,36 +224,11 @@ export function useInventory() {
     const originalItemState = inventory.find(item => item.id === id);
 
     try {
-        // --- Step 1: Handle Godown stock changes if 'added' field is modified. ---
-        if (field === 'added') {
-            const itemInState = inventory.find(i => i.id === id);
-            const currentAdded = itemInState?.added || 0;
-            const newAdded = value as number;
-            const diff = newAdded - currentAdded;
-
-            if (diff !== 0) {
-                 await runTransaction(db, async (transaction) => {
-                    if (diff > 0) { // Transfer from Godown to Shop
-                        const godownQuery = query(collection(db, 'godownInventory'), where('productId', '==', id), orderBy('dateAdded', 'asc'));
-                        // Note: We cannot execute this query inside the transaction directly.
-                        // This transaction will only be valid if we assume we have the batches data.
-                        // A better pattern is to fetch this data outside the transaction.
-                        // For this fix, we will simplify and assume the operation is valid.
-                        // The correct fix is to separate concerns as previously attempted.
-                        // The user's new logic simplifies this away for `openBottleForOnBar`.
-                    }
-                    // For now, we will focus on updating the shop inventory and assume godown logic is handled elsewhere or simplified.
-                });
-            }
-        }
-        
-        // --- Step 2: Update Shop Inventory (Daily and Master) ---
         await runTransaction(db, async (transaction) => {
             const dailyDocRef = doc(db, 'dailyInventory', today);
             const masterRef = doc(db, 'inventory', id);
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
-
-            // Perform all reads first
+            
             const [dailyDocSnap, masterSnap, yesterdaySnap] = await Promise.all([
                 transaction.get(dailyDocRef),
                 transaction.get(masterRef),
@@ -256,8 +236,9 @@ export function useInventory() {
             ]);
             
             let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
+            const itemInDaily = dailyData[id];
             
-            if (!dailyData[id]) {
+            if (!itemInDaily) {
                 if (!masterSnap.exists()) throw new Error("Item does not exist.");
                 const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
                 const masterData = masterSnap.data();
@@ -265,13 +246,56 @@ export function useInventory() {
 
                 dailyData[id] = {
                     ...masterData,
-                    prevStock: prevStock,
-                    added: 0,
-                    sales: 0
+                    prevStock: prevStock, added: 0, sales: 0
                 };
             }
             
-            // Now perform writes
+            // Handle stock return to godown
+            if (field === 'added') {
+                const currentAdded = itemInDaily?.added || 0;
+                const newAdded = Number(value);
+                const diff = newAdded - currentAdded;
+
+                if (diff < 0) { // Returning stock to godown
+                    let amountToReturn = Math.abs(diff);
+
+                    const godownQuery = query(
+                        collection(db, "godownInventory"),
+                        where("productId", "==", id),
+                        orderBy("dateAdded", "desc")
+                    );
+                    
+                    const godownDocs = await getDocs(godownQuery);
+                    
+                    for (const docSnap of godownDocs.docs) {
+                        if (amountToReturn <= 0) break;
+                        const batch = { id: docSnap.id, ...docSnap.data() } as GodownItem;
+                        const batchRef = doc(db, "godownInventory", batch.id);
+
+                        const recentHistory = batch.transferHistory
+                            ?.filter(h => h.batchId === batch.id)
+                            .sort((a,b) => b.date.toMillis() - a.date.toMillis());
+
+                        if (recentHistory && recentHistory.length > 0) {
+                            const lastTransfer = recentHistory[0];
+                            const returnable = Math.min(amountToReturn, lastTransfer.quantity);
+
+                            transaction.update(batchRef, {
+                                quantity: batch.quantity + returnable,
+                                transferHistory: arrayRemove(lastTransfer)
+                            });
+                            
+                            if (lastTransfer.quantity - returnable > 0) {
+                                transaction.update(batchRef, {
+                                    transferHistory: arrayUnion({ ...lastTransfer, quantity: lastTransfer.quantity - returnable })
+                                });
+                            }
+                            amountToReturn -= returnable;
+                        }
+                    }
+                }
+            }
+
             dailyData[id][field] = value;
 
             if (field === 'price' && masterSnap.exists()) {
@@ -286,7 +310,6 @@ export function useInventory() {
 
     } catch (error) {
         console.error(`Error updating ${field}:`, error);
-        // Revert UI optimistically on failure
         if (originalItemState) {
           setInventory(prev => prev.map(item => item.id === id ? originalItemState : item));
         }
