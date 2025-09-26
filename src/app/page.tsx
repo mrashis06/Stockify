@@ -10,7 +10,7 @@ import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { useAuth } from "@/hooks/use-auth";
 import { useLoading } from "@/hooks/use-loading";
-import CelestialElixirBottle from "@/components/landing/animated-glass";
+import AnimatedBottle from "@/components/landing/animated-bottle";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import Logo from "@/components/ui/logo";
 
@@ -107,7 +107,7 @@ export default function Home({ params, searchParams }: { params: { slug: string 
           </div>
           
           <div className="my-8 opacity-0 fade-in [animation-delay:0.6s]">
-            <CelestialElixirBottle />
+            <AnimatedBottle />
           </div>
 
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row opacity-0 fade-in [animation-delay:0.9s]">
@@ -124,5 +124,3 @@ export default function Home({ params, searchParams }: { params: { slug: string 
     </div>
   );
 }
-
-    
