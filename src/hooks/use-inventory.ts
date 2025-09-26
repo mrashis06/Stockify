@@ -28,7 +28,7 @@ import { format, subDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { usePageLoading } from './use-loading';
 import type { GodownItem, TransferHistory } from './use-godown-inventory';
-import { createAdminNotification } from './use-notifications';
+import { createAdminNotification, deleteAdminNotificationByProductId } from './use-notifications';
 import { useAuth } from './use-auth';
 import { useNotificationSettings } from './use-notification-settings';
 
@@ -257,7 +257,7 @@ export function useInventory() {
                 };
             }
 
-            const oldClosingStock = (itemInDaily?.prevStock || 0) + (itemInDaily?.added || 0) - (itemInDaily?.sales || 0);
+            const oldClosingStock = (dailyData[id].prevStock || 0) + (dailyData[id].added || 0) - (dailyData[id].sales || 0);
             
             // Handle stock return to godown
             if (field === 'added') {
@@ -318,8 +318,8 @@ export function useInventory() {
             const newClosingStock = dailyData[id].closing;
 
             // Check for low stock alert
-            if (field === 'sales') {
-                 if (notificationSettings.lowStockAlerts && newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
+            if (notificationSettings.lowStockAlerts) {
+                 if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
                     if(user && user.shopId) {
                          createAdminNotification(user.shopId, {
                             title: 'Low Stock Alert',
@@ -329,20 +329,15 @@ export function useInventory() {
                             productId: id // Add productId to identify the notification
                         });
                     }
+                 } else if (newClosingStock > LOW_STOCK_THRESHOLD && oldClosingStock <= LOW_STOCK_THRESHOLD) {
+                    // Stock has been replenished, remove notification
+                     if (user?.shopId) {
+                        // This function needs to be awaited if we want to ensure it completes in the transaction
+                        await deleteAdminNotificationByProductId(transaction, user.shopId, id);
+                     }
                  }
             }
 
-             // Check if a low stock alert should be removed
-            if (newClosingStock > LOW_STOCK_THRESHOLD && oldClosingStock <= LOW_STOCK_THRESHOLD) {
-                if (user?.shopId) {
-                    const notificationsRef = collection(db, `shops/${user.shopId}/notifications`);
-                    const q = query(notificationsRef, where("type", "==", "low-stock"), where("productId", "==", id));
-                    const querySnapshot = await getDocs(q);
-                    querySnapshot.forEach((doc) => {
-                        transaction.delete(doc.ref);
-                    });
-                }
-            }
 
             transaction.set(dailyDocRef, dailyData, { merge: true });
         });

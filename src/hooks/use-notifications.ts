@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, getDoc, writeBatch, arrayUnion, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc, getDocs, writeBatch, arrayUnion, deleteDoc, Transaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from './use-auth';
 import { v4 as uuidv4 } from 'uuid';
@@ -117,6 +117,20 @@ export const createAdminNotification = async (shopId: string, data: Omit<Notific
         console.error("Failed to create admin notification:", error);
     }
 };
+
+// Function to delete admin notifications for a specific product, used within a transaction
+export const deleteAdminNotificationByProductId = async (transaction: Transaction, shopId: string, productId: string) => {
+    const notificationsRef = collection(db, `shops/${shopId}/notifications`);
+    const q = query(notificationsRef, where("type", "==", "low-stock"), where("productId", "==", productId));
+    
+    // We get the documents first, then delete them in the transaction.
+    // This is the recommended pattern for queries inside transactions.
+    const querySnapshot = await getDocs(q);
+    querySnapshot.forEach(doc => {
+        transaction.delete(doc.ref);
+    });
+};
+
 
 // Function for creating staff-targeted broadcast notifications
 export const createStaffBroadcast = async (shopId: string, data: Omit<NotificationData, 'target' | 'title'>) => {
