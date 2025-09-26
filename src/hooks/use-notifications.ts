@@ -17,6 +17,7 @@ export type Notification = {
     link?: string;
     target?: 'admin' | 'staff'; // Specify who the notification is for
     author?: string; // Who sent the notification
+    productId?: string; // To link notification to a specific product
 };
 
 export type NotificationData = Omit<Notification, 'id' | 'createdAt' | 'readBy'>;
@@ -96,6 +97,16 @@ export const createAdminNotification = async (shopId: string, data: Omit<Notific
     try {
         const notificationRef = collection(db, `shops/${shopId}/notifications`);
         
+        // If it's a low-stock alert, check if one already exists for this product
+        if (data.type === 'low-stock' && data.productId) {
+            const q = query(notificationRef, where("type", "==", "low-stock"), where("productId", "==", data.productId));
+            const existing = await getDocs(q);
+            if (!existing.empty) {
+                // An alert for this product already exists, do not create a new one.
+                return;
+            }
+        }
+
         await addDoc(notificationRef, {
             ...data,
             target: 'admin',

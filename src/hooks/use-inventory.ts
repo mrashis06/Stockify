@@ -315,19 +315,33 @@ export function useInventory() {
             dailyData[id].opening = (dailyData[id].prevStock || 0) + (dailyData[id].added || 0);
             dailyData[id].closing = dailyData[id].opening - (dailyData[id].sales || 0);
 
+            const newClosingStock = dailyData[id].closing;
+
             // Check for low stock alert
             if (field === 'sales') {
-                 const newClosingStock = dailyData[id].closing;
                  if (notificationSettings.lowStockAlerts && newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
                     if(user && user.shopId) {
                          createAdminNotification(user.shopId, {
                             title: 'Low Stock Alert',
                             description: `${dailyData[id].brand} (${dailyData[id].size}) is running low. Only ${newClosingStock} units left.`,
                             type: 'low-stock',
-                            link: '/dashboard/inventory'
+                            link: '/dashboard/inventory',
+                            productId: id // Add productId to identify the notification
                         });
                     }
                  }
+            }
+
+             // Check if a low stock alert should be removed
+            if (newClosingStock > LOW_STOCK_THRESHOLD && oldClosingStock <= LOW_STOCK_THRESHOLD) {
+                if (user?.shopId) {
+                    const notificationsRef = collection(db, `shops/${user.shopId}/notifications`);
+                    const q = query(notificationsRef, where("type", "==", "low-stock"), where("productId", "==", id));
+                    const querySnapshot = await getDocs(q);
+                    querySnapshot.forEach((doc) => {
+                        transaction.delete(doc.ref);
+                    });
+                }
             }
 
             transaction.set(dailyDocRef, dailyData, { merge: true });
