@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 const CelestialElixirBottle = () => {
     return (
-        <div className="relative w-64 h-96 flex items-center justify-center -mt-4 -mb-4">
+        <div className="relative w-56 h-80 flex items-center justify-center">
             <svg viewBox="0 0 180 270" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <linearGradient id="liquidGradient" x1="0.5" y1="0" x2="0.5" y2="1">
