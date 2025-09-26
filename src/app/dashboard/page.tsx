@@ -136,9 +136,16 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
     processedInventory.forEach(item => {
         const closingStock = item.closing ?? 0;
-        const wasJustAdded = (item.prevStock ?? 0) === 0 && (item.added ?? 0) > 0;
+        const stockAtDayStart = item.prevStock ?? 0;
+        const addedToday = (item.added ?? 0) > 0;
 
-        if (wasJustAdded) return;
+        // Condition to exclude from alerts: If the item started the day with 0 stock
+        // and was restocked today, it shouldn't trigger an alert immediately.
+        const wasJustRestocked = stockAtDayStart === 0 && addedToday;
+
+        if (wasJustRestocked) {
+            return; // Skip this item from alerts for today.
+        }
 
         if (closingStock === 0) {
             outOfStock.push(item);
