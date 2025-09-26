@@ -55,7 +55,6 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       setLoading(true);
       try {
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-        setTodaySalesData(dailyData);
         
         const inventorySnapshot = await getDocs(collection(db, 'inventory'));
         const masterInventory = new Map<string, any>();
@@ -76,19 +75,16 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             
             const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
 
-            if (dailyItem) {
-                items.push({ ...masterItem, ...dailyItem, prevStock });
-            } else {
-                items.push({
-                    ...masterItem,
-                    prevStock,
-                    added: 0,
-                    sales: 0,
-                });
-            }
+            items.push({
+                ...masterItem,
+                prevStock: prevStock,
+                added: dailyItem?.added ?? 0,
+                sales: dailyItem?.sales ?? 0,
+            });
         });
         
         setInventory(items);
+        setTodaySalesData(dailyData);
 
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -125,7 +121,17 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     return total;
   };
 
-  const todaysSales = useMemo(() => calculateTotalSales(todaySalesData), [todaySalesData]);
+  const todaysSales = useMemo(() => {
+    let total = 0;
+    inventory.forEach(item => {
+        const dailyItem = todaySalesData[item.id];
+        if (dailyItem && dailyItem.sales && dailyItem.price) {
+            total += dailyItem.sales * dailyItem.price;
+        }
+    });
+    return total;
+  }, [todaySalesData, inventory]);
+  
   const yesterdaysSales = useMemo(() => calculateTotalSales(yesterdaySalesData), [yesterdaySalesData]);
 
   const totalStock = useMemo(() => {
@@ -288,5 +294,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
 
     
