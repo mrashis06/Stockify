@@ -219,7 +219,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalAlerts > 0 ? 'text-destructive' : ''}`}>{totalAlerts} Items</div>
-            <div className="mt-2 text-xs">
+            <div className="mt-2 text-xs space-y-1">
                 {lowStockItems.length > 0 && (
                     <div className="flex justify-between">
                         <span>Low Stock</span>
@@ -237,8 +237,8 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
                 )}
             </div>
             {totalAlerts > 0 && 
-                <Button variant="link" size="sm" className="text-xs text-destructive/80 hover:underline mt-2 block text-right h-auto p-0" onClick={() => setIsLowStockDialogOpen(true)}>
-                    View all
+                <Button variant="destructive" size="sm" className="w-full mt-4" onClick={() => setIsLowStockDialogOpen(true)}>
+                    View All Alerts
                 </Button>
             }
           </CardContent>
