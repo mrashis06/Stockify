@@ -3,7 +3,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { motion, useAnimation, useTheme } from 'framer-motion';
+import { motion, useAnimation } from 'framer-motion';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 
 const spiritColors = {
