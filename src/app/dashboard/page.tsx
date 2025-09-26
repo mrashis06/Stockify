@@ -153,11 +153,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     return calculateTotalSales(yesterdaySalesData, inventory)
   }, [yesterdaySalesData, inventory]);
 
-const totalPrevStock = useMemo(() => {
-  if (!inventory || inventory.length === 0) return 0;
-  return inventory.reduce((sum, item) => sum + (item.prevStock ?? 0), 0);
-}, [inventory]);
-
+  const totalPrevStock = useMemo(() => {
+    if (!inventory || inventory.length === 0) return 0;
+    return inventory.reduce((sum, item) => sum + (item.prevStock ?? 0), 0);
+  }, [inventory]);
   
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const lowStock: InventoryItem[] = [];
@@ -312,3 +311,4 @@ const totalPrevStock = useMemo(() => {
   );
 }
 
+    
