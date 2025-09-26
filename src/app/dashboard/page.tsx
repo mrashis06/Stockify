@@ -129,6 +129,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const yesterdaysSales = useMemo(() => calculateTotalSales(yesterdaySalesData), [yesterdaySalesData]);
 
   const totalStock = useMemo(() => {
+    // Correctly sum the 'prevStock' from all items in the inventory
     return inventory.reduce((acc, item) => acc + (item.prevStock ?? 0), 0);
   }, [inventory]);
   
@@ -287,3 +288,5 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
