@@ -134,9 +134,8 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   
   const yesterdaysSales = useMemo(() => calculateTotalSales(yesterdaySalesData), [yesterdaySalesData]);
 
-  const totalStock = useMemo(() => {
-    // Correctly sum the 'prevStock' from all items in the inventory
-    return inventory.reduce((acc, item) => acc + (item.prevStock ?? 0), 0);
+  const totalPrevStock = useMemo(() => {
+    return inventory.reduce((total, item) => total + (item.prevStock ?? 0), 0);
   }, [inventory]);
   
   const { lowStockItems, outOfStockItems } = useMemo(() => {
@@ -191,7 +190,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
                 <PackageCheck className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalStock} Units</div>
+                <div className="text-2xl font-bold">{totalPrevStock} Units</div>
                 <p className="text-xs text-muted-foreground">
                   Yesterday's closing stock across all items
                 </p>
