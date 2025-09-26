@@ -22,6 +22,7 @@ import type { InventoryItem } from "@/hooks/use-inventory";
 import { usePageLoading } from "@/hooks/use-loading";
 import LowStockDialog from "@/components/dashboard/low-stock-dialog";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 
 
 const categories = [
@@ -34,6 +35,7 @@ const categories = [
 ];
 
 export default function DashboardPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+  const { user } = useAuth();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [todaySalesData, setTodaySalesData] = useState<any>({});
@@ -197,7 +199,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         lowStockItems={lowStockItems}
         outOfStockItems={outOfStockItems}
        />
-      <h1 className="text-2xl font-bold tracking-tight mb-6">Dashboard</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">Welcome, {user?.displayName || 'User'}!</h1>
+        <p className="text-muted-foreground">Here's a summary of your store's activity.</p>
+      </div>
       
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8">
         <Link href="/dashboard/inventory" className="block hover:shadow-lg transition-shadow rounded-lg">
@@ -310,3 +315,5 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
