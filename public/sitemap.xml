@@ -2,27 +2,20 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://stockify.bar/</loc>
-    <lastmod>2024-01-01</lastmod>
+    <lastmod>2024-07-29</lastmod>
+    <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://stockify.bar/dashboard</loc>
-    <lastmod>2024-01-01</lastmod>
+    <loc>https://stockify.bar/login</loc>
+    <lastmod>2024-07-29</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://stockify.bar/dashboard/inventory</loc>
-    <lastmod>2024-01-01</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stockify.bar/dashboard/sales</loc>
-    <lastmod>2024-01-01</lastmod>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://stockify.bar/dashboard/reports</loc>
-    <lastmod>2024-01-01</lastmod>
+    <loc>https://stockify.bar/signup</loc>
+    <lastmod>2024-07-29</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 </urlset>
