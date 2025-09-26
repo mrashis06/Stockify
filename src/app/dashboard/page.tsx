@@ -74,7 +74,6 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterdayDateStr);
             const yesterdayDocSnap = await getDoc(yesterdayDocRef);
             const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
-            setYesterdaySalesData(yesterdayData);
 
             // Fetch today's data once for initial state
             const todayDocSnap = await getDoc(dailyDocRef);
@@ -201,7 +200,6 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
        />
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Welcome, {user?.displayName || 'User'}!</h1>
-        <p className="text-muted-foreground">Here's a summary of your store's activity.</p>
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8">
@@ -315,5 +313,3 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
