@@ -74,8 +74,13 @@
   * {
     @apply border-border;
   }
-  body {
+  html, body {
     @apply bg-background text-foreground;
+    background-color: hsl(var(--background));
+  }
+
+  .dark html, .dark body {
+    background-color: #000;
   }
 }
 
