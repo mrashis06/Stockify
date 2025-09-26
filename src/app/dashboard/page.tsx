@@ -312,4 +312,3 @@ const totalPrevStock = useMemo(() => {
   );
 }
 
-    
