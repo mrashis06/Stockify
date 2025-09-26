@@ -11,9 +11,19 @@ import Script from "next/script";
 import { Analytics } from '@vercel/analytics/react';
 
 export const metadata = {
-  title: 'Stockify - Liquor Store Inventory Management',
-  description: 'Stockify helps liquor shops manage inventory, staff, reports, and sales with ease.',
-  keywords: 'Liquor, Inventory, Bar, Stock Management, Staff, Reports',
+  title: "Stockify - Liquor Store Inventory Management",
+  description: "Stockify helps liquor shops manage inventory, staff, reports, and sales with ease.",
+  icons: {
+    icon: [
+      { url: "/icons/favicon.ico", sizes: "any" },
+      { url: "/icons/icon-192x192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icons/icon-256x256.png", type: "image/png", sizes: "256x256" },
+      { url: "/icons/icon-512x512.png", type: "image/png", sizes: "512x512" }
+    ],
+    apple: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" }
+    ]
+  }
 };
 
 export default function RootLayout({
@@ -33,7 +43,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='white' stroke='%23374151' stroke-width='2' /><text x='50' y='55' font-size='24' font-family='Arial, sans-serif' fill='%23374151' text-anchor='middle' dominant-baseline='middle' font-style='italic'>Stockify</text><circle cx='66.5' cy='38' r='2' fill='orange' /></svg>" type="image/svg+xml" />
+        <link rel="manifest" href="/manifest.json" />
         {process.env.NEXT_PUBLIC_GA_ID && (
           <>
             <Script
