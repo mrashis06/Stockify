@@ -197,6 +197,10 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         return filteredInventory.reduce((total, item) => total + (item.sales ?? 0) * item.price, 0);
     }, [filteredInventory]);
 
+    const totalPrevStock = useMemo(() => {
+        return filteredInventory.reduce((total, item) => total + (item.prevStock ?? 0), 0);
+    }, [filteredInventory]);
+
   if (loading) {
     return null;
   }
@@ -403,9 +407,14 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                         })}
                         </TableBody>
                          <TableFooter>
+                             <TableRow>
+                                <TableCell colSpan={4} className="text-right font-bold text-lg">Total Previous Stock</TableCell>
+                                <TableCell className="font-bold text-lg">{totalPrevStock}</TableCell>
+                                <TableCell colSpan={showOpening && showClosing ? 5 : 4}></TableCell>
+                            </TableRow>
                             <TableRow className="border-t-2 border-primary/50">
-                                <TableCell colSpan={showOpening && showClosing ? 9 : 8} className="text-right font-extrabold text-xl text-primary">Total Bottle Sales</TableCell>
-                                <TableCell colSpan={2} className="font-extrabold text-xl text-primary">
+                                <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right font-extrabold text-xl text-primary">Total Bottle Sales</TableCell>
+                                <TableCell colSpan={1} className="font-extrabold text-xl text-primary">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-6 w-6 mr-1 shrink-0" />
                                         {(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
