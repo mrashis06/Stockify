@@ -48,7 +48,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
   useEffect(() => {
     const today = formatDate(new Date(), 'yyyy-MM-dd');
-    const yesterday = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
+    const yesterdayDateStr = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
     
     // Set up a listener for today's data to keep sales figures live.
     const dailyDocRef = doc(db, 'dailyInventory', today);
@@ -69,7 +69,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             });
 
             // Fetch yesterday's closing data once
-            const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
+            const yesterdayDocRef = doc(db, 'dailyInventory', yesterdayDateStr);
             const yesterdayDocSnap = await getDoc(yesterdayDocRef);
             const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
             setYesterdaySalesData(yesterdayData);
@@ -310,5 +310,3 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
