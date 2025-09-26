@@ -96,10 +96,10 @@ const CelestialElixirBottle = () => {
                     </g>
                     
                     <text x="28" y="50" textAnchor="middle" fontFamily="serif" fontSize="6" fill="#4A2E04">
-                        MAGIC INFUSION
+                        FINE SPIRITS
                     </text>
                     <text x="28" y="62" textAnchor="middle" fontFamily="sans-serif" fontSize="5" fill="#4A2E04">
-                        Est. 1892
+                        Est. 1992
                     </text>
                 </g>
 
