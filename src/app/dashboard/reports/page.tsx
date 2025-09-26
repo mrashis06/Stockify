@@ -2,13 +2,14 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { eachDayOfInterval, isSameDay, parse, startOfDay } from 'date-fns';
+import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { useSearchParams } from 'next/navigation';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,12 +64,22 @@ type OnBarSoldItem = {
 }
 
 
-export default function ReportsPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function ReportsPage() {
     const { formatDate } = useDateFormat();
-    const [date, setDate] = useState<DateRange | undefined>({
-        from: new Date(),
-        to: new Date(),
+    const searchParams = useSearchParams();
+
+    const [date, setDate] = useState<DateRange | undefined>(() => {
+        const fromParam = searchParams.get('from');
+        const toParam = searchParams.get('to');
+        if (fromParam) {
+            return {
+                from: parseISO(fromParam),
+                to: toParam ? parseISO(toParam) : parseISO(fromParam)
+            }
+        }
+        return { from: new Date(), to: new Date() };
     });
+
     const [reportType, setReportType] = useState<'offcounter' | 'onbar'>('offcounter');
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -79,9 +90,10 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
         setDate(range);
     };
 
-    const fetchReportData = useCallback(async (range: DateRange) => {
-        if (!range.from) {
+    const fetchReportData = useCallback(async (range: DateRange | undefined) => {
+        if (!range?.from) {
             toast({ title: "Error", description: "Please select a start date.", variant: "destructive" });
+            setLoading(false);
             return;
         }
         setLoading(true);
@@ -111,21 +123,11 @@ export default function ReportsPage({ params, searchParams }: { params: { slug: 
     }, [formatDate]);
     
     useEffect(() => {
-        if (date?.from) {
-            fetchReportData(date);
-        } else {
-            const today = new Date();
-            setDate({ from: today, to: today });
-            fetchReportData({ from: today, to: today });
-        }
-    }, []); 
+       fetchReportData(date);
+    }, [date, fetchReportData]); 
 
     const handleFilter = () => {
-        if (date?.from) {
-            fetchReportData(date);
-        } else {
-            toast({ title: "Error", description: "Please select a date range.", variant: "destructive" });
-        }
+        fetchReportData(date);
     };
 
     const { offCounterSalesData, onBarSalesData } = useMemo(() => {

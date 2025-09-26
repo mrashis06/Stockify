@@ -42,6 +42,9 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const [isLowStockDialogOpen, setIsLowStockDialogOpen] = useState(false);
   
   usePageLoading(loading);
+  const yesterday = useMemo(() => subDays(new Date(), 1), []);
+  const yesterdayString = useMemo(() => formatDate(yesterday, 'yyyy-MM-dd'), [yesterday, formatDate]);
+
 
   useEffect(() => {
     const today = formatDate(new Date(), 'yyyy-MM-dd');
@@ -193,20 +196,22 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Yesterday's Sales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold flex items-center">
-                <IndianRupee className="h-6 w-6 mr-1" />
-                {yesterdaysSales.toLocaleString('en-IN')}
-            </div>
-             <p className="text-xs text-muted-foreground">
-              Total sales recorded yesterday
-            </p>
-          </CardContent>
-        </Card>
+        <Link href={`/dashboard/reports?from=${yesterdayString}&to=${yesterdayString}`} className="block hover:shadow-lg transition-shadow rounded-lg">
+            <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Yesterday's Sales</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold flex items-center">
+                    <IndianRupee className="h-6 w-6 mr-1" />
+                    {yesterdaysSales.toLocaleString('en-IN')}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                Total sales recorded yesterday
+                </p>
+            </CardContent>
+            </Card>
+        </Link>
         <Card className={totalAlerts > 0 ? "bg-destructive/10 border-destructive/30" : ""}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className={`text-sm font-medium ${totalAlerts > 0 ? 'text-destructive': ''}`}>Stock Alerts</CardTitle>
