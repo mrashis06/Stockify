@@ -1,6 +1,4 @@
 
-"use client";
-
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
@@ -11,7 +9,8 @@ import { NotificationSettingsProvider } from '@/hooks/use-notification-settings'
 import Loader from '@/components/loader';
 import Script from "next/script";
 import { Analytics } from '@vercel/analytics/react';
-import { useState, useEffect } from 'react';
+import React from 'react';
+import ClientOnly from '@/components/client-only';
 
 export const metadata = {
   title: "Stockify - Liquor Store Inventory Management",
@@ -28,21 +27,6 @@ export const metadata = {
     ]
   }
 };
-
-const ClientOnly = ({ children }: { children: React.ReactNode }) => {
-    const [hasMounted, setHasMounted] = useState(false);
-
-    useEffect(() => {
-        setHasMounted(true);
-    }, []);
-
-    if (!hasMounted) {
-        return null;
-    }
-
-    return <>{children}</>;
-};
-
 
 export default function RootLayout({
   children,
