@@ -52,14 +52,13 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     const today = formatDate(new Date(), 'yyyy-MM-dd');
     const yesterdayDateStr = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
     
-    // Set up a listener for today's data to keep sales figures live.
+    // Listener for today's data to keep sales figures live.
     const dailyDocRef = doc(db, 'dailyInventory', today);
     const unsubscribeDaily = onSnapshot(dailyDocRef, (dailySnap) => {
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
         setTodaySalesData(dailyData);
     });
 
-    // The main data fetch function
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
@@ -70,10 +69,11 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
                 masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
             });
 
-            // Fetch yesterday's closing data once
+            // Fetch yesterday's data for both stock and sales
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterdayDateStr);
             const yesterdayDocSnap = await getDoc(yesterdayDocRef);
             const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
+            setYesterdaySalesData(yesterdayData); // Set yesterday's sales data
 
             // Fetch today's data once for initial state
             const todayDocSnap = await getDoc(dailyDocRef);
@@ -81,12 +81,9 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
             const items: InventoryItem[] = [];
 
-            // Iterate over the complete master inventory
             masterInventory.forEach((masterItem) => {
                 const id = masterItem.id;
                 const dailyItem = todayData[id];
-                
-                // Correctly determine previous stock from yesterday's closing data
                 const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
 
                 items.push({
