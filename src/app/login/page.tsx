@@ -49,14 +49,14 @@ const LoginForm = ({
   password: string;
   setPassword: (password: string) => void;
   loading: boolean;
-  handleEmailSignIn: (e: React.FormEvent, role: 'admin' | 'staff') => Promise<void>;
+  handleEmailSignIn: (e: React.FormEvent, role: 'admin' | 'staff', email: string, pass: string) => Promise<void>;
   authError: string;
   role: 'admin' | 'staff';
 }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-   <form onSubmit={(e) => handleEmailSignIn(e, role)} className="grid gap-4">
+   <form onSubmit={(e) => handleEmailSignIn(e, role, email, password)} className="grid gap-4">
       {authError && (
             <Alert variant="destructive" className="mb-2">
                 <AlertDescription>{authError}</AlertDescription>
@@ -111,8 +111,12 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
+  
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [staffEmail, setStaffEmail] = useState('');
+  const [staffPassword, setStaffPassword] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [activeTab, setActiveTab] = useState('admin');
@@ -143,13 +147,13 @@ function LoginContent() {
     }
   }, [user, authLoading, router]);
 
-  const handleEmailSignIn = async (e: React.FormEvent, role: 'admin' | 'staff') => {
+  const handleEmailSignIn = async (e: React.FormEvent, role: 'admin' | 'staff', email: string, pass: string) => {
     e.preventDefault();
     setLoading(true);
     setAuthError('');
     try {
       await setPersistence(auth, browserSessionPersistence);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
       const authenticatedUser = userCredential.user;
 
       // After successful sign-in, check their role from Firestore
@@ -230,10 +234,10 @@ function LoginContent() {
             </TabsList>
             <TabsContent value="admin" className="pt-4">
                 <LoginForm 
-                    email={email}
-                    setEmail={setEmail}
-                    password={password}
-                    setPassword={setPassword}
+                    email={adminEmail}
+                    setEmail={setAdminEmail}
+                    password={adminPassword}
+                    setPassword={setAdminPassword}
                     loading={loading && activeTab === 'admin'}
                     handleEmailSignIn={handleEmailSignIn}
                     authError={activeTab === 'admin' ? authError : ''}
@@ -242,10 +246,10 @@ function LoginContent() {
             </TabsContent>
             <TabsContent value="staff" className="pt-4">
                 <LoginForm 
-                    email={email}
-                    setEmail={setEmail}
-                    password={password}
-                    setPassword={setPassword}
+                    email={staffEmail}
+                    setEmail={setStaffEmail}
+                    password={staffPassword}
+                    setPassword={setStaffPassword}
                     loading={loading && activeTab === 'staff'}
                     handleEmailSignIn={handleEmailSignIn}
                     authError={activeTab === 'staff' ? authError : ''}
