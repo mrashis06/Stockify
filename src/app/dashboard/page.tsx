@@ -49,72 +49,96 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   useEffect(() => {
     const today = formatDate(new Date(), 'yyyy-MM-dd');
     const yesterday = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
+    
+    // Set up a listener for today's data to keep sales figures live.
     const dailyDocRef = doc(db, 'dailyInventory', today);
-
-    const unsubscribe = onSnapshot(dailyDocRef, async (dailySnap) => {
-      setLoading(true);
-      try {
+    const unsubscribeDaily = onSnapshot(dailyDocRef, (dailySnap) => {
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-        
-        const inventorySnapshot = await getDocs(collection(db, 'inventory'));
-        const masterInventory = new Map<string, any>();
-        inventorySnapshot.forEach(doc => {
-            masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
-        });
-
-        const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
-        const yesterdayDocSnap = await getDoc(yesterdayDocRef);
-        const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
-        setYesterdaySalesData(yesterdayData);
-
-        const items: InventoryItem[] = [];
-
-        masterInventory.forEach((masterItem) => {
-            const id = masterItem.id;
-            const dailyItem = dailyData[id];
-            
-            const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
-
-            items.push({
-                ...masterItem,
-                prevStock: prevStock,
-                added: dailyItem?.added ?? 0,
-                sales: dailyItem?.sales ?? 0,
-            });
-        });
-        
-        setInventory(items);
         setTodaySalesData(dailyData);
-
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
     });
 
-    return () => unsubscribe();
+    // The main data fetch function
+    const fetchDashboardData = async () => {
+        setLoading(true);
+        try {
+            // Fetch all master inventory items once
+            const inventorySnapshot = await getDocs(collection(db, 'inventory'));
+            const masterInventory = new Map<string, any>();
+            inventorySnapshot.forEach(doc => {
+                masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
+            });
+
+            // Fetch yesterday's closing data once
+            const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
+            const yesterdayDocSnap = await getDoc(yesterdayDocRef);
+            const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
+            setYesterdaySalesData(yesterdayData);
+
+            // Fetch today's data once for initial state
+            const todayDocSnap = await getDoc(dailyDocRef);
+            const todayData = todayDocSnap.exists() ? todayDocSnap.data() : {};
+
+            const items: InventoryItem[] = [];
+
+            // Iterate over the complete master inventory
+            masterInventory.forEach((masterItem) => {
+                const id = masterItem.id;
+                const dailyItem = todayData[id];
+                
+                // Correctly determine previous stock from yesterday's closing data
+                const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
+
+                items.push({
+                    ...masterItem,
+                    prevStock: prevStock,
+                    added: dailyItem?.added ?? 0,
+                    sales: dailyItem?.sales ?? 0,
+                });
+            });
+            
+            setInventory(items);
+
+        } catch (error) {
+            console.error("Error fetching dashboard data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchDashboardData();
+
+    // Cleanup the listener when the component unmounts
+    return () => unsubscribeDaily();
   }, [formatDate]);
 
   const processedInventory = useMemo(() => {
     return inventory.map(item => {
-      const opening = (item.prevStock ?? 0) + (item.added ?? 0);
-      const closing = opening - (item.sales ?? 0);
+      // Recalculate opening and closing based on potentially updated daily sales data
+      const dailyItem = todaySalesData[item.id];
+      const added = dailyItem?.added ?? item.added ?? 0;
+      const sales = dailyItem?.sales ?? item.sales ?? 0;
+      
+      const opening = (item.prevStock ?? 0) + added;
+      const closing = opening - sales;
       return {
         ...item,
+        added,
+        sales,
         opening,
         closing,
       };
     });
-  }, [inventory]);
+  }, [inventory, todaySalesData]);
 
-  const calculateTotalSales = (salesData: any) => {
+  const calculateTotalSales = (salesData: any, inventoryMap: InventoryItem[]) => {
     let total = 0;
     for (const key in salesData) {
         if (Object.prototype.hasOwnProperty.call(salesData, key)) {
             const item = salesData[key];
-            if (item.sales && item.price) {
-                 total += item.sales * item.price;
+            const masterItem = inventoryMap.find(inv => inv.id === key);
+            const price = item.price ?? masterItem?.price ?? 0;
+            if (item.sales && price) {
+                 total += item.sales * price;
             }
         }
     }
@@ -122,21 +146,18 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   };
 
   const todaysSales = useMemo(() => {
-    let total = 0;
-    inventory.forEach(item => {
-        const dailyItem = todaySalesData[item.id];
-        if (dailyItem && dailyItem.sales && dailyItem.price) {
-            total += dailyItem.sales * dailyItem.price;
-        }
-    });
-    return total;
+    return calculateTotalSales(todaySalesData, inventory);
   }, [todaySalesData, inventory]);
   
-  const yesterdaysSales = useMemo(() => calculateTotalSales(yesterdaySalesData), [yesterdaySalesData]);
+  const yesterdaysSales = useMemo(() => {
+    return calculateTotalSales(yesterdaySalesData, inventory)
+  }, [yesterdaySalesData, inventory]);
 
-  const totalPrevStock = useMemo(() => {
-    return inventory.reduce((total, item) => total + (item.prevStock ?? 0), 0);
-  }, [inventory]);
+const totalPrevStock = useMemo(() => {
+  if (!inventory || inventory.length === 0) return 0;
+  return inventory.reduce((sum, item) => sum + (item.prevStock ?? 0), 0);
+}, [inventory]);
+
   
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const lowStock: InventoryItem[] = [];
@@ -147,12 +168,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         const stockAtDayStart = item.prevStock ?? 0;
         const addedToday = (item.added ?? 0) > 0;
 
-        // Condition to exclude from alerts: If the item started the day with 0 stock
-        // and was restocked today, it shouldn't trigger an alert immediately.
         const wasJustRestocked = stockAtDayStart === 0 && addedToday;
 
         if (wasJustRestocked) {
-            return; // Skip this item from alerts for today.
+            return; 
         }
 
         if (closingStock === 0) {
@@ -168,7 +187,6 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const totalAlerts = lowStockItems.length + outOfStockItems.length;
 
   if (loading) {
-      // The loader will be displayed by the global state, so we can return null or a minimal placeholder.
       return null;
   }
 
@@ -293,3 +311,5 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
