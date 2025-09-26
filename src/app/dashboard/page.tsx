@@ -128,7 +128,9 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const todaysSales = useMemo(() => calculateTotalSales(todaySalesData), [todaySalesData]);
   const yesterdaysSales = useMemo(() => calculateTotalSales(yesterdaySalesData), [yesterdaySalesData]);
 
-  const totalStock = processedInventory.reduce((acc, item) => acc + (item.closing ?? 0), 0);
+  const totalStock = useMemo(() => {
+    return inventory.reduce((acc, item) => acc + (item.prevStock ?? 0), 0);
+  }, [inventory]);
   
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const lowStock: InventoryItem[] = [];
@@ -184,7 +186,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
               <CardContent>
                 <div className="text-2xl font-bold">{totalStock} Units</div>
                 <p className="text-xs text-muted-foreground">
-                  Today's closing stock across all items
+                  Yesterday's closing stock across all items
                 </p>
               </CardContent>
             </Card>
