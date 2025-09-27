@@ -288,3 +288,4 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
 }
 
     
+    
