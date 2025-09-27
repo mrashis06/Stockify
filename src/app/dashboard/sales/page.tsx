@@ -57,7 +57,7 @@ export default function SalesPage() {
                 
                 setScannedItem(itemData);
                 setEditedPrice(itemData.price);
-                setSaleQuantity(1); // Still default to 1 for speed, but allow easy overwrite
+                setSaleQuantity(''); // Set to empty for faster input
             } else {
                 toast({ title: 'Product Not Mapped', description: 'Redirecting to mapping page...', variant: 'destructive' });
                 router.push(`/dashboard/map-barcode?code=${decodedText}`);
