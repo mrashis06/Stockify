@@ -185,11 +185,29 @@ export function useGodownInventory() {
         const docRef = doc(db, 'godownInventory', id);
         await deleteDoc(docRef);
      } catch (error) {
-        console.error("Error deleting godown item: ", error);
+        console.error("Error deleting godown item:", error);
         throw error;
      } finally {
          setSaving(false);
      }
+  };
+
+  const deleteGodownProduct = async (productId: string) => {
+    setSaving(true);
+    try {
+      const q = query(collection(db, "godownInventory"), where("productId", "==", productId));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error("Error deleting godown product:", error);
+      throw error;
+    } finally {
+      setSaving(false);
+    }
   };
 
   const transferToShop = async (productId: string, quantityToTransfer: number) => {
@@ -298,7 +316,7 @@ export function useGodownInventory() {
   };
 
 
-  return { godownInventory, loading, saving, addGodownItem, addMultipleGodownItems, updateGodownItem, deleteGodownItem, transferToShop, forceRefetch: fetchGodownInventory };
+  return { godownInventory, loading, saving, addGodownItem, addMultipleGodownItems, updateGodownItem, deleteGodownItem, deleteGodownProduct, transferToShop, forceRefetch: fetchGodownInventory };
 }
 
     

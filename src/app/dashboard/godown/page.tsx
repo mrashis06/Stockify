@@ -59,6 +59,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
         addMultipleGodownItems,
         updateGodownItem,
         deleteGodownItem,
+        deleteGodownProduct,
         transferToShop,
         forceRefetch
     } = useGodownInventory();
@@ -73,6 +74,8 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     const [isScanBillOpen, setIsScanBillOpen] = useState(false);
     const [transferringItem, setTransferringItem] = useState<GroupedGodownItem | null>(null);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const { toast } = useToast();
 
     const handleAddItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'transferHistory'>) => {
@@ -123,6 +126,28 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                  toast({ title: 'Error', description: 'Failed to update quantity.', variant: 'destructive' });
             }
         }
+    };
+
+    const handleDeleteSelected = async () => {
+        try {
+            await Promise.all(Array.from(selectedRows).map(id => deleteGodownProduct(id)));
+            toast({ title: 'Success', description: 'Selected products removed.' });
+            setSelectedRows(new Set());
+        } catch (error) {
+            console.error('Error removing products:', error);
+            toast({ title: 'Error', description: 'Failed to remove selected products.', variant: 'destructive' });
+        }
+        setIsDeleteDialogOpen(false);
+    };
+    
+    const handleRowSelect = (productId: string) => {
+        const newSelection = new Set(selectedRows);
+        if (newSelection.has(productId)) {
+            newSelection.delete(productId);
+        } else {
+            newSelection.add(productId);
+        }
+        setSelectedRows(newSelection);
     };
 
     const toggleRowExpansion = (productId: string) => {
@@ -223,10 +248,31 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                         forceRefetch();
                     }
                 } catch(e) {
-                    toast({ title: 'Error', description: 'Failed to add items from bill.', variant: 'destructive'});
+                    const errorMessage = e instanceof Error ? e.message : 'Failed to add items from bill.';
+                    if (errorMessage.includes("quota")) {
+                        toast({ title: 'AI Service Unavailable', description: 'Could not process bill. Please check your API key billing status or try again later.', variant: 'destructive'});
+                    } else {
+                        toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
+                    }
                 }
             }}
         />
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will permanently delete the selected product(s) and all their batches from the godown. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive hover:bg-destructive/90">
+                        Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
        
         <h1 className="text-2xl font-bold tracking-tight mb-6">Godown Inventory</h1>
         <Card>
@@ -258,6 +304,9 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                         <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={() => setIsAddItemOpen(true)}>
                             <PackagePlus className="mr-2 h-4 w-4" /> Add Item
                         </Button>
+                        <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)} className="w-full sm:w-auto">
+                            <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedRows.size})
+                        </Button>
                     </div>
                 </div>
 
@@ -265,6 +314,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                     <Table>
                         <TableHeader>
                         <TableRow>
+                            <TableHead className="w-12"></TableHead>
                             <TableHead className="w-12"></TableHead>
                             <TableHead className="font-bold text-foreground">Brand</TableHead>
                             <TableHead className="font-bold text-foreground">Size</TableHead>
@@ -278,11 +328,19 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                             const isExpanded = expandedRows.has(item.productId);
                             return (
                             <React.Fragment key={item.productId}>
-                                <TableRow>
+                                <TableRow data-state={selectedRows.has(item.productId) ? "selected" : ""}>
                                     <TableCell>
                                         <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(item.productId)} className="h-8 w-8">
                                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                         </Button>
+                                    </TableCell>
+                                     <TableCell className="text-center">
+                                        <input
+                                            type="checkbox"
+                                            className="h-4 w-4"
+                                            checked={selectedRows.has(item.productId)}
+                                            onChange={() => handleRowSelect(item.productId)}
+                                        />
                                     </TableCell>
                                     <TableCell className="font-medium">{item.brand}</TableCell>
                                     <TableCell>{item.size}</TableCell>
@@ -297,7 +355,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                                 </TableRow>
                                 {isExpanded && (
                                      <TableRow key={`${item.productId}-details`} className="bg-muted/50 hover:bg-muted/50">
-                                        <TableCell colSpan={6} className="p-0">
+                                        <TableCell colSpan={7} className="p-0">
                                             <div className="p-4">
                                                 <h4 className="font-semibold mb-2">Batches for {item.brand} ({item.size})</h4>
                                                 <Table>
