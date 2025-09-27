@@ -146,7 +146,9 @@ export default function SalesPage() {
     const handleSale = async () => {
         if (!scannedItem || editedPrice === null || !user) return;
         
-        const availableStock = Number(scannedItem.closing ?? scannedItem.opening ?? 0);
+        const opening = (scannedItem.prevStock || 0) + (scannedItem.added || 0);
+        const availableStock = opening - (scannedItem.sales || 0);
+
         if (saleQuantity > availableStock) {
             toast({ title: 'Error', description: `Cannot sell more than available stock (${availableStock}).`, variant: 'destructive' });
             return;
@@ -175,7 +177,12 @@ export default function SalesPage() {
         processingRef.current = false;
     };
 
-    const availableStock = Number(scannedItem?.closing ?? scannedItem?.opening ?? 0);
+    const availableStock = useMemo(() => {
+        if (!scannedItem) return 0;
+        const opening = (scannedItem.prevStock || 0) + (scannedItem.added || 0);
+        return opening - (scannedItem.sales || 0);
+    }, [scannedItem]);
+
 
     return (
         <main className="flex-1 p-4 md:p-8">
@@ -275,5 +282,3 @@ export default function SalesPage() {
         </main>
     );
 }
-
-    
