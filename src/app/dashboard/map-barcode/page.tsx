@@ -79,12 +79,13 @@ export default function MapBarcodePage() {
             setIsScannerActive(true);
         } catch (err: any) {
             console.error("Error starting scanner:", err);
+            // This specific error is a race condition that can be ignored.
+            if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
+                return;
+            }
             if (err.name === 'NotAllowedError') {
                  setScanError("Camera access was denied. Please go to your browser settings and allow camera access for this site.");
-            } else if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
-                // This error can be ignored as it's a race condition handled by our refs
-            }
-            else {
+            } else {
                  setScanError("Could not start camera. Please check permissions and refresh.");
             }
         }
