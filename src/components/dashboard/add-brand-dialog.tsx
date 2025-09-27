@@ -127,89 +127,91 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
         
         {step === 'form' ? (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit((data) => handleFormSubmit(data, false))} className="grid gap-4 py-4">
-              <FormField
-                control={form.control}
-                name="brand"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Brand Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Old Monk" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="size"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Size</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., 750ml" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price (₹)</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="e.g., 190" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+            <form onSubmit={form.handleSubmit((data) => handleFormSubmit(data, false))}>
+              <div className="space-y-4 py-4">
+                <FormField
+                  control={form.control}
+                  name="brand"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Brand Name</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
+                        <Input placeholder="e.g., Old Monk" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {categories.map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="prevStock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Initial Stock</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="e.g., 50" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter className="flex-col sm:flex-row sm:justify-end gap-2 pt-4">
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="size"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Size</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., 750ml" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price (₹)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="e.g., 190" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="prevStock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Initial Stock</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="e.g., 50" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-4">
                  <DialogClose asChild>
-                  <Button type="button" variant="secondary" className="w-full sm:w-auto">Cancel</Button>
+                  <Button type="button" variant="secondary">Cancel</Button>
                 </DialogClose>
-                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))} className="w-full sm:w-auto">
+                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))}>
                     Review & Add Another
                  </Button>
-                <Button type="submit" className="w-full sm:w-auto bg-green-600 hover:bg-green-700">Proceed to Review</Button>
+                <Button type="submit" className="bg-green-600 hover:bg-green-700">Proceed to Review</Button>
               </DialogFooter>
             </form>
           </Form>
