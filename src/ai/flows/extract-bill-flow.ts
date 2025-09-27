@@ -67,7 +67,7 @@ Analyze the document carefully and identify each product. For each product, extr
 Return the data as a structured array of items. If you cannot determine a piece of information for an item, make your best guess.
 
 Bill document: {{media url=billDataUri}}`,
-  model: 'googleai/gemini-pro',
+  model: 'googleai/gemini-2.5-flash',
   requestOptions: {
     timeout: 30000,
   },
