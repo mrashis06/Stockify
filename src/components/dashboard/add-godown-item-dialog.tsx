@@ -163,7 +163,7 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
             />
             <DialogFooter className="flex-col sm:flex-row gap-2">
                <DialogClose asChild>
-                <Button type="button" variant="secondary" className="w-full sm:w-auto">
+                <Button type="button" variant="secondary" className="w-full sm:w-auto hover:bg-destructive hover:text-destructive-foreground">
                   Cancel
                 </Button>
               </DialogClose>
