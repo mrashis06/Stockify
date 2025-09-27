@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeError, Html5QrcodeResult, QrCodeSuccessCallback } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { Camera, Barcode, X, HelpCircle, Search, Edit } from 'lucide-react';
 import { useMediaQuery } from 'react-responsive';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -39,7 +39,6 @@ export default function SalesPage() {
                     await html5QrCodeRef.current.stop();
                 }
             } catch (err: any) {
-                // This error can happen if the scanner is already stopping, it's safe to ignore.
                 if (err.name !== 'NotAllowedError' && !err.message.includes("Cannot transition to a new state, already under transition")) {
                     console.error("Failed to stop scanner gracefully.", err);
                 }
@@ -56,18 +55,22 @@ export default function SalesPage() {
         setScannedItem(null);
 
         if (!html5QrCodeRef.current) {
-            html5QrCodeRef.current = new Html5Qrcode("barcode-scanner-region");
+            html5QrCodeRef.current = new Html5Qrcode("barcode-scanner-region", { verbose: false });
         }
 
         try {
             await html5QrCodeRef.current.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
-                handleScanSuccess,
-                (errorMessage) => { 
-                    // This is the error callback, often called for non-decodable frames.
-                    // We can largely ignore it to prevent log spam, unless we want to debug.
-                }
+                (decodedText, decodedResult) => {
+                    if (processingRef.current) return;
+                    processingRef.current = true;
+                    
+                    stopScanner();
+                    setScanResult(decodedText);
+                    handleScanSuccess(decodedText);
+                },
+                (errorMessage) => { /* ignore */ }
             );
             scannerRunningRef.current = true;
             setIsScannerActive(true);
@@ -79,7 +82,7 @@ export default function SalesPage() {
                  setScanError("Could not start camera. Please check permissions and refresh.");
             }
         }
-    }, []);
+    }, [stopScanner]);
 
     useEffect(() => {
         return () => {
@@ -87,13 +90,7 @@ export default function SalesPage() {
         };
     }, [stopScanner]);
 
-    const handleScanSuccess: QrCodeSuccessCallback = useCallback(async (decodedText, decodedResult) => {
-        if (processingRef.current) return;
-        processingRef.current = true;
-        
-        stopScanner();
-        setScanResult(decodedText);
-
+    const handleScanSuccess = async (decodedText: string) => {
         try {
             const inventoryRef = collection(db, "inventory");
             const q = query(inventoryRef, where("barcodeId", "==", decodedText));
@@ -103,16 +100,9 @@ export default function SalesPage() {
                 const docData = querySnapshot.docs[0].data() as InventoryItem;
                 const itemId = querySnapshot.docs[0].id;
                 const itemFromHook = inventory.find(i => i.id === itemId);
-
-                if (itemFromHook) {
-                    setScannedItem(itemFromHook);
-                } else {
-                    // Item found in DB but not in local state, use DB data
-                    setScannedItem({ id: itemId, ...docData });
-                }
+                setScannedItem(itemFromHook || { id: itemId, ...docData });
             } else {
-                setScanError(`Product with barcode ${decodedText} not found. Please map it to a product.`);
-                setIsMapping(true);
+                setScanError(`Product with barcode ${decodedText} not found. Please map it first using the 'Map Barcodes' page.`);
             }
         } catch (error) {
             console.error("Error fetching product by barcode:", error);
@@ -120,25 +110,8 @@ export default function SalesPage() {
         } finally {
             processingRef.current = false;
         }
-    }, [inventory, stopScanner]);
-
-    const handleMapBarcode = async (productId: string) => {
-        if (!scanResult) return;
-
-        try {
-            await updateBrand(productId, { barcodeId: scanResult });
-            const mappedItem = inventory.find(item => item.id === productId);
-            if (mappedItem) {
-                setScannedItem(mappedItem);
-            }
-            toast({ title: 'Success', description: `Barcode successfully linked to ${mappedItem?.brand}.` });
-            resetScannerState();
-        } catch (error) {
-            console.error("Error mapping barcode:", error);
-            toast({ title: 'Error', description: 'Failed to map barcode.', variant: 'destructive' });
-        }
     };
-
+    
     const handleSale = async () => {
         if (!scannedItem) return;
         
@@ -168,14 +141,6 @@ export default function SalesPage() {
     return (
         <main className="flex-1 p-4 md:p-8">
             <h1 className="text-2xl font-bold tracking-tight mb-6">Point of Sale</h1>
-            
-            <MapBarcodeDialog
-                isOpen={isMapping}
-                onOpenChange={setIsMapping}
-                barcodeId={scanResult}
-                onMap={handleMapBarcode}
-                onCancel={resetScannerState}
-            />
 
             <Card className="max-w-2xl mx-auto">
                 <CardHeader>
@@ -250,7 +215,7 @@ export default function SalesPage() {
                                 </div>
                                 <div className="flex gap-2 pt-4">
                                     <Button onClick={handleSale} className="flex-1 bg-green-600 hover:bg-green-700">Add to Cart</Button>
-                                    <Button onClick={resetScannerState} variant="outline" className="flex-1">Scan Another</Button>
+                                    <Button onClick={() => { resetScannerState(); startScanner(); }} variant="outline" className="flex-1">Scan Another</Button>
                                 </div>
                             </CardContent>
                         </Card>
@@ -261,65 +226,5 @@ export default function SalesPage() {
     );
 }
 
-function MapBarcodeDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: { isOpen: boolean, onOpenChange: (open: boolean) => void, barcodeId: string | null, onMap: (productId: string) => void, onCancel: () => void }) {
-    const { inventory } = useInventory();
-    const [searchTerm, setSearchTerm] = useState('');
 
-    const filteredInventory = useMemo(() => {
-        if (!searchTerm) return inventory;
-        return inventory.filter(item =>
-            item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.category.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [inventory, searchTerm]);
     
-    useEffect(() => {
-        if(!isOpen) setSearchTerm('');
-    }, [isOpen]);
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Map Barcode</DialogTitle>
-                    <DialogDescription>
-                        The barcode <span className="font-mono bg-muted p-1 rounded-sm">{barcodeId}</span> is new. Select the correct product from your inventory to link it.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4 space-y-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search inventory..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                        />
-                    </div>
-                    <ScrollArea className="h-64 border rounded-md">
-                        {filteredInventory.length > 0 ? (
-                            filteredInventory.map(item => (
-                                <div key={item.id} className="flex items-center justify-between p-3 border-b last:border-b-0">
-                                    <div>
-                                        <p className="font-semibold">{item.brand}</p>
-                                        <p className="text-sm text-muted-foreground">{item.size} &bull; {item.category}</p>
-                                    </div>
-                                    <Button size="sm" onClick={() => onMap(item.id)}>Select</Button>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-center p-8 text-muted-foreground">
-                                No products found.
-                            </div>
-                        )}
-                    </ScrollArea>
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild>
-                        <Button onClick={onCancel} variant="outline">Cancel</Button>
-                    </DialogClose>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
