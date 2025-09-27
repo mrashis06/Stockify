@@ -84,7 +84,20 @@ const extractBillFlow = ai.defineFlow(
     outputSchema: BillExtractionOutputSchema,
   },
   async input => {
-    const {output} = await billExtractionPrompt(input);
-    return output!;
+    try {
+        const {output} = await billExtractionPrompt(input);
+        
+        if (!output) {
+            throw new Error("The AI model did not return a valid response. It might be temporarily unavailable.");
+        }
+        return output;
+
+    } catch (e) {
+        console.error("Error during bill extraction:", e);
+        // Catch the error and re-throw it as a standard Error object to avoid crashing the server process.
+        // This makes sure a clear, string-based message is sent to the client.
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        throw new Error("Failed to process bill with AI. " + errorMessage);
+    }
   }
 );
