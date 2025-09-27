@@ -71,11 +71,15 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     },
   });
 
-  const handleFormSubmit = (data: AddBrandFormValues, addAnother: boolean) => {
+  const handleFormSubmit = (data: AddBrandFormValues) => {
     setFormData(data);
-    setIsAddingAnother(addAnother);
     setStep('review');
   };
+  
+  const handleReviewAndAddAnother = (data: AddBrandFormValues) => {
+    setIsAddingAnother(true);
+    handleFormSubmit(data);
+  }
 
   const handleConfirmSubmit = (isAddingAnother: boolean) => {
     if (formData) {
@@ -127,7 +131,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
         
         {step === 'form' ? (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit((data) => handleFormSubmit(data, false))} className="grid gap-4 py-4">
+            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="grid gap-4 py-4">
               <FormField
                 control={form.control}
                 name="brand"
@@ -206,7 +210,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                  <DialogClose asChild>
                   <Button type="button" variant="secondary" className="w-full sm:w-auto">Cancel</Button>
                 </DialogClose>
-                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))} className="w-full sm:w-auto">
+                 <Button type="button" variant="outline" onClick={form.handleSubmit(handleReviewAndAddAnother)} className="w-full sm:w-auto">
                     Review & Add Another
                  </Button>
                 <Button type="submit" className="w-full sm:w-auto bg-green-600 hover:bg-green-700">Proceed to Review</Button>
