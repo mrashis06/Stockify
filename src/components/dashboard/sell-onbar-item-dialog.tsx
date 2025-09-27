@@ -56,7 +56,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
   
   const form = useForm<SellFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: isBeer ? { quantity: undefined } : { servingSize: undefined, salePrice: undefined },
+    defaultValues: isBeer ? { quantity: '' as any } : { servingSize: 30, salePrice: '' as any },
   });
   
   const quantity = form.watch(isBeer ? 'quantity' : undefined);
@@ -74,7 +74,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
   
   useEffect(() => {
     if (isOpen) {
-      form.reset(isBeer ? { quantity: undefined } : { servingSize: 30, salePrice: undefined });
+      form.reset(isBeer ? { quantity: '' as any } : { servingSize: 30, salePrice: '' as any });
     }
   }, [isOpen, item, form, isBeer]);
 

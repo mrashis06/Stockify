@@ -47,14 +47,14 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      quantity: undefined,
+      quantity: '' as any, // Initialize with empty string to avoid uncontrolled input error
     },
   });
 
   // Reset form when item changes or dialog opens
   useEffect(() => {
     if (isOpen) {
-      form.reset({ quantity: undefined });
+      form.reset({ quantity: '' as any });
     }
   }, [isOpen, item, form]);
 
