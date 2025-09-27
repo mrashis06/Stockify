@@ -56,15 +56,13 @@ const billExtractionPrompt = ai.definePrompt({
     schema: BillExtractionOutputSchema,
     format: 'json'
   },
-  prompt: `You are an expert data entry agent for a liquor store with deep knowledge of liquor brands and their variations. Your task is to extract all line items from the provided bill/invoice image.
+  prompt: `You are an expert data entry agent for a liquor store. Your task is to extract all line items from the provided bill/invoice image.
 
 Analyze the document carefully and identify each product. For each product, extract the following details:
-- brand: The brand name of the product.
+- brand: The brand name of the product, extracted *exactly* as it appears on the bill. Do not normalize or change it.
 - size: The volume of the bottle. Extract this value *exactly* as it appears on the document. For example, if the bill says "650", the size is "650". If it says "750ml", the size is "750ml". DO NOT add 'ml' if it is not present in the text. This is very important.
 - quantity: The number of units or bottles.
 - category: The type of liquor (e.g., Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
-
-IMPORTANT: You must normalize brand names to their most common or base form. For example, if you see "Tuborg Classic", "Tuborg C", or "Tuborg Strong", you should normalize the brand to just "Tuborg". Similarly, "Royal Stag Deluxe" should become "Royal Stag". Use your knowledge of brands to ensure consistency.
 
 Return the data as a structured array of items. If you cannot determine a piece of information for an item, make your best guess.
 
