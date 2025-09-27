@@ -66,8 +66,8 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
     defaultValues: {
       inventoryId: '',
       quantity: 1,
-      pegPrice30ml: undefined,
-      pegPrice60ml: undefined,
+      pegPrice30ml: '' as any,
+      pegPrice60ml: '' as any,
     },
   });
   
@@ -191,7 +191,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
                                 <FormLabel>30ml Peg Price</FormLabel>
                                 <div className="relative">
                                     <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <FormControl><Input type="number" placeholder="e.g. 100" {...field} className="pl-8" /></FormControl>
+                                    <FormControl><Input type="number" placeholder="e.g. 100" {...field} defaultValue={field.value || ''} className="pl-8" /></FormControl>
                                 </div>
                                 <FormMessage />
                              </FormItem>
@@ -201,7 +201,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
                                 <FormLabel>60ml Peg Price</FormLabel>
                                  <div className="relative">
                                     <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <FormControl><Input type="number" placeholder="e.g. 200" {...field} className="pl-8" /></FormControl>
+                                    <FormControl><Input type="number" placeholder="e.g. 200" {...field} defaultValue={field.value || ''} className="pl-8" /></FormControl>
                                  </div>
                                 <FormMessage />
                              </FormItem>
@@ -222,5 +222,3 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
     </Dialog>
   );
 }
-
-    
