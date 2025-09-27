@@ -17,7 +17,7 @@ import { Barcode, HelpCircle, IndianRupee, Scan, X } from 'lucide-react';
 import SharedScanner from '@/components/dashboard/shared-scanner';
 
 export default function SalesPage() {
-    const { inventory, recordSale } = useInventory();
+    const { inventory, recordSale, forceRefetch } = useInventory();
     const { user } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
@@ -27,7 +27,7 @@ export default function SalesPage() {
     const [scannedItem, setScannedItem] = useState<InventoryItem | null>(null);
     const [isScannerPaused, setIsScannerPaused] = useState(false);
     
-    const [saleQuantity, setSaleQuantity] = useState<number | ''>(1);
+    const [saleQuantity, setSaleQuantity] = useState<number | ''>('');
     const [editedPrice, setEditedPrice] = useState<number | null>(null);
 
     useEffect(() => {
@@ -40,6 +40,7 @@ export default function SalesPage() {
         setIsScannerPaused(true);
 
         try {
+            await forceRefetch(); // Ensure we have the latest data before checking
             const inventoryRef = collection(db, "inventory");
             const q = query(inventoryRef, or(
                 where("barcodeId", "==", decodedText),
@@ -49,13 +50,14 @@ export default function SalesPage() {
 
             if (!querySnapshot.empty) {
                 const itemId = querySnapshot.docs[0].id;
+                // Re-check the updated local inventory from the hook after refetch
                 const itemFromHook = inventory.find(i => i.id === itemId);
 
                 const itemData = itemFromHook || { id: itemId, ...querySnapshot.docs[0].data(), added: 0, sales: 0 } as InventoryItem;
                 
                 setScannedItem(itemData);
                 setEditedPrice(itemData.price);
-                setSaleQuantity(1);
+                setSaleQuantity(1); // Still default to 1 for speed, but allow easy overwrite
             } else {
                 toast({ title: 'Product Not Mapped', description: 'Redirecting to mapping page...', variant: 'destructive' });
                 router.push(`/dashboard/map-barcode?code=${decodedText}`);
@@ -97,7 +99,7 @@ export default function SalesPage() {
 
     const resetScanState = () => {
         setScannedItem(null);
-        setSaleQuantity(1);
+        setSaleQuantity('');
         setEditedPrice(null);
         setIsScannerPaused(false);
     };
@@ -180,7 +182,6 @@ export default function SalesPage() {
                                         max={availableStock}
                                         className="max-w-[120px]"
                                         autoFocus
-                                        onFocus={(e) => e.target.select()}
                                     />
                                 </div>
                                 <div className="flex gap-2 pt-4">
