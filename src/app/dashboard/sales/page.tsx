@@ -38,19 +38,21 @@ export default function SalesPage() {
     const processingRef = useRef<boolean>(false);
 
     const stopScanner = useCallback(async () => {
-        if (scannerRunningRef.current && html5QrCodeRef.current) {
-            try {
-                if (html5QrCodeRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
-                    await html5QrCodeRef.current.stop();
-                }
-            } catch (err: any) {
-                if (err.name !== 'NotAllowedError' && !err.message.includes("Cannot transition to a new state, already under transition")) {
-                    console.error("Failed to stop scanner gracefully.", err);
-                }
-            } finally {
-                scannerRunningRef.current = false;
-                setIsScannerActive(false);
+        if (!scannerRunningRef.current || !html5QrCodeRef.current) {
+            return;
+        }
+
+        try {
+            if (html5QrCodeRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+                await html5QrCodeRef.current.stop();
             }
+        } catch (err: any) {
+            if (err.name !== 'NotAllowedError' && !err.message.includes("Cannot transition to a new state, already under transition")) {
+                console.error("Failed to stop scanner gracefully.", err);
+            }
+        } finally {
+            scannerRunningRef.current = false;
+            setIsScannerActive(false);
         }
     }, []);
 
@@ -79,6 +81,10 @@ export default function SalesPage() {
             scannerRunningRef.current = true;
             setIsScannerActive(true);
         } catch (err: any) {
+             if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
+                // This specific error is a race condition that can be ignored.
+                return;
+            }
             console.error("Error starting scanner:", err);
             let errorMessage = "Could not start camera. Please check permissions and refresh.";
             if (err.name === 'NotAllowedError') {
@@ -264,3 +270,5 @@ export default function SalesPage() {
         </main>
     );
 }
+
+    

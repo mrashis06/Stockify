@@ -34,22 +34,24 @@ export default function MapBarcodePage() {
     const processingRef = useRef<boolean>(false);
 
     const stopScanner = useCallback(async (shouldRestart = false) => {
-        if (scannerRunningRef.current && html5QrCodeRef.current) {
-            try {
-                if (html5QrCodeRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
-                    await html5QrCodeRef.current.stop();
-                }
-            } catch (err: any) {
-                if (err.name !== 'NotAllowedError' && !err.message.includes("Cannot transition to a new state, already under transition")) {
-                    console.error("Failed to stop scanner gracefully.", err);
-                }
-            } finally {
-                scannerRunningRef.current = false;
-                setIsScannerActive(false);
-                if (shouldRestart) {
-                    // Slight delay to allow camera to release before restarting
-                    setTimeout(() => startScanner(), 100);
-                }
+        if (!scannerRunningRef.current || !html5QrCodeRef.current) {
+            return;
+        }
+
+        try {
+            if (html5QrCodeRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+                await html5QrCodeRef.current.stop();
+            }
+        } catch (err: any) {
+            if (err.name !== 'NotAllowedError' && !err.message.includes("Cannot transition to a new state, already under transition")) {
+                console.error("Failed to stop scanner gracefully.", err);
+            }
+        } finally {
+            scannerRunningRef.current = false;
+            setIsScannerActive(false);
+            if (shouldRestart) {
+                // Slight delay to allow camera to release before restarting
+                setTimeout(() => startScanner(), 100);
             }
         }
     }, []);
@@ -63,8 +65,6 @@ export default function MapBarcodePage() {
         }
 
         try {
-            scannerRunningRef.current = true;
-            setIsScannerActive(true);
             await html5QrCodeRef.current.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -77,9 +77,11 @@ export default function MapBarcodePage() {
                 },
                 (errorMessage) => { /* onFailure, do nothing */ }
             );
+            scannerRunningRef.current = true;
+            setIsScannerActive(true);
         } catch (err: any) {
-            // This specific error is a race condition that can be ignored.
             if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
+                // This specific error is a race condition that can be ignored.
                 return;
             }
             console.error("Error starting scanner:", err);
@@ -94,7 +96,6 @@ export default function MapBarcodePage() {
     }, [isMobile]);
 
     useEffect(() => {
-        // Start scanner automatically on mobile when page loads
         if(isMobile) {
             startScanner();
         }
@@ -294,7 +295,5 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
         </Dialog>
     )
 }
-
-    
 
     
