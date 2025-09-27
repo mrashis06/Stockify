@@ -52,7 +52,10 @@ export async function extractItemsFromBill(input: BillExtractionInput): Promise<
 const billExtractionPrompt = ai.definePrompt({
   name: 'billExtractionPrompt',
   input: {schema: BillExtractionInputSchema},
-  output: {schema: BillExtractionOutputSchema},
+  output: {
+    schema: BillExtractionOutputSchema,
+    format: 'json'
+  },
   prompt: `You are an expert data entry agent for a liquor store. Your task is to extract all line items from the provided bill/invoice image.
 
 Analyze the document carefully and identify each product. For each product, extract the following details:
@@ -64,6 +67,12 @@ Analyze the document carefully and identify each product. For each product, extr
 Return the data as a structured array of items. If you cannot determine a piece of information for an item, make your best guess.
 
 Bill document: {{media url=billDataUri}}`,
+  config: {
+    model: 'googleai/gemini-2.5-flash',
+    requestOptions: {
+      timeout: 30000,
+    },
+  },
 });
 
 
