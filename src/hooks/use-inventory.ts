@@ -43,6 +43,7 @@ export type InventoryItem = {
   sales: number;
   opening?: number;
   closing?: number;
+  barcodeId?: string | null;
 };
 
 // Generates a Firestore-safe ID from brand and size
@@ -147,6 +148,7 @@ export function useInventory() {
             price: newItemData.price,
             category: newItemData.category,
             prevStock: newItemData.prevStock,
+            barcodeId: newItemData.barcodeId || null,
         };
 
         await setDoc(docRef, masterItemData, { merge: true });
@@ -275,7 +277,7 @@ export function useInventory() {
                     
                     const godownDocs = await getDocs(godownQuery);
                     // Sort in-code to avoid index requirement
-                    const sortedGodownDocs = godownDocs.docs.sort((a, b) => b.data().dateAdded.toMillis() - a.data().dateAdded.toMillis());
+                    const sortedGodownDocs = godownDocs.docs.sort((a, b) => b.data().dateAdded.toMillis() - a.data().toMillis());
                     
                     for (const docSnap of sortedGodownDocs) {
                         if (amountToReturn <= 0) break;

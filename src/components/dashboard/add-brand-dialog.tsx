@@ -40,6 +40,7 @@ const formSchema = z.object({
   price: z.coerce.number().min(0, 'Price must be a positive number'),
   category: z.string().min(1, 'Category is required'),
   prevStock: z.coerce.number().int().min(0, 'Initial stock must be a non-negative integer'),
+  barcodeId: z.string().optional(),
 });
 
 export type AddBrandFormValues = z.infer<typeof formSchema>;
@@ -64,6 +65,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
       price: 0,
       category: '',
       prevStock: 0,
+      barcodeId: '',
     },
   });
 
