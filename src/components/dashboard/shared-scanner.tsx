@@ -41,7 +41,6 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: 'environment',
-                        // These constraints can improve focus
                         advanced: [{ autoFocus: "continuous" }]
                     } 
                 });
@@ -74,36 +73,38 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
     // Function to start the scanner
     const startScanner = useCallback(async () => {
         if (scannerState === 'running' || scannerState === 'starting') return;
-        if (hasPermission === null) {
-            if (!(await requestCameraPermission())) return;
+        
+        let permissionGranted = hasPermission;
+        if (permissionGranted === null) {
+            permissionGranted = await requestCameraPermission();
         }
+        if (!permissionGranted) return;
 
         setScannerState('starting');
+        
+        // This function will only be called when the scanner div is in the DOM.
+        // So we can safely initialize Html5Qrcode here.
+        const html5QrCode = new Html5Qrcode(scannerRegionId, { verbose: false });
+        html5QrCodeRef.current = html5QrCode;
+
         const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
             const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
             const qrboxSize = Math.floor(minEdge * 0.7);
-            // Make the box wider for bottle barcodes
             const width = Math.min(qrboxSize * 1.5, viewfinderWidth * 0.9);
             const height = Math.min(qrboxSize * 0.7, viewfinderHeight * 0.9);
             return { width, height };
         };
 
-        // Initialize here to ensure the DOM element exists.
-        if (!html5QrCodeRef.current) {
-            html5QrCodeRef.current = new Html5Qrcode(scannerRegionId, { verbose: false });
-        }
-        
         try {
-            await html5QrCodeRef.current.start(
+            await html5QrCode.start(
                 { facingMode: "environment" },
                 { 
                     fps: 10,
                     qrbox: qrboxFunction,
-                    // Use only the barcode types you need
-                    formatsToSupport: [0, 1, 2, 3, 4, 5, 6, 7, 8], // UPC-A, UPC-E, EAN-8, EAN-13, etc.
+                    formatsToSupport: [0, 1, 2, 3, 4, 5, 6, 7, 8],
                 },
                 onScanSuccess,
-                (errorMessage) => { /* ignore, this is called on every frame without a match */ }
+                (errorMessage) => { /* ignore */ }
             );
             setScannerState('running');
         } catch (error) {
@@ -113,24 +114,35 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
         }
     }, [hasPermission, scannerState, requestCameraPermission, onScanSuccess]);
 
-    // Cleanup on unmount
+    // Main cleanup effect
     useEffect(() => {
         return () => {
-            if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-                html5QrCodeRef.current.stop().catch(err => console.error("Cleanup stop failed", err));
+            const scanner = html5QrCodeRef.current;
+            if (scanner && scanner.isScanning) {
+                scanner.stop().catch(err => {
+                    console.error("Failed to stop scanner on cleanup", err);
+                });
             }
         };
     }, []);
 
+
     // Control pause/resume
     useEffect(() => {
-        if (!html5QrCodeRef.current || scannerState !== 'running') return;
-        if (isPaused) {
-            html5QrCodeRef.current.pause(true);
-        } else {
-            html5QrCodeRef.current.resume();
+        const scanner = html5QrCodeRef.current;
+        if (!scanner || scannerState !== 'running') return;
+        
+        try {
+            if (isPaused && scanner.getState() === Html5QrcodeScannerState.SCANNING) {
+                scanner.pause(true);
+            } else if (!isPaused && scanner.getState() === Html5QrcodeScannerState.PAUSED) {
+                scanner.resume();
+            }
+        } catch (error) {
+            console.warn("Error pausing/resuming scanner:", error);
         }
     }, [isPaused, scannerState]);
+
 
     // Handle Torch
     const toggleTorch = useCallback(async () => {
@@ -144,6 +156,8 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
                 console.error('Failed to toggle torch', error);
                 toast({ title: "Error", description: "Could not toggle the flashlight.", variant: "destructive" });
             }
+        } else {
+             toast({ title: "Info", description: "Flashlight not available on this device.", variant: "default" });
         }
     }, [torchOn, capabilities.torch, toast]);
 
@@ -186,35 +200,35 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
         );
     }
     
-    if (scannerState !== 'running') {
+    // Initial state: show button to start scanner
+    if (scannerState === 'idle') {
         return (
             <div className="w-full aspect-video bg-black rounded-md flex flex-col items-center justify-center text-white gap-4 p-4">
-                {scannerState === 'starting' ? (
-                     <Loader2 className="h-8 w-8 animate-spin" />
-                ) : (
-                    <>
-                        <p className="text-center">Press the button to start the camera and begin scanning.</p>
-                        <Button onClick={startScanner} variant="secondary" size="lg">
-                            <Camera className="mr-2" /> Start Scanner
-                        </Button>
-                    </>
-                )}
+                <p className="text-center">Press the button to start the camera and begin scanning.</p>
+                <Button onClick={startScanner} variant="secondary" size="lg">
+                    <Camera className="mr-2" /> Start Scanner
+                </Button>
             </div>
-        )
+        );
     }
 
+    // Starting or Running state: show scanner view and controls
     return (
         <div className="space-y-4">
             <div id={scannerRegionId} className="w-full aspect-video bg-black rounded-md overflow-hidden" />
             
+            {scannerState === 'starting' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-md">
+                    <Loader2 className="h-8 w-8 animate-spin text-white" />
+                </div>
+            )}
+            
             <div className="grid grid-cols-3 items-center gap-4 px-2">
                  <div className="flex justify-start">
-                     {capabilities.torch && (
-                        <Button onClick={toggleTorch} variant="outline" size="icon" className="rounded-full h-12 w-12">
-                            {torchOn ? <ZapOff /> : <Zap />}
-                            <span className="sr-only">Toggle Flashlight</span>
-                        </Button>
-                     )}
+                    <Button onClick={toggleTorch} variant="outline" size="icon" className="rounded-full h-12 w-12" disabled={!capabilities.torch}>
+                        {torchOn ? <ZapOff /> : <Zap />}
+                        <span className="sr-only">Toggle Flashlight</span>
+                    </Button>
                  </div>
                  
                  <div className="flex items-center gap-2">
