@@ -128,13 +128,15 @@ export function useGodownInventory() {
         await runTransaction(db, async (transaction) => {
             const godownItemsQuery = query(
                 collection(db, 'godownInventory'),
-                where('productId', '==', productId),
-                orderBy('dateAdded', 'asc') // Order by date to ensure FIFO
+                where('productId', '==', productId)
             );
             
             const godownItemsSnapshot = await getDocs(godownItemsQuery);
+            const sortedGodownItems = godownItemsSnapshot.docs.sort(
+                (a, b) => a.data().dateAdded.toMillis() - b.data().dateAdded.toMillis()
+            );
 
-            const totalGodownStock = godownItemsSnapshot.docs.reduce((sum, doc) => sum + doc.data().quantity, 0);
+            const totalGodownStock = sortedGodownItems.reduce((sum, doc) => sum + doc.data().quantity, 0);
 
             if (totalGodownStock < quantityToTransfer) {
                 throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
@@ -152,7 +154,7 @@ export function useGodownInventory() {
 
             if (!shopItemDoc.exists()) {
                 // If item doesn't exist in master, create it.
-                const firstBatch = godownItemsSnapshot.docs[0].data();
+                const firstBatch = sortedGodownItems[0].data();
                 shopItemData = {
                     brand: firstBatch.brand,
                     size: firstBatch.size,
@@ -168,7 +170,7 @@ export function useGodownInventory() {
             let remainingToTransfer = quantityToTransfer;
             const transferTimestamp = Timestamp.now();
 
-            for (const docSnap of godownItemsSnapshot.docs) {
+            for (const docSnap of sortedGodownItems) {
                 if (remainingToTransfer <= 0) break;
                 
                 const batch = { id: docSnap.id, ...docSnap.data() } as GodownItem;
