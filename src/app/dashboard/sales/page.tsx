@@ -30,7 +30,7 @@ export default function SalesPage() {
     const [scanResult, setScanResult] = useState<string | null>(null);
     const [scannedItem, setScannedItem] = useState<InventoryItem | null>(null);
     const [scanError, setScanError] = useState<string | null>(null);
-    const [saleQuantity, setSaleQuantity] = useState<number>(1);
+    const [saleQuantity, setSaleQuantity] = useState<number | ''>('');
     const [editedPrice, setEditedPrice] = useState<number | null>(null);
     
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
@@ -146,7 +146,13 @@ export default function SalesPage() {
     const handleSale = async () => {
         if (!scannedItem || editedPrice === null || !user) return;
         
-        if (saleQuantity <= 0 || !Number.isInteger(saleQuantity)) {
+        const quantityNum = Number(saleQuantity);
+        if (saleQuantity === '' || isNaN(quantityNum)) {
+            toast({ title: 'Invalid Quantity', description: 'Please enter a quantity.', variant: 'destructive' });
+            return;
+        }
+
+        if (quantityNum <= 0 || !Number.isInteger(quantityNum)) {
             toast({ title: 'Invalid Quantity', description: 'Please enter a valid whole number greater than zero.', variant: 'destructive' });
             return;
         }
@@ -154,15 +160,15 @@ export default function SalesPage() {
         const opening = (scannedItem.prevStock || 0) + (scannedItem.added || 0);
         const availableStock = opening - (scannedItem.sales || 0);
 
-        if (saleQuantity > availableStock) {
+        if (quantityNum > availableStock) {
             toast({ title: 'Error', description: `Cannot sell more than available stock (${availableStock}).`, variant: 'destructive' });
             return;
         }
         
         try {
-            await recordSale(scannedItem.id, saleQuantity, editedPrice, user.uid);
+            await recordSale(scannedItem.id, quantityNum, editedPrice, user.uid);
 
-            toast({ title: 'Sale Recorded', description: `Sold ${saleQuantity} of ${scannedItem.brand} at ₹${editedPrice} each.` });
+            toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
             resetScanState();
         } catch (error) {
             console.error("Error processing sale:", error);
@@ -177,7 +183,7 @@ export default function SalesPage() {
         setScanResult(null);
         setScannedItem(null);
         setScanError(null);
-        setSaleQuantity(1);
+        setSaleQuantity('');
         setEditedPrice(null);
         processingRef.current = false;
     };
@@ -269,7 +275,8 @@ export default function SalesPage() {
                                         id="quantity"
                                         type="number"
                                         value={saleQuantity}
-                                        onChange={(e) => setSaleQuantity(Number(e.target.value))}
+                                        onChange={(e) => setSaleQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+                                        placeholder="Enter quantity"
                                         min="1"
                                         max={availableStock}
                                         className="max-w-[120px]"
