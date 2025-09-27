@@ -14,7 +14,7 @@ import {z} from 'zod';
 // Define the structure for a single extracted item
 const ExtractedItemSchema = z.object({
     brand: z.string().describe('The brand name of the product.'),
-    size: z.string().describe('The volume or size of the product (e.g., "750ml", "500ml").'),
+    size: z.string().describe('The volume or size of the product (e.g., "750ml", "650").'),
     quantity: z.number().describe('The number of units for this item.'),
     category: z.string().describe('The category of the liquor (e.g., "Whiskey", "Rum", "Beer", "Wine").'),
 });
@@ -60,7 +60,7 @@ const billExtractionPrompt = ai.definePrompt({
 
 Analyze the document carefully and identify each product. For each product, extract the following details:
 - brand: The brand name of the product.
-- size: The volume of the bottle (e.g., 750ml, 180ml, 500ml).
+- size: The volume of the bottle. Extract this value *exactly* as it appears (e.g., "750ml", "180", "500ml"). Do NOT add 'ml' if it is not present in the text.
 - quantity: The number of units or bottles.
 - category: The type of liquor (e.g., Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
 
