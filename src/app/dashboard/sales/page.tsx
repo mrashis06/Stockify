@@ -44,53 +44,57 @@ export default function SalesPage() {
 
         try {
             const inventoryRef = collection(db, "inventory");
+            // Always perform a direct query to Firestore for the most up-to-date check
             const q = query(inventoryRef, or(
                 where("barcodeId", "==", decodedText),
                 where("qrCodeId", "==", decodedText)
             ));
             const querySnapshot = await getDocs(q);
 
-            if (!querySnapshot.empty) {
-                const masterDoc = querySnapshot.docs[0];
-                const itemId = masterDoc.id;
-                const masterData = masterDoc.data() as Omit<InventoryItem, 'id'>;
-
-                // Fetch fresh daily and master data directly for accuracy
-                const today = formatDate(new Date(), 'yyyy-MM-dd');
-                const yesterday = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
-
-                const dailyDocRef = doc(db, 'dailyInventory', today);
-                const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
-
-                const [dailySnap, yesterdaySnap] = await Promise.all([
-                    getDoc(dailyDocRef),
-                    getDoc(yesterdayDocRef)
-                ]);
-
-                const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-                const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
-                
-                const itemDailyData = dailyData[itemId];
-                
-                const prevStock = yesterdayData[itemId]?.closing ?? masterData.prevStock ?? 0;
-                const added = itemDailyData?.added ?? 0;
-                const sales = itemDailyData?.sales ?? 0;
-
-                const itemData: InventoryItem = {
-                    ...masterData,
-                    id: itemId,
-                    prevStock,
-                    added,
-                    sales,
-                };
-                
-                setScannedItem(itemData);
-                setEditedPrice(itemData.price);
-                setSaleQuantity('');
-            } else {
+            if (querySnapshot.empty) {
+                // If the direct query finds nothing, THEN it's safe to assume it's unmapped
                 toast({ title: 'Product Not Mapped', description: 'Redirecting to mapping page...', variant: 'destructive' });
                 router.push(`/dashboard/map-barcode?code=${decodedText}`);
+                return; // Stop execution here
             }
+
+            // If found, proceed with fetching all necessary data for the sale
+            const masterDoc = querySnapshot.docs[0];
+            const itemId = masterDoc.id;
+            const masterData = masterDoc.data() as Omit<InventoryItem, 'id'>;
+
+            const today = formatDate(new Date(), 'yyyy-MM-dd');
+            const yesterday = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
+
+            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
+
+            const [dailySnap, yesterdaySnap] = await Promise.all([
+                getDoc(dailyDocRef),
+                getDoc(yesterdayDocRef)
+            ]);
+
+            const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+            const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
+            
+            const itemDailyData = dailyData[itemId];
+            
+            const prevStock = yesterdayData[itemId]?.closing ?? masterData.prevStock ?? 0;
+            const added = itemDailyData?.added ?? 0;
+            const sales = itemDailyData?.sales ?? 0;
+
+            const itemData: InventoryItem = {
+                ...masterData,
+                id: itemId,
+                prevStock,
+                added,
+                sales,
+            };
+            
+            setScannedItem(itemData);
+            setEditedPrice(itemData.price);
+            setSaleQuantity(''); // Reset to empty for better UX
+
         } catch (error) {
             console.error("Error fetching product by barcode:", error);
             toast({ title: "Error", description: "An error occurred while fetching the product.", variant: "destructive" });
