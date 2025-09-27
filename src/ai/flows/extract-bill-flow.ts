@@ -69,7 +69,7 @@ IMPORTANT: You must normalize brand names to their most common or base form. For
 Return the data as a structured array of items. If you cannot determine a piece of information for an item, make your best guess.
 
 Bill document: {{media url=billDataUri}}`,
-  model: 'gemini-2.5-flash',
+  model: 'googleai/gemini-2.5-flash',
   requestOptions: {
     timeout: 30000,
   },
