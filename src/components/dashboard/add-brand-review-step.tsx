@@ -10,8 +10,9 @@ import { IndianRupee } from 'lucide-react';
 
 type ReviewStepProps = {
   formData: AddBrandFormValues;
+  isAddingAnother: boolean;
   onEdit: () => void;
-  onConfirm: () => void;
+  onConfirm: (addAnother: boolean) => void;
   onCancel: () => void;
 };
 
@@ -22,7 +23,7 @@ const ReviewField = ({ label, value }: { label: string; value: React.ReactNode }
   </div>
 );
 
-export default function AddBrandReviewStep({ formData, onEdit, onConfirm, onCancel }: ReviewStepProps) {
+export default function AddBrandReviewStep({ formData, isAddingAnother, onEdit, onConfirm, onCancel }: ReviewStepProps) {
   return (
     <div className="space-y-6">
       <Card className="border-none shadow-none">
@@ -45,7 +46,11 @@ export default function AddBrandReviewStep({ formData, onEdit, onConfirm, onCanc
       <DialogFooter className="flex-col sm:flex-row gap-2">
         <Button onClick={onCancel} variant="outline" className="w-full sm:w-auto">Cancel</Button>
         <Button onClick={onEdit} variant="secondary" className="w-full sm:w-auto">Edit Details</Button>
-        <Button onClick={onConfirm} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">Confirm & Save</Button>
+        {isAddingAnother ? (
+            <Button onClick={() => onConfirm(true)} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">Confirm & Add Another</Button>
+        ) : (
+            <Button onClick={() => onConfirm(false)} className="w-full sm:w-auto bg-green-600 hover:bg-green-700">Confirm & Save</Button>
+        )}
       </DialogFooter>
     </div>
   );

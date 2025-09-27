@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import AddBrandReviewStep from './add-brand-review-step';
+import { toast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   brand: z.string().min(1, 'Brand name is required'),
@@ -56,6 +57,7 @@ const categories = ['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine', 'Gin', 'Tequila',
 export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: AddBrandDialogProps) {
   const [step, setStep] = useState<'form' | 'review'>('form');
   const [formData, setFormData] = useState<AddBrandFormValues | null>(null);
+  const [isAddingAnother, setIsAddingAnother] = useState(false);
 
   const form = useForm<AddBrandFormValues>({
     resolver: zodResolver(formSchema),
@@ -69,15 +71,34 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     },
   });
 
-  const handleFormSubmit = (data: AddBrandFormValues) => {
+  const handleFormSubmit = (data: AddBrandFormValues, addAnother: boolean) => {
     setFormData(data);
+    setIsAddingAnother(addAnother);
     setStep('review');
   };
 
-  const handleConfirmSubmit = () => {
+  const handleConfirmSubmit = (isAddingAnother: boolean) => {
     if (formData) {
       onAddBrand(formData);
-      onOpenChange(false); // Close dialog on final submission
+
+      if (isAddingAnother) {
+        toast({
+          title: 'Brand Added',
+          description: `${formData.brand} (${formData.size}) has been saved.`,
+        });
+        // Go back to form, keeping the category.
+        form.reset({
+          brand: '',
+          size: '',
+          price: 0,
+          category: formData.category, // Keep category for next item
+          prevStock: 0,
+          barcodeId: '',
+        });
+        setStep('form');
+      } else {
+        onOpenChange(false); // Close dialog on final submission
+      }
     }
   };
   
@@ -87,6 +108,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
       form.reset();
       setStep('form');
       setFormData(null);
+      setIsAddingAnother(false);
     }
   }, [isOpen, form]);
 
@@ -105,7 +127,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
         
         {step === 'form' ? (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="grid gap-4 py-4">
+            <form onSubmit={form.handleSubmit((data) => handleFormSubmit(data, false))} className="grid gap-4 py-4">
               <FormField
                 control={form.control}
                 name="brand"
@@ -151,7 +173,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a category" />
@@ -180,10 +202,13 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                   </FormItem>
                 )}
               />
-              <DialogFooter>
+              <DialogFooter className="gap-2 sm:gap-0">
                 <DialogClose asChild>
                   <Button type="button" variant="secondary">Cancel</Button>
                 </DialogClose>
+                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))}>
+                    Review & Add Another
+                 </Button>
                 <Button type="submit">Proceed to Review</Button>
               </DialogFooter>
             </form>
@@ -191,6 +216,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
         ) : formData ? (
           <AddBrandReviewStep 
             formData={formData}
+            isAddingAnother={isAddingAnother}
             onEdit={() => setStep('form')}
             onConfirm={handleConfirmSubmit}
             onCancel={() => onOpenChange(false)}
