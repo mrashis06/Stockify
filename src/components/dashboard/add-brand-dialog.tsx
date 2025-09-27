@@ -32,7 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import AddBrandReviewStep from './add-brand-review-step';
 import { toast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
@@ -55,10 +54,6 @@ type AddBrandDialogProps = {
 const categories = ['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine', 'Gin', 'Tequila', 'IML'];
 
 export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: AddBrandDialogProps) {
-  const [step, setStep] = useState<'form' | 'review'>('form');
-  const [formData, setFormData] = useState<AddBrandFormValues | null>(null);
-  const [isAddingAnother, setIsAddingAnother] = useState(false);
-
   const form = useForm<AddBrandFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -91,9 +86,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     }
   };
 
-  const handleReviewAndSubmit = (data: AddBrandFormValues) => {
-    setFormData(data);
-    setIsAddingAnother(false); // This path is for single submission
+  const handleFinalSubmit = (data: AddBrandFormValues) => {
     onAddBrand(data);
     onOpenChange(false);
   }
@@ -102,9 +95,6 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
   useEffect(() => {
     if (!isOpen) {
       form.reset();
-      setStep('form');
-      setFormData(null);
-      setIsAddingAnother(false);
     }
   }, [isOpen, form]);
 
@@ -112,14 +102,14 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{'Add New Brand'}</DialogTitle>
+          <DialogTitle>Add New Brand</DialogTitle>
           <DialogDescription>
-            {'Enter the details for the new brand.'}
+            Enter the details for the new brand.
           </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleReviewAndSubmit)}>
+            <form onSubmit={form.handleSubmit(handleFinalSubmit)}>
               <div className="space-y-4 py-4">
                 <FormField
                   control={form.control}
@@ -198,7 +188,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
               </div>
               <DialogFooter className="flex-col sm:flex-row sm:justify-end gap-2 pt-4">
                  <DialogClose asChild>
-                  <Button type="button" variant="secondary" className="w-full sm:w-auto">Cancel</Button>
+                  <Button type="button" variant="secondary" className="w-full sm:w-auto hover:bg-destructive hover:text-destructive-foreground">Cancel</Button>
                 </DialogClose>
                  <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))} className="w-full sm:w-auto">
                     Save & Add Another
