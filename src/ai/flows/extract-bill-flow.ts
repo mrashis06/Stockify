@@ -60,7 +60,7 @@ const billExtractionPrompt = ai.definePrompt({
 
 Analyze the document carefully and identify each product. For each product, extract the following details:
 - brand: The brand name of the product.
-- size: The volume of the bottle. Extract this value *exactly* as it appears (e.g., "750ml", "180", "500ml"). Do NOT add 'ml' if it is not present in the text.
+- size: The volume of the bottle. Extract this value *exactly* as it appears on the document. For example, if the bill says "650", the size is "650". If it says "750ml", the size is "750ml". DO NOT add 'ml' if it is not present in the text. This is very important.
 - quantity: The number of units or bottles.
 - category: The type of liquor (e.g., Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
 
