@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, ChevronDown, ChevronUp, FileScan } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -67,6 +67,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
     const [isTransferOpen, setIsTransferOpen] = useState(false);
+    const [isScanBillOpen, setIsScanBillOpen] = useState(false);
     const [transferringItem, setTransferringItem] = useState<GroupedGodownItem | null>(null);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const { toast } = useToast();
@@ -219,6 +220,9 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                                 ))}
                             </SelectContent>
                         </Select>
+                        <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsScanBillOpen(true)}>
+                            <FileScan className="mr-2 h-4 w-4" /> Scan Bill
+                        </Button>
                         <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={() => setIsAddItemOpen(true)}>
                             <PackagePlus className="mr-2 h-4 w-4" /> Add Item
                         </Button>
