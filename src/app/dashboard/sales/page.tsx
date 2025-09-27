@@ -3,9 +3,10 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { Camera, Barcode, X, HelpCircle, Search, IndianRupee } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Camera, Barcode, HelpCircle, IndianRupee } from 'lucide-react';
 import { useMediaQuery } from 'react-responsive';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, or } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import { useToast } from '@/hooks/use-toast';
@@ -16,8 +17,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { usePageLoading } from '@/hooks/use-loading';
 
 export default function SalesPage() {
-    const { inventory, updateItemField } = useInventory();
+    const { inventory, updateItemField, recordSale } = useInventory();
     const { toast } = useToast();
+    const router = useRouter();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
     usePageLoading(false);
 
@@ -51,7 +53,7 @@ export default function SalesPage() {
 
     const startScanner = useCallback(async () => {
         if (scannerRunningRef.current) return;
-        resetScanState(false); // Don't restart scanner, just clear state
+        resetScanState();
 
         if (!html5QrCodeRef.current) {
             html5QrCodeRef.current = new Html5Qrcode("barcode-scanner-region", { verbose: false });
@@ -75,27 +77,29 @@ export default function SalesPage() {
             setIsScannerActive(true);
         } catch (err: any) {
             console.error("Error starting scanner:", err);
+            let errorMessage = "Could not start camera. Please check permissions and refresh.";
             if (err.name === 'NotAllowedError') {
-                 setScanError("Camera access was denied. Please go to your browser settings and allow camera access for this site.");
-            } else {
-                 setScanError("Could not start camera. Please check permissions and refresh.");
+                 errorMessage = "Camera access was denied. Please go to your browser settings and allow camera access for this site.";
             }
+            setScanError(errorMessage);
         }
     }, []);
 
     useEffect(() => {
-        // Automatically start on mobile
         if(isMobile) startScanner();
 
         return () => {
             stopScanner();
         };
-    }, [isMobile, startScanner]);
+    }, [isMobile, startScanner, stopScanner]);
 
     const handleScanSuccess = async (decodedText: string) => {
         try {
             const inventoryRef = collection(db, "inventory");
-            const q = query(inventoryRef, where("barcodeId", "==", decodedText));
+            const q = query(inventoryRef, or(
+                where("barcodeId", "==", decodedText),
+                where("qrCodeId", "==", decodedText)
+            ));
             const querySnapshot = await getDocs(q);
 
             if (!querySnapshot.empty) {
@@ -105,10 +109,15 @@ export default function SalesPage() {
                     setScannedItem(itemFromHook);
                     setEditedPrice(itemFromHook.price);
                 } else {
-                    setScanError(`Product with barcode ${decodedText} was found but is not in the current active inventory. Try End of Day process.`);
+                    // Item exists in master but not in daily-loaded inventory. This shouldn't happen with the new useInventory hook.
+                    const masterData = querySnapshot.docs[0].data();
+                    const fallbackItem = { id: itemId, ...masterData, added: 0, sales: 0, prevStock: masterData.prevStock || 0 } as InventoryItem;
+                    setScannedItem(fallbackItem);
+                    setEditedPrice(fallbackItem.price);
                 }
             } else {
-                setScanError(`Product not mapped. Please map it first on the 'Map Barcodes' page.`);
+                toast({ title: 'Product Not Mapped', description: 'Redirecting to mapping page...', variant: 'destructive' });
+                router.push(`/dashboard/map-barcode?code=${decodedText}`);
             }
         } catch (error) {
             console.error("Error fetching product by barcode:", error);
@@ -119,7 +128,7 @@ export default function SalesPage() {
     };
     
     const handleSale = async () => {
-        if (!scannedItem || editedPrice === null) return;
+        if (!scannedItem || editedPrice === null || !user) return;
         
         const availableStock = Number(scannedItem.closing ?? scannedItem.opening ?? 0);
         if (saleQuantity > availableStock) {
@@ -128,17 +137,10 @@ export default function SalesPage() {
         }
         
         try {
-            // If price was edited, update it first
-            if (editedPrice !== scannedItem.price) {
-                await updateItemField(scannedItem.id, 'price', editedPrice);
-            }
-            
-            // Update sales
-            const newSales = (scannedItem.sales || 0) + saleQuantity;
-            await updateItemField(scannedItem.id, 'sales', newSales);
+            await recordSale(scannedItem.id, saleQuantity, editedPrice, user.uid);
 
             toast({ title: 'Sale Recorded', description: `Sold ${saleQuantity} of ${scannedItem.brand} at ₹${editedPrice} each.` });
-            resetScanState(true);
+            resetScanState();
         } catch (error) {
             console.error("Error processing sale:", error);
             const errorMessage = (error as Error).message || 'Failed to process sale.';
@@ -146,7 +148,7 @@ export default function SalesPage() {
         }
     };
 
-    const resetScanState = (restart: boolean) => {
+    const resetScanState = () => {
         setScanResult(null);
         setScannedItem(null);
         setScanError(null);
@@ -156,12 +158,6 @@ export default function SalesPage() {
 
         if (html5QrCodeRef.current?.isPaused) {
             html5QrCodeRef.current.resume();
-        }
-        
-        if (restart && isMobile) {
-            startScanner();
-        } else if (!isMobile) {
-            stopScanner(); // Stop if on desktop
         }
     };
 
@@ -196,9 +192,9 @@ export default function SalesPage() {
                     ) : (
                         <Alert>
                             <HelpCircle className="h-4 w-4" />
-                            <AlertTitle>Mobile Feature</AlertTitle>
+                            <AlertTitle>Desktop Mode</AlertTitle>
                             <AlertDescription>
-                                The barcode scanner is primarily designed for mobile devices.
+                                Barcode scanning is optimized for mobile devices. On desktop, you can manage inventory manually.
                             </AlertDescription>
                         </Alert>
                     )}
@@ -206,7 +202,7 @@ export default function SalesPage() {
                     {scanError && (
                         <Alert variant="destructive">
                             <AlertDescription>{scanError}</AlertDescription>
-                            <Button onClick={() => resetScanState(true)} variant="outline" className="w-full mt-4">Scan Again</Button>
+                            <Button onClick={resetScanState} variant="outline" className="w-full mt-4">Scan Again</Button>
                         </Alert>
                     )}
 
@@ -255,7 +251,7 @@ export default function SalesPage() {
                                 </div>
                                 <div className="flex gap-2 pt-4">
                                     <Button onClick={handleSale} className="flex-1 bg-green-600 hover:bg-green-700">Confirm Sale</Button>
-                                    <Button onClick={() => resetScanState(true)} variant="outline" className="flex-1">Scan Another</Button>
+                                    <Button onClick={resetScanState} variant="outline" className="flex-1">Cancel</Button>
                                 </div>
                             </CardContent>
                         </Card>
@@ -265,5 +261,3 @@ export default function SalesPage() {
         </main>
     );
 }
-
-    

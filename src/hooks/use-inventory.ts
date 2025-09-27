@@ -44,6 +44,7 @@ export type InventoryItem = {
   opening?: number;
   closing?: number;
   barcodeId?: string | null;
+  qrCodeId?: string | null;
 };
 
 // Generates a Firestore-safe ID from brand and size
@@ -149,6 +150,7 @@ export function useInventory() {
             category: newItemData.category,
             prevStock: newItemData.prevStock,
             barcodeId: newItemData.barcodeId || null,
+            qrCodeId: newItemData.qrCodeId || null,
         };
 
         await setDoc(docRef, masterItemData, { merge: true });
@@ -226,6 +228,87 @@ export function useInventory() {
      } finally {
          setSaving(false);
      }
+  };
+
+  const recordSale = async (id: string, quantity: number, salePrice: number, soldBy: string) => {
+      setSaving(true);
+      const originalItem = inventory.find(item => item.id === id);
+      if (!originalItem) throw new Error("Item not found to record sale.");
+
+      try {
+        await runTransaction(db, async (transaction) => {
+            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const masterRef = doc(db, 'inventory', id);
+            
+            const [dailyDoc, masterDoc] = await Promise.all([
+                transaction.get(dailyDocRef),
+                transaction.get(masterRef)
+            ]);
+
+            if (!masterDoc.exists()) throw new Error("Master product record not found.");
+            
+            const masterData = masterDoc.data();
+            let dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+            let itemDailyData = dailyData[id];
+
+            if (!itemDailyData) {
+                // If no entry for today, create one from master data
+                const yesterdayDoc = await getDoc(doc(db, 'dailyInventory', yesterday));
+                const prevStock = yesterdayDoc.exists() ? (yesterdayDoc.data()[id]?.closing ?? masterData.prevStock ?? 0) : (masterData.prevStock ?? 0);
+                itemDailyData = { ...masterData, prevStock, added: 0, sales: 0 };
+            }
+
+            const oldSales = itemDailyData.sales || 0;
+            const newSales = oldSales + quantity;
+            
+            const oldClosingStock = (itemDailyData.prevStock ?? 0) + (itemDailyData.added ?? 0) - oldSales;
+            const newClosingStock = (itemDailyData.prevStock ?? 0) + (itemDailyData.added ?? 0) - newSales;
+
+            if (newClosingStock < 0) {
+                throw new Error("Insufficient stock to complete sale.");
+            }
+
+            // Update daily sales
+            itemDailyData.sales = newSales;
+            dailyData[id] = itemDailyData;
+            transaction.set(dailyDocRef, dailyData, { merge: true });
+
+            // If price has changed, update master inventory
+            if (masterData.price !== salePrice) {
+                transaction.update(masterRef, { price: salePrice });
+            }
+            
+            // Create sales log entry
+            const salesLogRef = doc(collection(db, 'sales_log'));
+            transaction.set(salesLogRef, {
+                productId: id,
+                barcodeId: masterData.barcodeId || null,
+                quantity: quantity,
+                price: salePrice,
+                total: quantity * salePrice,
+                soldBy: soldBy,
+                createdAt: serverTimestamp(),
+            });
+
+            // Handle low stock notifications
+            if (notificationSettings.lowStockAlerts && user?.shopId) {
+                 if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
+                    createAdminNotification(user.shopId, {
+                        title: 'Low Stock Alert',
+                        description: `${masterData.brand} (${masterData.size}) is running low. Only ${newClosingStock} units left.`,
+                        type: 'low-stock',
+                        link: '/dashboard/inventory',
+                        productId: id
+                    });
+                 }
+            }
+        });
+      } catch (error) {
+          console.error(`Error recording sale:`, error);
+          throw error;
+      } finally {
+          setSaving(false);
+      }
   };
   
  const updateItemField = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => {
@@ -355,5 +438,5 @@ export function useInventory() {
     }
 };
 
-  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField };
+  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, recordSale };
 }

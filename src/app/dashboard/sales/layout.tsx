@@ -8,5 +8,3 @@ export default function SalesLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
-    
