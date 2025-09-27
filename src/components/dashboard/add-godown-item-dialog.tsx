@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   brand: z.string().min(1, 'Brand name is required'),
@@ -63,6 +64,26 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
   const onSubmit = (data: AddGodownItemFormValues) => {
     onAddItem(data);
     onOpenChange(false);
+  };
+  
+  const handleQuickAdd = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+        const data = form.getValues();
+        onAddItem(data);
+        toast({
+            title: 'Batch Added',
+            description: `${data.quantity} units of ${data.brand} (${data.size}) added.`,
+        });
+        // Reset form but keep brand and category
+        form.reset({
+            brand: data.brand,
+            category: data.category,
+            size: '',
+            quantity: '' as any,
+        });
+        // You might want to focus the 'size' input here
+    }
   };
   
   useEffect(() => {
@@ -146,7 +167,10 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" className="bg-green-600 hover:bg-green-700">Add Batch</Button>
+               <Button type="button" onClick={handleQuickAdd} variant="outline">
+                Save and Add Another
+              </Button>
+              <Button type="submit" className="bg-green-600 hover:bg-green-700">Save &amp; Close</Button>
             </DialogFooter>
           </form>
         </Form>
