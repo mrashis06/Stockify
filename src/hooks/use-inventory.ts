@@ -51,7 +51,11 @@ export type InventoryItem = {
 
 // Generates a Firestore-safe ID from brand and size
 const generateProductId = (brand: string, size: string) => {
-    const brandFormatted = brand.toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Normalize brand name: lowercase, remove "strong", "beer", "can", and special chars
+    const brandFormatted = brand.toLowerCase()
+        .replace(/\b(strong|beer|can)\b/g, '')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
     const sizeFormatted = size.toLowerCase().replace(/[^a-z0-9]/g, '');
     return `${brandFormatted}_${sizeFormatted}`;
 }
@@ -227,11 +231,9 @@ export function useInventory() {
           throw new Error("Cannot delete a product that has been sold today. Please clear today's sales for this item first.");
         }
 
-        const addedToday = itemToday?.added || 0;
-        
-        // This stock return logic is now handled in updateItemField.
-        // If we reach here, it means added is 0 or sales is 0.
-        // We can safely delete the record.
+        if (itemToday && itemToday.added > 0) {
+            throw new Error("Cannot delete product. Please set 'Added' to 0 to return transferred stock to godown first.");
+        }
 
         transaction.delete(inventoryDocRef);
         if (itemToday) {
@@ -382,9 +384,7 @@ export function useInventory() {
                         if (batchDoc.exists()) {
                             transaction.update(batchRef, { quantity: batchDoc.data().quantity + returnable });
                         } else {
-                            // If batch was deleted, we might need to recreate it or handle it differently.
-                            // For now, let's assume we recreate it.
-                            console.warn(`Godown batch ${transfer.batchId} not found. Recreating.`);
+                            // If batch was deleted, we recreate it.
                             const godownItem = {
                                 brand: masterData.brand, size: masterData.size, category: masterData.category,
                                 quantity: returnable, dateAdded: transfer.date, productId: id,
@@ -395,7 +395,7 @@ export function useInventory() {
                         // Adjust transfer history
                         const historyIndex = newTransferHistory.findIndex(h => h.date.isEqual(transfer.date) && h.batchId === transfer.batchId);
                         if (historyIndex > -1) {
-                            if (transfer.quantity - returnable > 0) {
+                            if (newTransferHistory[historyIndex].quantity - returnable > 0) {
                                 newTransferHistory[historyIndex].quantity -= returnable;
                             } else {
                                 newTransferHistory.splice(historyIndex, 1);

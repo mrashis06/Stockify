@@ -51,7 +51,11 @@ export type ExtractedItem = {
 
 // Generates a Firestore-safe ID from brand and size for grouping
 const generateProductId = (brand: string, size: string) => {
-    const brandFormatted = brand.toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Normalize brand name: lowercase, remove "strong", "beer", "can", and special chars
+    const brandFormatted = brand.toLowerCase()
+        .replace(/\b(strong|beer|can)\b/g, '')
+        .replace(/[^a-z0-9]/g, '')
+        .trim();
     const sizeFormatted = size.toLowerCase().replace(/[^a-z0-9]/g, '');
     return `${brandFormatted}_${sizeFormatted}`;
 }
@@ -225,13 +229,20 @@ export function useGodownInventory() {
                 (a, b) => a.data().dateAdded.toMillis() - b.data().dateAdded.toMillis()
             );
 
+            if (sortedGodownItems.length === 0) {
+                 throw new Error(`Product not found in godown.`);
+            }
+
             const totalGodownStock = sortedGodownItems.reduce((sum, doc) => sum + doc.data().quantity, 0);
 
             if (totalGodownStock < quantityToTransfer) {
                 throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
             }
 
-            const shopItemRef = doc(db, 'inventory', productId);
+            const firstGodownBatch = sortedGodownItems[0].data();
+            const shopProductId = generateProductId(firstGodownBatch.brand, firstGodownBatch.size);
+            
+            const shopItemRef = doc(db, 'inventory', shopProductId);
             const dailyInventoryRef = doc(db, 'dailyInventory', today);
             const yesterdayInventoryRef = doc(db, 'dailyInventory', yesterday);
 
@@ -243,11 +254,13 @@ export function useGodownInventory() {
 
             if (!shopItemDoc.exists()) {
                 // If item doesn't exist in master, create it.
-                const firstBatch = sortedGodownItems[0].data();
+                // Use a more generic brand name from the first batch if possible
+                const brandNameToCreate = firstGodownBatch.brand.replace(/\b(strong|beer|can)\b/gi, '').trim();
+
                 shopItemData = {
-                    brand: firstBatch.brand,
-                    size: firstBatch.size,
-                    category: firstBatch.category,
+                    brand: brandNameToCreate,
+                    size: firstGodownBatch.size,
+                    category: firstGodownBatch.category,
                     price: 0, // Price needs to be set manually
                     prevStock: 0,
                     transferHistory: [],
@@ -292,9 +305,9 @@ export function useGodownInventory() {
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
             
-            const prevStockFromYesterday = yesterdayData[productId]?.closing ?? shopItemData?.prevStock ?? 0;
+            const prevStockFromYesterday = yesterdayData[shopProductId]?.closing ?? shopItemData?.prevStock ?? 0;
             
-            const currentDailyItem = dailyData[productId] || {
+            const currentDailyItem = dailyData[shopProductId] || {
                  brand: shopItemData.brand,
                  size: shopItemData.size,
                  category: shopItemData.category,
@@ -306,7 +319,7 @@ export function useGodownInventory() {
             
             currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
             
-            transaction.set(dailyInventoryRef, { [productId]: currentDailyItem }, { merge: true });
+            transaction.set(dailyInventoryRef, { [shopProductId]: currentDailyItem }, { merge: true });
         });
 
     } catch (error) {
