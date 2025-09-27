@@ -94,7 +94,7 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add New Batch to Godown</DialogTitle>
         </DialogHeader>
