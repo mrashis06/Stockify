@@ -146,6 +146,11 @@ export default function SalesPage() {
     const handleSale = async () => {
         if (!scannedItem || editedPrice === null || !user) return;
         
+        if (saleQuantity <= 0 || !Number.isInteger(saleQuantity)) {
+            toast({ title: 'Invalid Quantity', description: 'Please enter a valid whole number greater than zero.', variant: 'destructive' });
+            return;
+        }
+
         const opening = (scannedItem.prevStock || 0) + (scannedItem.added || 0);
         const availableStock = opening - (scannedItem.sales || 0);
 
@@ -268,6 +273,8 @@ export default function SalesPage() {
                                         min="1"
                                         max={availableStock}
                                         className="max-w-[120px]"
+                                        autoFocus
+                                        onFocus={(e) => e.target.select()}
                                     />
                                 </div>
                                 <div className="flex gap-2 pt-4">
