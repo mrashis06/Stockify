@@ -95,7 +95,7 @@ export default function MapBarcodePage() {
         return () => {
             stopScanner();
         };
-    }, [isMobile, startScanner]);
+    }, [isMobile, startScanner, stopScanner]);
 
     const handleScanSuccess = async (decodedText: string) => {
         try {
@@ -229,7 +229,7 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
         if (!searchTerm) return inventory;
         return inventory.filter(item =>
             item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.category.toLowerCase().includes(searchTerm.toLowerCase())
+            (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
         );
     }, [inventory, searchTerm]);
     
@@ -286,6 +286,3 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
         </Dialog>
     )
 }
-
-    
-    

@@ -15,9 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { usePageLoading } from '@/hooks/use-loading';
+import { useAuth } from '@/hooks/use-auth';
+
 
 export default function SalesPage() {
-    const { inventory, updateItemField, recordSale } = useInventory();
+    const { inventory, recordSale } = useInventory();
+    const { user } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
@@ -52,7 +55,7 @@ export default function SalesPage() {
     }, []);
 
     const startScanner = useCallback(async () => {
-        if (scannerRunningRef.current) return;
+        if (scannerRunningRef.current || !isMobile) return;
         resetScanState();
 
         if (!html5QrCodeRef.current) {
@@ -83,7 +86,7 @@ export default function SalesPage() {
             }
             setScanError(errorMessage);
         }
-    }, []);
+    }, [isMobile]);
 
     useEffect(() => {
         if(isMobile) startScanner();
@@ -109,7 +112,7 @@ export default function SalesPage() {
                     setScannedItem(itemFromHook);
                     setEditedPrice(itemFromHook.price);
                 } else {
-                    // Item exists in master but not in daily-loaded inventory. This shouldn't happen with the new useInventory hook.
+                    // Item exists in master but not in daily-loaded inventory. This can happen for newly added items.
                     const masterData = querySnapshot.docs[0].data();
                     const fallbackItem = { id: itemId, ...masterData, added: 0, sales: 0, prevStock: masterData.prevStock || 0 } as InventoryItem;
                     setScannedItem(fallbackItem);
@@ -156,12 +159,12 @@ export default function SalesPage() {
         setEditedPrice(null);
         processingRef.current = false;
 
-        if (html5QrCodeRef.current?.isPaused) {
+        if (isMobile && html5QrCodeRef.current?.isPaused) {
             html5QrCodeRef.current.resume();
         }
     };
 
-    const availableStock = scannedItem ? Number(scannedItem.closing ?? scannedItem.opening ?? 0) : 0;
+    const availableStock = Number(scannedItem?.closing ?? scannedItem?.opening ?? 0);
 
     return (
         <main className="flex-1 p-4 md:p-8">
@@ -194,7 +197,7 @@ export default function SalesPage() {
                             <HelpCircle className="h-4 w-4" />
                             <AlertTitle>Desktop Mode</AlertTitle>
                             <AlertDescription>
-                                Barcode scanning is optimized for mobile devices. On desktop, you can manage inventory manually.
+                                Barcode scanning is optimized for mobile devices. Please use your phone to access this feature.
                             </AlertDescription>
                         </Alert>
                     )}
