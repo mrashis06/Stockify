@@ -67,24 +67,20 @@ export function useInventory() {
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-
-  // This effect sets up the listener for the daily inventory data
-  useEffect(() => {
-    setLoading(true);
-    const dailyDocRef = doc(db, 'dailyInventory', today);
-
-    const unsubscribe = onSnapshot(dailyDocRef, async (dailySnap) => {
+  
+  const fetchInventoryData = useCallback(async () => {
+      setLoading(true);
       try {
+        const dailyDocRef = doc(db, 'dailyInventory', today);
+        const dailySnap = await getDoc(dailyDocRef);
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
         
-        // Fetch all master inventory items
         const inventorySnapshot = await getDocs(collection(db, 'inventory'));
         const masterInventory = new Map<string, any>();
         inventorySnapshot.forEach(doc => {
             masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
         });
 
-        // Fetch yesterday's closing stock for calculating prevStock
         const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
         const yesterdayDocSnap = await getDoc(yesterdayDocRef);
         const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
@@ -102,7 +98,6 @@ export function useInventory() {
             if (dailyItem) {
                 items.push({ ...masterItem, ...dailyItem, prevStock, added, sales });
             } else {
-                // This is a new day with no entry yet, or item is not in daily doc
                 items.push({
                     ...masterItem,
                     prevStock,
@@ -118,11 +113,9 @@ export function useInventory() {
              return { ...item, opening, closing };
         });
         
-        // Filter out items that have 0 closing stock, 0 prev stock and 0 added stock
         const finalInventory = processedInventory.filter(item => {
             return (item.closing ?? 0) > 0 || (item.prevStock ?? 0) > 0 || (item.added ?? 0) > 0 || (item.sales ?? 0) > 0;
         });
-
 
         setInventory(finalInventory.sort((a, b) => a.brand.localeCompare(b.brand)));
       } catch (error) {
@@ -131,10 +124,20 @@ export function useInventory() {
       } finally {
         setLoading(false);
       }
+  }, [today, yesterday]);
+
+  // This effect sets up the listener for the daily inventory data
+  useEffect(() => {
+    const dailyDocRef = doc(db, 'dailyInventory', today);
+    const unsubscribe = onSnapshot(dailyDocRef, (doc) => {
+        fetchInventoryData(); // Refetch all data when daily doc changes
     });
 
+    // Initial fetch
+    fetchInventoryData();
+
     return () => unsubscribe();
-  }, [today, yesterday]);
+  }, [today, fetchInventoryData]);
   
 
   const addBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing'>) => {
@@ -157,16 +160,14 @@ export function useInventory() {
         
         const dailyDocRef = doc(db, 'dailyInventory', today);
         
-        // When adding a new brand, we create a fresh daily record for it.
-        // We do not merge with any potentially stale data from a previous day's doc copy.
         const dailyItemData = {
             brand: newItemData.brand,
             size: newItemData.size,
             price: newItemData.price,
             category: newItemData.category,
             prevStock: newItemData.prevStock,
-            added: 0, // Should be 0 on creation
-            sales: 0, // Should be 0 on creation
+            added: 0,
+            sales: 0,
         };
 
         (dailyItemData as any).opening = dailyItemData.prevStock + dailyItemData.added;
@@ -446,5 +447,5 @@ export function useInventory() {
     }
 };
 
-  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, recordSale };
+  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, recordSale, forceRefetch: fetchInventoryData };
 }

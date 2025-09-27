@@ -17,7 +17,7 @@ import { Barcode, HelpCircle, Search, CheckCircle, Info, Scan, X } from 'lucide-
 import SharedScanner from '@/components/dashboard/shared-scanner';
 
 export default function MapBarcodePage() {
-    const { inventory, updateBrand } = useInventory();
+    const { inventory, updateBrand, forceRefetch } = useInventory();
     const { toast } = useToast();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
 
@@ -62,6 +62,7 @@ export default function MapBarcodePage() {
             await updateBrand(productId, { barcodeId: scannedBarcode });
             const mappedItem = inventory.find(item => item.id === productId);
             toast({ title: 'Success', description: `Barcode mapped to ${mappedItem?.brand} successfully.` });
+            await forceRefetch(); // Force a refetch to ensure data consistency
         } catch (error) {
             console.error("Error mapping barcode:", error);
             toast({ title: 'Error', description: 'Mapping failed. Please try again.', variant: 'destructive' });
