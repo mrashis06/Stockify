@@ -1,10 +1,8 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, Barcode, HelpCircle, IndianRupee } from 'lucide-react';
 import { useMediaQuery } from 'react-responsive';
 import { collection, query, where, getDocs, or } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -14,9 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { usePageLoading } from '@/hooks/use-loading';
 import { useAuth } from '@/hooks/use-auth';
-
+import { Barcode, HelpCircle, IndianRupee, Scan, X } from 'lucide-react';
+import SharedScanner from '@/components/dashboard/shared-scanner';
 
 export default function SalesPage() {
     const { inventory, recordSale } = useInventory();
@@ -24,92 +22,23 @@ export default function SalesPage() {
     const { toast } = useToast();
     const router = useRouter();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
-    usePageLoading(false);
 
-    const [isScannerActive, setIsScannerActive] = useState(false);
-    const [scanResult, setScanResult] = useState<string | null>(null);
+    const [isClient, setIsClient] = useState(false);
     const [scannedItem, setScannedItem] = useState<InventoryItem | null>(null);
-    const [scanError, setScanError] = useState<string | null>(null);
-    const [saleQuantity, setSaleQuantity] = useState<number | ''>('');
-    const [editedPrice, setEditedPrice] = useState<number | null>(null);
+    const [isScannerPaused, setIsScannerPaused] = useState(false);
     
-    const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
-    const scannerStateRef = useRef<'idle' | 'starting' | 'running' | 'stopping'>('idle');
-    const processingRef = useRef<boolean>(false);
-
-    const stopScanner = useCallback(async () => {
-        if (scannerStateRef.current !== 'running' || !html5QrCodeRef.current) {
-            return;
-        }
-
-        scannerStateRef.current = 'stopping';
-        try {
-            const scanner = html5QrCodeRef.current;
-            if (scanner && scanner.getState() === Html5QrcodeScannerState.SCANNING) {
-                await scanner.stop();
-            }
-        } catch (err: any) {
-            if (!err.message.includes("Cannot transition to a new state, already under transition")) {
-                console.error("Failed to stop scanner gracefully.", err);
-            }
-        } finally {
-            scannerStateRef.current = 'idle';
-            setIsScannerActive(false);
-        }
-    }, []);
-
-
-    const startScanner = useCallback(async () => {
-        if (!isMobile || scannerStateRef.current === 'running' || scannerStateRef.current === 'starting') {
-            return;
-        }
-        scannerStateRef.current = 'starting';
-
-        resetScanState();
-
-        if (!html5QrCodeRef.current) {
-            html5QrCodeRef.current = new Html5Qrcode("barcode-scanner-region", { verbose: false });
-        }
-
-        try {
-            await html5QrCodeRef.current.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                (decodedText) => {
-                    if (processingRef.current) return;
-                    processingRef.current = true;
-                    
-                    setScanResult(decodedText);
-                    handleScanSuccess(decodedText);
-                },
-                (errorMessage) => { /* ignore */ }
-            );
-            scannerStateRef.current = 'running';
-            setIsScannerActive(true);
-        } catch (err: any) {
-             if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
-                scannerStateRef.current = 'running'; // Assume it is running
-                return;
-            }
-            console.error("Error starting scanner:", err);
-            let errorMessage = "Could not start camera. Please check permissions and refresh.";
-            if (err.name === 'NotAllowedError') {
-                 errorMessage = "Camera access was denied. Please go to your browser settings and allow camera access for this site.";
-            }
-            setScanError(errorMessage);
-            scannerStateRef.current = 'idle';
-        }
-    }, [isMobile]);
+    const [saleQuantity, setSaleQuantity] = useState<number | ''>(1);
+    const [editedPrice, setEditedPrice] = useState<number | null>(null);
 
     useEffect(() => {
-        if(isMobile) startScanner();
-
-        return () => {
-            stopScanner();
-        };
-    }, [isMobile, startScanner, stopScanner]);
+        setIsClient(true);
+    }, []);
 
     const handleScanSuccess = async (decodedText: string) => {
+        if (isScannerPaused) return;
+
+        setIsScannerPaused(true);
+
         try {
             const inventoryRef = collection(db, "inventory");
             const q = query(inventoryRef, or(
@@ -121,25 +50,20 @@ export default function SalesPage() {
             if (!querySnapshot.empty) {
                 const itemId = querySnapshot.docs[0].id;
                 const itemFromHook = inventory.find(i => i.id === itemId);
-                if (itemFromHook) {
-                    setScannedItem(itemFromHook);
-                    setEditedPrice(itemFromHook.price);
-                } else {
-                    // Item exists in master but not in daily-loaded inventory. This can happen for newly added items.
-                    const masterData = querySnapshot.docs[0].data();
-                    const fallbackItem = { id: itemId, ...masterData, added: 0, sales: 0, prevStock: masterData.prevStock || 0 } as InventoryItem;
-                    setScannedItem(fallbackItem);
-                    setEditedPrice(fallbackItem.price);
-                }
+
+                const itemData = itemFromHook || { id: itemId, ...querySnapshot.docs[0].data(), added: 0, sales: 0 } as InventoryItem;
+                
+                setScannedItem(itemData);
+                setEditedPrice(itemData.price);
+                setSaleQuantity(1);
             } else {
                 toast({ title: 'Product Not Mapped', description: 'Redirecting to mapping page...', variant: 'destructive' });
                 router.push(`/dashboard/map-barcode?code=${decodedText}`);
             }
         } catch (error) {
             console.error("Error fetching product by barcode:", error);
-            setScanError("An error occurred while fetching the product.");
-        } finally {
-            // Keep processingRef true until user confirms or cancels sale
+            toast({ title: "Error", description: "An error occurred while fetching the product.", variant: "destructive" });
+            resetScanState();
         }
     };
     
@@ -147,12 +71,7 @@ export default function SalesPage() {
         if (!scannedItem || editedPrice === null || !user) return;
         
         const quantityNum = Number(saleQuantity);
-        if (saleQuantity === '' || isNaN(quantityNum)) {
-            toast({ title: 'Invalid Quantity', description: 'Please enter a quantity.', variant: 'destructive' });
-            return;
-        }
-
-        if (quantityNum <= 0 || !Number.isInteger(quantityNum)) {
+        if (saleQuantity === '' || isNaN(quantityNum) || quantityNum <= 0 || !Number.isInteger(quantityNum)) {
             toast({ title: 'Invalid Quantity', description: 'Please enter a valid whole number greater than zero.', variant: 'destructive' });
             return;
         }
@@ -167,25 +86,20 @@ export default function SalesPage() {
         
         try {
             await recordSale(scannedItem.id, quantityNum, editedPrice, user.uid);
-
             toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
             resetScanState();
         } catch (error) {
             console.error("Error processing sale:", error);
             const errorMessage = (error as Error).message || 'Failed to process sale.';
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
-        } finally {
-             processingRef.current = false;
         }
     };
 
     const resetScanState = () => {
-        setScanResult(null);
         setScannedItem(null);
-        setScanError(null);
-        setSaleQuantity('');
+        setSaleQuantity(1);
         setEditedPrice(null);
-        processingRef.current = false;
+        setIsScannerPaused(false);
     };
 
     const availableStock = useMemo(() => {
@@ -193,7 +107,6 @@ export default function SalesPage() {
         const opening = (scannedItem.prevStock || 0) + (scannedItem.added || 0);
         return opening - (scannedItem.sales || 0);
     }, [scannedItem]);
-
 
     return (
         <main className="flex-1 p-4 md:p-8">
@@ -209,18 +122,11 @@ export default function SalesPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {isMobile ? (
-                        <>
-                            <div id="barcode-scanner-region" className="w-full aspect-video bg-black rounded-md overflow-hidden" />
-                             {!isScannerActive && !scanError && (
-                                <div className="text-center p-8 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4">
-                                     <p className="text-muted-foreground">Press the button to start scanning.</p>
-                                     <Button onClick={startScanner}>
-                                        <Camera className="mr-2" /> Start Scanner
-                                    </Button>
-                                </div>
-                            )}
-                        </>
+                    {isClient && isMobile ? (
+                        <SharedScanner 
+                            onScanSuccess={handleScanSuccess}
+                            isPaused={isScannerPaused}
+                        />
                     ) : (
                         <Alert>
                             <HelpCircle className="h-4 w-4" />
@@ -228,13 +134,6 @@ export default function SalesPage() {
                             <AlertDescription>
                                 Barcode scanning is optimized for mobile devices. Please use your phone to access this feature.
                             </AlertDescription>
-                        </Alert>
-                    )}
-
-                    {scanError && (
-                        <Alert variant="destructive">
-                            <AlertDescription>{scanError}</AlertDescription>
-                            <Button onClick={resetScanState} variant="outline" className="w-full mt-4">Scan Again</Button>
                         </Alert>
                     )}
 

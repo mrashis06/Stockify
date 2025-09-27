@@ -1,9 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { Camera, Barcode, X, HelpCircle, Search, CheckCircle, Info } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMediaQuery } from 'react-responsive';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -13,101 +11,32 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { usePageLoading } from '@/hooks/use-loading';
+import { Barcode, HelpCircle, Search, CheckCircle, Info, Scan, X } from 'lucide-react';
+import SharedScanner from '@/components/dashboard/shared-scanner';
 
 export default function MapBarcodePage() {
     const { inventory, updateBrand } = useInventory();
     const { toast } = useToast();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
-    usePageLoading(false); // This page doesn't have a primary data loading state
 
-    const [isScannerActive, setIsScannerActive] = useState(false);
-    const [scanResult, setScanResult] = useState<string | null>(null);
-    const [scanError, setScanError] = useState<string | null>(null);
+    const [isClient, setIsClient] = useState(false);
     const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
+    const [isScannerPaused, setIsScannerPaused] = useState(false);
+    const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
     const [alreadyMappedItem, setAlreadyMappedItem] = useState<InventoryItem | null>(null);
-    
-    const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
-    const scannerStateRef = useRef<'idle' | 'starting' | 'running' | 'stopping'>('idle');
-    const processingRef = useRef<boolean>(false);
-
-    const stopScanner = useCallback(async () => {
-        if (scannerStateRef.current !== 'running' || !html5QrCodeRef.current) {
-            return;
-        }
-
-        scannerStateRef.current = 'stopping';
-        try {
-            const scanner = html5QrCodeRef.current;
-            if (scanner && scanner.getState() === Html5QrcodeScannerState.SCANNING) {
-                await scanner.stop();
-            }
-        } catch (err: any) {
-            if (!err.message.includes("Cannot transition to a new state, already under transition")) {
-                 console.error("Failed to stop scanner gracefully.", err);
-            }
-        } finally {
-            scannerStateRef.current = 'idle';
-            setIsScannerActive(false);
-        }
-    }, []);
-
-    const startScanner = useCallback(async () => {
-        if (!isMobile || scannerStateRef.current === 'running' || scannerStateRef.current === 'starting') {
-             return;
-        }
-        scannerStateRef.current = 'starting';
-
-        resetScanState();
-
-        if (!html5QrCodeRef.current) {
-            html5QrCodeRef.current = new Html5Qrcode("barcode-scanner-region", { verbose: false });
-        }
-
-        try {
-            await html5QrCodeRef.current.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                (decodedText) => { // onSuccess
-                    if (processingRef.current) return;
-                    processingRef.current = true;
-                    setScanResult(decodedText);
-                    // Do NOT pause here for continuous scanning
-                    handleScanSuccess(decodedText);
-                },
-                (errorMessage) => { /* onFailure, do nothing */ }
-            );
-            scannerStateRef.current = 'running';
-            setIsScannerActive(true);
-        } catch (err: any) {
-            if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
-                scannerStateRef.current = 'running'; // Assume it's running
-                return;
-            }
-            console.error("Error starting scanner:", err);
-            if (err.name === 'NotAllowedError') {
-                 setScanError("Camera access was denied. Please go to your browser settings and allow camera access for this site.");
-            } else {
-                 setScanError("Could not start camera. Please check permissions and refresh.");
-            }
-             scannerStateRef.current = 'idle';
-             setIsScannerActive(false);
-        }
-    }, [isMobile]);
 
     useEffect(() => {
-        if(isMobile) {
-            startScanner();
-        }
-        // Cleanup function to stop the scanner when the component unmounts
-        return () => {
-             stopScanner();
-        };
-    }, [isMobile, startScanner, stopScanner]);
+        setIsClient(true);
+    }, []);
 
     const handleScanSuccess = async (decodedText: string) => {
+        if (isScannerPaused) return;
+
+        setIsScannerPaused(true);
+        setScannedBarcode(decodedText);
+
         try {
             const inventoryRef = collection(db, "inventory");
             const q = query(inventoryRef, where("barcodeId", "==", decodedText));
@@ -121,43 +50,36 @@ export default function MapBarcodePage() {
             }
         } catch (error) {
             console.error("Error fetching product by barcode:", error);
-            setScanError("An error occurred while fetching the product.");
-        } finally {
-            // Keep processingRef true until the dialog is closed or action is taken
+            toast({ title: "Error", description: "An error occurred while fetching the product.", variant: "destructive" });
+            resetForNextScan();
         }
     };
 
     const handleMapBarcode = async (productId: string) => {
-        if (!scanResult) return;
+        if (!scannedBarcode) return;
 
         try {
-            await updateBrand(productId, { barcodeId: scanResult });
+            await updateBrand(productId, { barcodeId: scannedBarcode });
             const mappedItem = inventory.find(item => item.id === productId);
             toast({ title: 'Success', description: `Barcode mapped to ${mappedItem?.brand} successfully.` });
-            resetForNextScan();
         } catch (error) {
             console.error("Error mapping barcode:", error);
             toast({ title: 'Error', description: 'Mapping failed. Please try again.', variant: 'destructive' });
         } finally {
-             processingRef.current = false;
+            resetForNextScan();
         }
     };
-
-    const resetScanState = () => {
-        setScanResult(null);
-        setScanError(null);
-        setAlreadyMappedItem(null);
-        setIsMappingDialogOpen(false);
-        processingRef.current = false;
-    };
-
+    
     const handleCancelMapping = () => {
         setIsMappingDialogOpen(false);
-        processingRef.current = false;
-    }
+        resetForNextScan();
+    };
 
     const resetForNextScan = () => {
-        resetScanState();
+        setScannedBarcode(null);
+        setAlreadyMappedItem(null);
+        setIsMappingDialogOpen(false);
+        setIsScannerPaused(false);
     };
 
     return (
@@ -165,7 +87,7 @@ export default function MapBarcodePage() {
             <MapProductDialog
                 isOpen={isMappingDialogOpen}
                 onOpenChange={setIsMappingDialogOpen}
-                barcodeId={scanResult}
+                barcodeId={scannedBarcode}
                 onMap={handleMapBarcode}
                 onCancel={handleCancelMapping}
             />
@@ -180,17 +102,12 @@ export default function MapBarcodePage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {isMobile ? (
+                    {isClient && isMobile ? (
                         <>
-                            <div id="barcode-scanner-region" className="w-full aspect-video bg-black rounded-md overflow-hidden" />
-                             {!isScannerActive && !scanError && (
-                                <div className="text-center p-8 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4">
-                                     <p className="text-muted-foreground">Press the button to start the camera.</p>
-                                     <Button onClick={startScanner}>
-                                        <Camera className="mr-2" /> Start Scanner
-                                    </Button>
-                                </div>
-                            )}
+                             <SharedScanner
+                                onScanSuccess={handleScanSuccess}
+                                isPaused={isScannerPaused}
+                             />
                         </>
                     ) : (
                         <Alert>
@@ -202,30 +119,26 @@ export default function MapBarcodePage() {
                         </Alert>
                     )}
 
-                    {scanError && (
-                        <Alert variant="destructive">
-                            <AlertDescription>{scanError}</AlertDescription>
-                        </Alert>
-                    )}
-                    
-                    {scanResult && !isMappingDialogOpen && (
+                    {isScannerPaused && !isMappingDialogOpen && (
                          <Card className="bg-muted/50">
                             <CardHeader>
-                                <CardTitle>Last Scan</CardTitle>
-                                <CardDescription>Result from the most recent scan.</CardDescription>
+                                <CardTitle>Scan Result</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                <Alert variant={alreadyMappedItem ? 'default' : 'destructive'}>
                                     {alreadyMappedItem ? <CheckCircle className="h-4 w-4" /> : <Info className="h-4 w-4" />}
-                                    <AlertTitle>{alreadyMappedItem ? "Already Mapped" : "New Barcode Detected"}</AlertTitle>
+                                    <AlertTitle>{alreadyMappedItem ? "Barcode Already Mapped" : "New Barcode Detected"}</AlertTitle>
                                     <AlertDescription>
                                         {alreadyMappedItem 
-                                            ? `This barcode is already linked to: ${alreadyMappedItem.brand} (${alreadyMappedItem.size}).`
-                                            : `This barcode (${scanResult}) is not yet mapped to any product.`
+                                            ? `This barcode is linked to: ${alreadyMappedItem.brand} (${alreadyMappedItem.size}).`
+                                            : `This barcode (${scannedBarcode}) is not yet mapped to any product.`
                                         }
                                     </AlertDescription>
                                 </Alert>
-                                <Button onClick={resetForNextScan} variant="outline" className="w-full">Scan Next Item</Button>
+                                <Button onClick={resetForNextScan} variant="outline" className="w-full">
+                                    <Scan className="mr-2 h-4 w-4" />
+                                    Scan Next Item
+                                </Button>
                             </CardContent>
                         </Card>
                     )}
@@ -258,14 +171,14 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => {
-            if (!open) onCancel(); // Call cancel when dialog is closed
+            if (!open) onCancel();
             onOpenChange(open);
         }}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>Map New Barcode</DialogTitle>
                     <DialogDescription>
-                        The barcode <span className="font-mono bg-muted p-1 rounded-sm">{barcodeId}</span> is new. Select the correct product to link it.
+                        The barcode <span className="font-mono bg-muted p-1 rounded-sm">{barcodeId}</span> is new. Select the product to link it to.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
@@ -303,5 +216,3 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
         </Dialog>
     )
 }
-
-    
