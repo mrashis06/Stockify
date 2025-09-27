@@ -42,6 +42,13 @@ export type GodownItem = {
   transferHistory?: TransferHistory[];
 };
 
+export type ExtractedItem = {
+    brand: string;
+    size: string;
+    quantity: number;
+    category: string;
+}
+
 // Generates a Firestore-safe ID from brand and size for grouping
 const generateProductId = (brand: string, size: string) => {
     const brandFormatted = brand.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -57,8 +64,24 @@ export function useGodownInventory() {
   // This hook now connects the component's loading state to the global loader
   usePageLoading(loading);
 
-  useEffect(() => {
+  const fetchGodownInventory = useCallback(async () => {
     setLoading(true);
+    try {
+      const q = query(collection(db, "godownInventory"), orderBy("dateAdded", "asc"));
+      const snapshot = await getDocs(q);
+      const items: GodownItem[] = [];
+      snapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() } as GodownItem);
+      });
+      setGodownInventory(items);
+    } catch(e) {
+      console.error("Error fetching godown inventory:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
     const q = query(collection(db, "godownInventory"), orderBy("dateAdded", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const items: GodownItem[] = [];
@@ -67,7 +90,11 @@ export function useGodownInventory() {
         });
         setGodownInventory(items);
         setLoading(false);
+    }, (error) => {
+        console.error("Godown inventory listener error:", error);
+        setLoading(false);
     });
+    
     return () => unsubscribe();
   }, []);
 
@@ -92,6 +119,33 @@ export function useGodownInventory() {
         setSaving(false);
     }
   };
+  
+  const addMultipleGodownItems = async (items: ExtractedItem[]) => {
+      if (items.length === 0) return;
+      setSaving(true);
+      try {
+        const batch = writeBatch(db);
+        const godownRef = collection(db, 'godownInventory');
+
+        items.forEach(item => {
+            const productId = generateProductId(item.brand, item.size);
+            const docRef = doc(godownRef);
+            batch.set(docRef, {
+                ...item,
+                productId,
+                dateAdded: serverTimestamp(),
+                transferHistory: [],
+            });
+        });
+        await batch.commit();
+
+      } catch(e) {
+          console.error("Error adding multiple godown items:", e);
+          throw e;
+      } finally {
+          setSaving(false);
+      }
+  }
 
   const updateGodownItem = async (id: string, data: Partial<Omit<GodownItem, 'id'>>) => {
     setSaving(true);
@@ -225,5 +279,7 @@ export function useGodownInventory() {
   };
 
 
-  return { godownInventory, loading, saving, addGodownItem, updateGodownItem, deleteGodownItem, transferToShop };
+  return { godownInventory, loading, saving, addGodownItem, addMultipleGodownItems, updateGodownItem, deleteGodownItem, transferToShop, forceRefetch: fetchGodownInventory };
 }
+
+    

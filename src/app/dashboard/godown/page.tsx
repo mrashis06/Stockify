@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
+import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -55,9 +56,11 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
         godownInventory,
         loading,
         addGodownItem,
+        addMultipleGodownItems,
         updateGodownItem,
         deleteGodownItem,
         transferToShop,
+        forceRefetch
     } = useGodownInventory();
     
     usePageLoading(loading);
@@ -195,6 +198,19 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                 onTransfer={handleTransferToShop}
             />
         )}
+        <ScanBillDialog 
+            isOpen={isScanBillOpen}
+            onOpenChange={setIsScanBillOpen}
+            onAddItems={async (items) => {
+                try {
+                    await addMultipleGodownItems(items);
+                    toast({ title: 'Success', description: `${items.length} item types added to godown from the bill.`});
+                    forceRefetch();
+                } catch(e) {
+                    toast({ title: 'Error', description: 'Failed to add items from bill.', variant: 'destructive'});
+                }
+            }}
+        />
        
         <h1 className="text-2xl font-bold tracking-tight mb-6">Godown Inventory</h1>
         <Card>
@@ -324,3 +340,5 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     </main>
   );
 }
+
+    
