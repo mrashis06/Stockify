@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -210,31 +211,78 @@ export function useInventory() {
   };
 
   const deleteBrand = async (id: string) => {
-     setSaving(true);
-     try {
-        const batch = writeBatch(db);
-        
-        const inventoryDocRef = doc(db, 'inventory', id);
-        batch.delete(inventoryDocRef);
-
+    setSaving(true);
+    try {
+      await runTransaction(db, async (transaction) => {
         const dailyDocRef = doc(db, 'dailyInventory', today);
-        const dailyDocSnap = await getDoc(dailyDocRef);
-        if (dailyDocSnap.exists()) {
-            const dailyData = dailyDocSnap.data();
-            if(dailyData[id]) {
-                const { [id]: _, ...rest } = dailyData;
-                batch.set(dailyDocRef, rest);
+        const inventoryDocRef = doc(db, 'inventory', id);
+        
+        const dailyDoc = await transaction.get(dailyDocRef);
+        const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+        const itemToday = dailyData[id];
+
+        if (itemToday && itemToday.sales > 0) {
+          throw new Error("Cannot delete a product that has been sold today. Please clear today's sales for this item first.");
+        }
+
+        const addedToday = itemToday?.added || 0;
+        
+        if (addedToday > 0) {
+            let amountToReturn = addedToday;
+
+            // Query for godown items that have a transfer history to find where the stock came from.
+            const godownQuery = query(
+                collection(db, "godownInventory"),
+                where("productId", "==", id),
+                where("transferHistory", "!=", [])
+            );
+
+            const godownDocs = await getDocs(godownQuery);
+            
+            for (const docSnap of godownDocs.docs) {
+                if (amountToReturn <= 0) break;
+                
+                const batch = { id: docSnap.id, ...docSnap.data() } as GodownItem;
+                const batchRef = doc(db, "godownInventory", batch.id);
+
+                const recentHistory = (batch.transferHistory || [])
+                    .filter(h => h.batchId === batch.id)
+                    .sort((a,b) => b.date.toMillis() - a.date.toMillis());
+
+                if (recentHistory.length > 0) {
+                    const lastTransfer = recentHistory[0];
+                    const returnable = Math.min(amountToReturn, lastTransfer.quantity);
+
+                    // Atomically update the godown batch
+                    transaction.update(batchRef, {
+                        quantity: batch.quantity + returnable,
+                        transferHistory: arrayRemove(lastTransfer)
+                    });
+
+                    // If the transfer was only partially returned, add the remainder back to history
+                    if (lastTransfer.quantity - returnable > 0) {
+                        transaction.update(batchRef, {
+                            transferHistory: arrayUnion({ ...lastTransfer, quantity: lastTransfer.quantity - returnable })
+                        });
+                    }
+                    amountToReturn -= returnable;
+                }
             }
         }
-        
-        await batch.commit();
 
-     } catch (error) {
-        console.error("Error deleting brand:", error);
-        throw error;
-     } finally {
-         setSaving(false);
-     }
+        // Delete from master inventory and daily log
+        transaction.delete(inventoryDocRef);
+        if (itemToday) {
+            const { [id]: _, ...rest } = dailyData;
+            transaction.set(dailyDocRef, rest);
+        }
+      });
+    } catch (error) {
+      console.error("Error deleting brand:", error);
+      throw error;
+    } finally {
+      setSaving(false);
+    }
   };
 
   const recordSale = async (id: string, quantity: number, salePrice: number, soldBy: string) => {

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -275,14 +276,18 @@ export function useGodownInventory() {
                 };
                 
                 if (batch.quantity - transferAmount <= 0) {
-                    // If the entire batch is used, delete it but keep its history in the log
+                    // If the entire batch is used, delete it but log the transfer history to the shop item
                     transaction.delete(batchRef);
                 } else {
                     transaction.update(batchRef, {
                         quantity: batch.quantity - transferAmount,
-                        transferHistory: arrayUnion(newHistoryEntry)
                     });
                 }
+                 
+                // Log the transfer history to the master inventory item
+                transaction.update(shopItemRef, {
+                    transferHistory: arrayUnion(newHistoryEntry)
+                });
                 
                 remainingToTransfer -= transferAmount;
             }
