@@ -209,7 +209,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                  <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))} className="w-full sm:w-auto">
                     Review & Add Another
                  </Button>
-                <Button type="submit" className="w-full sm:w-auto">Proceed to Review</Button>
+                <Button type="submit" className="w-full sm:w-auto bg-green-600 hover:bg-green-700">Proceed to Review</Button>
               </DialogFooter>
             </form>
           </Form>
