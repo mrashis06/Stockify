@@ -209,7 +209,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                   <Button type="button" variant="secondary">Cancel</Button>
                 </DialogClose>
                  <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))}>
-                    Review & Add Another
+                    Save & Add Another
                  </Button>
                 <Button type="submit" className="bg-green-600 hover:bg-green-700">Proceed to Review</Button>
               </DialogFooter>
