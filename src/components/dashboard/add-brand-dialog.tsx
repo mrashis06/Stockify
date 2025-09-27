@@ -202,14 +202,14 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                   </FormItem>
                 )}
               />
-              <DialogFooter className="flex-col sm:flex-row gap-2">
+              <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-4">
                 <DialogClose asChild>
-                  <Button type="button" variant="secondary" className="w-full sm:w-auto">Cancel</Button>
+                  <Button type="button" variant="secondary">Cancel</Button>
                 </DialogClose>
-                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))} className="w-full sm:w-auto">
+                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))}>
                     Review & Add Another
                  </Button>
-                <Button type="submit" className="w-full sm:w-auto">Proceed to Review</Button>
+                <Button type="submit">Proceed to Review</Button>
               </DialogFooter>
             </form>
           </Form>
