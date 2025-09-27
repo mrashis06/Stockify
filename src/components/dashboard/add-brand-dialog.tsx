@@ -202,7 +202,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                   </FormItem>
                 )}
               />
-              <DialogFooter className="flex-col sm:flex-row gap-2 pt-4">
+              <DialogFooter className="flex-col sm:flex-row sm:justify-end gap-2 pt-4">
                  <DialogClose asChild>
                   <Button type="button" variant="secondary" className="w-full sm:w-auto">Cancel</Button>
                 </DialogClose>
