@@ -40,7 +40,7 @@ export default function SalesPage() {
         setIsScannerPaused(true);
 
         try {
-            await forceRefetch(); // Ensure we have the latest data before checking
+            // No forceRefetch() here for faster lookup. We query directly.
             const inventoryRef = collection(db, "inventory");
             const q = query(inventoryRef, or(
                 where("barcodeId", "==", decodedText),
@@ -50,14 +50,21 @@ export default function SalesPage() {
 
             if (!querySnapshot.empty) {
                 const itemId = querySnapshot.docs[0].id;
-                // Re-check the updated local inventory from the hook after refetch
+                // Since inventory might be stale, we fetch the specific item's full, fresh data
                 const itemFromHook = inventory.find(i => i.id === itemId);
 
-                const itemData = itemFromHook || { id: itemId, ...querySnapshot.docs[0].data(), added: 0, sales: 0 } as InventoryItem;
+                // Combine master data with potentially live daily data for accuracy
+                const itemData = {
+                    ...(querySnapshot.docs[0].data() as Omit<InventoryItem, 'id' | 'added' | 'sales'>), // master data
+                    id: itemId,
+                    prevStock: itemFromHook?.prevStock ?? 0,
+                    added: itemFromHook?.added ?? 0,
+                    sales: itemFromHook?.sales ?? 0,
+                };
                 
                 setScannedItem(itemData);
                 setEditedPrice(itemData.price);
-                setSaleQuantity(''); // Set to empty for faster input
+                setSaleQuantity('');
             } else {
                 toast({ title: 'Product Not Mapped', description: 'Redirecting to mapping page...', variant: 'destructive' });
                 router.push(`/dashboard/map-barcode?code=${decodedText}`);
@@ -86,14 +93,20 @@ export default function SalesPage() {
             return;
         }
         
+        // Optimistic UI update
+        toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
+        resetScanState();
+
         try {
             await recordSale(scannedItem.id, quantityNum, editedPrice, user.uid);
-            toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
-            resetScanState();
+            // After the sale is confirmed in the backend, force a refetch to ensure data consistency
+            // This happens silently in the background
+            await forceRefetch();
         } catch (error) {
             console.error("Error processing sale:", error);
             const errorMessage = (error as Error).message || 'Failed to process sale.';
-            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+            // Optionally, show an error toast if the background operation fails
+            toast({ title: 'Sync Error', description: `Sale recorded locally, but failed to sync. ${errorMessage}`, variant: 'destructive' });
         }
     };
 
