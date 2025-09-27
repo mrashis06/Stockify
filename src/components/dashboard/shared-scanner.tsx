@@ -88,6 +88,7 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
             return { width, height };
         };
 
+        // Initialize here to ensure the DOM element exists.
         if (!html5QrCodeRef.current) {
             html5QrCodeRef.current = new Html5Qrcode(scannerRegionId, { verbose: false });
         }
