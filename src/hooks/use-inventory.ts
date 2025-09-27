@@ -230,16 +230,15 @@ export function useInventory() {
         if (addedToday > 0) {
             let amountToReturn = addedToday;
 
-            // Query for godown items that have a transfer history to find where the stock came from.
             const godownQuery = query(
                 collection(db, "godownInventory"),
-                where("productId", "==", id),
-                where("transferHistory", "!=", [])
+                where("productId", "==", id)
             );
 
-            const godownDocs = await getDocs(godownQuery);
+            const godownDocsSnapshot = await getDocs(godownQuery);
+            const godownDocs = godownDocsSnapshot.docs.filter(doc => doc.data().transferHistory && doc.data().transferHistory.length > 0);
             
-            for (const docSnap of godownDocs.docs) {
+            for (const docSnap of godownDocs) {
                 if (amountToReturn <= 0) break;
                 
                 const batch = { id: docSnap.id, ...docSnap.data() } as GodownItem;
@@ -253,13 +252,11 @@ export function useInventory() {
                     const lastTransfer = recentHistory[0];
                     const returnable = Math.min(amountToReturn, lastTransfer.quantity);
 
-                    // Atomically update the godown batch
                     transaction.update(batchRef, {
                         quantity: batch.quantity + returnable,
                         transferHistory: arrayRemove(lastTransfer)
                     });
 
-                    // If the transfer was only partially returned, add the remainder back to history
                     if (lastTransfer.quantity - returnable > 0) {
                         transaction.update(batchRef, {
                             transferHistory: arrayUnion({ ...lastTransfer, quantity: lastTransfer.quantity - returnable })
@@ -270,7 +267,6 @@ export function useInventory() {
             }
         }
 
-        // Delete from master inventory and daily log
         transaction.delete(inventoryDocRef);
         if (itemToday) {
             const { [id]: _, ...rest } = dailyData;
