@@ -161,16 +161,16 @@ export default function AddGodownItemDialog({ isOpen, onOpenChange, onAddItem }:
                 </FormItem>
               )}
             />
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
                <DialogClose asChild>
-                <Button type="button" variant="secondary">
+                <Button type="button" variant="secondary" className="w-full sm:w-auto">
                   Cancel
                 </Button>
               </DialogClose>
-               <Button type="button" onClick={handleQuickAdd} variant="outline">
+               <Button type="button" onClick={handleQuickAdd} variant="outline" className="w-full sm:w-auto">
                 Save and Add Another
               </Button>
-              <Button type="submit" className="bg-green-600 hover:bg-green-700">Save &amp; Close</Button>
+              <Button type="submit" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Save &amp; Close</Button>
             </DialogFooter>
           </form>
         </Form>

@@ -199,7 +199,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
         <Card>
             <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-                    <div className="relative w-full md:w-auto md:min-w-[300px]">
+                    <div className="relative w-full md:max-w-xs">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input 
                             placeholder="Search brands..."
@@ -208,9 +208,9 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                             onChange={(e) => setSearchQuery(e.target.value)}
                          />
                     </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
+                    <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
                         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                            <SelectTrigger className="w-full md:w-auto min-w-[180px]">
+                            <SelectTrigger className="w-full sm:w-[180px]">
                                 <SelectValue placeholder="All Categories" />
                             </SelectTrigger>
                             <SelectContent>
@@ -219,7 +219,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setIsAddItemOpen(true)}>
+                        <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={() => setIsAddItemOpen(true)}>
                             <PackagePlus className="mr-2 h-4 w-4" /> Add Item
                         </Button>
                     </div>

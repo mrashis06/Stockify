@@ -262,7 +262,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         <Card>
             <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-                    <div className="relative w-full md:w-auto md:min-w-[300px]">
+                    <div className="relative w-full md:max-w-xs">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input 
                             placeholder="Search brands..."
@@ -271,9 +271,9 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                             onChange={(e) => setSearchQuery(e.target.value)}
                          />
                     </div>
-                    <div className="flex w-full md:w-auto justify-end flex-wrap gap-2">
+                    <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
                         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                            <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
+                            <SelectTrigger className="w-full sm:w-[180px]">
                                 <SelectValue placeholder="All Categories" />
                             </SelectTrigger>
                             <SelectContent>
@@ -284,7 +284,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                         </Select>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline">
+                                <Button variant="outline" className="w-full sm:w-auto">
                                     <ListFilter className="mr-2 h-4 w-4" />
                                     Columns
                                 </Button>
@@ -306,10 +306,10 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                 </DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => setIsAddBrandOpen(true)}>
+                        <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={() => setIsAddBrandOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Brand
                         </Button>
-                        <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)}>
+                        <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)} className="w-full sm:w-auto">
                             <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedRows.size})
                         </Button>
                     </div>
@@ -443,5 +443,3 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
