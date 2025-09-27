@@ -34,6 +34,8 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
     
     // Function to request camera permission and get capabilities
     const requestCameraPermission = useCallback(async () => {
+        if (scannerState !== 'idle') return false;
+
         setScannerState('starting');
         try {
             const devices = await Html5Qrcode.getCameras();
@@ -41,18 +43,18 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: 'environment',
-                        advanced: [{ autoFocus: "continuous" }]
                     } 
                 });
                 
-                videoTrackRef.current = stream.getVideoTracks()[0];
-                const caps = videoTrackRef.current.getCapabilities();
+                const track = stream.getVideoTracks()[0];
+                videoTrackRef.current = track;
+                const caps = track.getCapabilities();
 
                 setCapabilities({
-                    torch: 'torch' in caps,
+                    torch: 'torch' in caps ? caps.torch : false,
                     zoom: 'zoom' in caps ? (caps.zoom as MediaSettingsRange) : undefined,
                 });
-
+                
                 if (caps.zoom) {
                     setZoom(caps.zoom.min || 1);
                 }
@@ -60,19 +62,40 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
                 setHasPermission(true);
                 setScannerState('idle'); // Ready to start
                 return true;
+            } else {
+                 throw new Error("No cameras found.");
             }
         } catch (error) {
             console.error("Camera permission error:", error);
             setHasPermission(false);
-            setErrorMessage("Camera access was denied. Please enable it in your browser settings.");
+            setErrorMessage("Camera access was denied or no camera was found. Please check permissions and refresh.");
             setScannerState('error');
+            return false;
         }
-        return false;
+    }, [scannerState]);
+
+    const stopScanner = useCallback(async () => {
+        const scanner = html5QrCodeRef.current;
+        if (scanner && scanner.isScanning) {
+            try {
+                await scanner.stop();
+            } catch (err) {
+                console.error("Error stopping the scanner gracefully:", err);
+            }
+        }
+        if (videoTrackRef.current) {
+            videoTrackRef.current.stop();
+            videoTrackRef.current = null;
+        }
+        html5QrCodeRef.current = null;
+        setScannerState('idle');
+        setHasPermission(null);
+        setTorchOn(false);
     }, []);
 
     // Function to start the scanner
     const startScanner = useCallback(async () => {
-        if (scannerState === 'running' || scannerState === 'starting') return;
+        if (scannerState !== 'idle' || html5QrCodeRef.current?.isScanning) return;
         
         let permissionGranted = hasPermission;
         if (permissionGranted === null) {
@@ -82,17 +105,13 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
 
         setScannerState('starting');
         
-        // This function will only be called when the scanner div is in the DOM.
-        // So we can safely initialize Html5Qrcode here.
         const html5QrCode = new Html5Qrcode(scannerRegionId, { verbose: false });
         html5QrCodeRef.current = html5QrCode;
 
         const qrboxFunction = (viewfinderWidth: number, viewfinderHeight: number) => {
             const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
             const qrboxSize = Math.floor(minEdge * 0.7);
-            const width = Math.min(qrboxSize * 1.5, viewfinderWidth * 0.9);
-            const height = Math.min(qrboxSize * 0.7, viewfinderHeight * 0.9);
-            return { width, height };
+            return { width: qrboxSize, height: qrboxSize };
         };
 
         try {
@@ -101,7 +120,7 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
                 { 
                     fps: 10,
                     qrbox: qrboxFunction,
-                    formatsToSupport: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+                    supportedScanTypes: [],
                 },
                 onScanSuccess,
                 (errorMessage) => { /* ignore */ }
@@ -111,20 +130,16 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
             console.error("Error starting scanner:", error);
             setErrorMessage("Failed to start the scanner. Please try again.");
             setScannerState('error');
+            await stopScanner();
         }
-    }, [hasPermission, scannerState, requestCameraPermission, onScanSuccess]);
+    }, [hasPermission, onScanSuccess, requestCameraPermission, scannerState, stopScanner]);
 
     // Main cleanup effect
     useEffect(() => {
         return () => {
-            const scanner = html5QrCodeRef.current;
-            if (scanner && scanner.isScanning) {
-                scanner.stop().catch(err => {
-                    console.error("Failed to stop scanner on cleanup", err);
-                });
-            }
+            stopScanner();
         };
-    }, []);
+    }, [stopScanner]);
 
 
     // Control pause/resume
@@ -175,26 +190,20 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
             }
         }
     }, [capabilities.zoom]);
-
-    if (hasPermission === false) {
-        return (
-            <Alert variant="destructive" className="text-center">
-                <AlertTitle>Camera Access Denied</AlertTitle>
-                <AlertDescription>{errorMessage}</AlertDescription>
-                <Button onClick={requestCameraPermission} variant="secondary" className="mt-4">
-                    <RefreshCw className="mr-2 h-4 w-4" /> Try Again
-                </Button>
-            </Alert>
-        );
-    }
     
+    const handleRetry = () => {
+        setErrorMessage(null);
+        setScannerState('idle');
+        requestCameraPermission();
+    }
+
     if (scannerState === 'error') {
          return (
             <Alert variant="destructive" className="text-center">
                 <AlertTitle>Scanner Error</AlertTitle>
                 <AlertDescription>{errorMessage}</AlertDescription>
-                <Button onClick={startScanner} variant="secondary" className="mt-4">
-                    <RefreshCw className="mr-2 h-4 w-4" /> Restart Scanner
+                <Button onClick={handleRetry} variant="secondary" className="mt-4">
+                    <RefreshCw className="mr-2 h-4 w-4" /> Try Again
                 </Button>
             </Alert>
         );
@@ -215,15 +224,19 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
     // Starting or Running state: show scanner view and controls
     return (
         <div className="space-y-4">
-            <div id={scannerRegionId} className="w-full aspect-video bg-black rounded-md overflow-hidden" />
+            <div className="relative w-full aspect-video bg-black rounded-md overflow-hidden">
+                <div id={scannerRegionId} className="w-full h-full" />
+                {scannerState === 'starting' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                        <Loader2 className="h-8 w-8 animate-spin text-white" />
+                    </div>
+                )}
+                 {scannerState === 'running' && (
+                    <div className="absolute inset-2 pointer-events-none border-2 border-white/50 border-dashed rounded-md"/>
+                )}
+            </div>
             
-            {scannerState === 'starting' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-md">
-                    <Loader2 className="h-8 w-8 animate-spin text-white" />
-                </div>
-            )}
-            
-            <div className="grid grid-cols-3 items-center gap-4 px-2">
+            <div className="grid grid-cols-2 items-center gap-4 px-2">
                  <div className="flex justify-start">
                     <Button onClick={toggleTorch} variant="outline" size="icon" className="rounded-full h-12 w-12" disabled={!capabilities.torch}>
                         {torchOn ? <ZapOff /> : <Zap />}
@@ -231,10 +244,10 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
                     </Button>
                  </div>
                  
-                 <div className="flex items-center gap-2">
+                 <div className="flex items-center gap-2 justify-end">
                      {capabilities.zoom && (
                          <>
-                            <Button onClick={() => handleZoomChange(zoom - capabilities.zoom!.step)} variant="outline" size="icon" className="h-8 w-8 rounded-full" disabled={zoom <= capabilities.zoom.min}>
+                            <Button onClick={() => handleZoomChange(zoom - capabilities.zoom!.step)} variant="outline" size="icon" className="h-10 w-10 rounded-full" disabled={zoom <= capabilities.zoom.min}>
                                 <ZoomOut className="h-4 w-4" />
                             </Button>
                             <Slider
@@ -245,15 +258,11 @@ const SharedScanner: React.FC<SharedScannerProps> = ({ onScanSuccess, isPaused }
                                 onValueChange={(value) => handleZoomChange(value[0])}
                                 className="w-24"
                             />
-                            <Button onClick={() => handleZoomChange(zoom + capabilities.zoom!.step)} variant="outline" size="icon" className="h-8 w-8 rounded-full" disabled={zoom >= capabilities.zoom.max}>
+                            <Button onClick={() => handleZoomChange(zoom + capabilities.zoom!.step)} variant="outline" size="icon" className="h-10 w-10 rounded-full" disabled={zoom >= capabilities.zoom.max}>
                                 <ZoomIn className="h-4 w-4" />
                             </Button>
                          </>
                      )}
-                 </div>
-
-                 <div className="flex justify-end">
-                     {/* Placeholder for potential future right-aligned control */}
                  </div>
             </div>
         </div>
