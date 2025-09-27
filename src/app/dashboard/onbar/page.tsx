@@ -24,7 +24,7 @@ import { usePageLoading } from '@/hooks/use-loading';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
-    const { onBarInventory, loading, sellCustomPeg, removeOnBarItem, refillPeg } = useOnBarInventory();
+    const { onBarInventory, loading, sellCustomPeg, removeOnBarItem, refillPeg, addOnBarItem } = useOnBarInventory();
     const { inventory: shopInventory } = useInventory();
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
     const { toast } = useToast();
@@ -111,6 +111,8 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             <AddOnBarItemDialog
                 isOpen={isAddItemOpen}
                 onOpenChange={setIsAddItemOpen}
+                onAddItem={addOnBarItem}
+                shopInventory={shopInventory}
             />
 
             {sellingItem && (

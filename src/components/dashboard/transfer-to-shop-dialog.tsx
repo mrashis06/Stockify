@@ -25,8 +25,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-// The item prop is now a grouped item, but we only need productId and total quantity
-// so the GodownItem type is close enough for the structure.
 import type { GodownItem } from '@/hooks/use-godown-inventory';
 
 type TransferToShopDialogProps = {
@@ -49,17 +47,14 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   const form = useForm<TransferFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      quantity: '' as any, // Use empty string to keep it controlled
+      quantity: undefined,
     },
   });
 
   // Reset form when item changes or dialog opens
   useEffect(() => {
     if (isOpen) {
-      form.reset({ quantity: '' as any });
-      // The schema is dependent on `item.quantity`, so it's re-created on each render.
-      // We may need to ensure the form re-evaluates against the new schema.
-      // `form.trigger()` can help, or simply relying on the re-render.
+      form.reset({ quantity: undefined });
     }
   }, [isOpen, item, form]);
 
@@ -67,10 +62,8 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   const onSubmit = (data: TransferFormValues) => {
     // The `id` on the item passed to this dialog is actually the `productId`
     onTransfer(item.id, data.quantity);
-    form.reset({ quantity: '' as any }); // Reset the form to default values after successful submission
   };
   
-  // This is redundant with the above useEffect, but harmless.
   useEffect(() => {
     if (!isOpen) {
       form.reset();

@@ -11,7 +11,8 @@ import {
   deleteDoc,
   serverTimestamp,
   addDoc,
-  getDoc
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useInventory } from './use-inventory'; // To trigger stock updates

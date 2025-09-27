@@ -169,11 +169,14 @@ export function useInventory() {
             sales: 0, // Should be 0 on creation
         };
 
-        dailyItemData.opening = dailyItemData.prevStock + dailyItemData.added;
-        dailyItemData.closing = dailyItemData.opening - dailyItemData.sales;
+        (dailyItemData as any).opening = dailyItemData.prevStock + dailyItemData.added;
+        (dailyItemData as any).closing = (dailyItemData as any).opening - dailyItemData.sales;
 
         await setDoc(dailyDocRef, { [id]: dailyItemData }, { merge: true });
 
+    } catch (error) {
+        console.error('Error adding brand:', error);
+        throw error;
     } finally {
         setSaving(false);
     }
@@ -225,6 +228,9 @@ export function useInventory() {
         
         await batch.commit();
 
+     } catch (error) {
+        console.error("Error deleting brand:", error);
+        throw error;
      } finally {
          setSaving(false);
      }
@@ -261,8 +267,9 @@ export function useInventory() {
             const oldSales = itemDailyData.sales || 0;
             const newSales = oldSales + quantity;
             
-            const oldClosingStock = (itemDailyData.prevStock ?? 0) + (itemDailyData.added ?? 0) - oldSales;
-            const newClosingStock = (itemDailyData.prevStock ?? 0) + (itemDailyData.added ?? 0) - newSales;
+            const openingStock = (itemDailyData.prevStock ?? 0) + (itemDailyData.added ?? 0);
+            const oldClosingStock = openingStock - oldSales;
+            const newClosingStock = openingStock - newSales;
 
             if (newClosingStock < 0) {
                 throw new Error("Insufficient stock to complete sale.");
@@ -341,8 +348,9 @@ export function useInventory() {
                     prevStock: prevStock, added: 0, sales: 0
                 };
             }
-
-            const oldClosingStock = (dailyData[id].prevStock || 0) + (dailyData[id].added || 0) - (dailyData[id].sales || 0);
+            
+            const opening = dailyData[id].prevStock || 0;
+            const oldClosingStock = opening + (dailyData[id].added || 0) - (dailyData[id].sales || 0);
             
             // Handle stock return to godown
             if (field === 'added') {
@@ -397,7 +405,7 @@ export function useInventory() {
                 transaction.update(masterRef, { price: value });
             }
 
-            dailyData[id].opening = (dailyData[id].prevStock || 0) + (dailyData[id].added || 0);
+            dailyData[id].opening = opening + (dailyData[id].added || 0);
             dailyData[id].closing = dailyData[id].opening - (dailyData[id].sales || 0);
 
             const newClosingStock = dailyData[id].closing;

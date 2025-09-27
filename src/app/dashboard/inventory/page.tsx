@@ -36,7 +36,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
-import { useOnBarInventory } from '@/hooks/use-onbar-inventory';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,8 +61,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     
     usePageLoading(loading);
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
-    const { onBarInventory } = useOnBarInventory();
-
 
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
@@ -254,7 +251,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
             </AlertDialogContent>
         </AlertDialog>
 
-        <h1 className="text-2xl font-bold tracking-tight mb-6">OffCounter Inventory</h1>
+        <h1 className="text-2xl font-bold tracking-tight mb-6">Off-Counter Inventory</h1>
         <Card>
             <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">

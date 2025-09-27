@@ -128,16 +128,13 @@ export function useGodownInventory() {
         await runTransaction(db, async (transaction) => {
             const godownItemsQuery = query(
                 collection(db, 'godownInventory'),
-                where('productId', '==', productId)
+                where('productId', '==', productId),
+                orderBy('dateAdded', 'asc') // Order by date to ensure FIFO
             );
             
             const godownItemsSnapshot = await getDocs(godownItemsQuery);
-            // Sort in-code to avoid needing a composite index
-            const godownBatches = godownItemsSnapshot.docs
-              .map(d => ({ id: d.id, ...d.data() } as GodownItem))
-              .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());
 
-            const totalGodownStock = godownBatches.reduce((sum, batch) => sum + batch.quantity, 0);
+            const totalGodownStock = godownItemsSnapshot.docs.reduce((sum, doc) => sum + doc.data().quantity, 0);
 
             if (totalGodownStock < quantityToTransfer) {
                 throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
@@ -155,7 +152,7 @@ export function useGodownInventory() {
 
             if (!shopItemDoc.exists()) {
                 // If item doesn't exist in master, create it.
-                const firstBatch = godownBatches[0];
+                const firstBatch = godownItemsSnapshot.docs[0].data();
                 shopItemData = {
                     brand: firstBatch.brand,
                     size: firstBatch.size,
@@ -168,33 +165,32 @@ export function useGodownInventory() {
                 shopItemData = shopItemDoc.data();
             }
 
-
             let remainingToTransfer = quantityToTransfer;
             const transferTimestamp = Timestamp.now();
 
-            for (const batch of godownBatches) {
+            for (const docSnap of godownItemsSnapshot.docs) {
                 if (remainingToTransfer <= 0) break;
-
+                
+                const batch = { id: docSnap.id, ...docSnap.data() } as GodownItem;
                 const batchRef = doc(db, 'godownInventory', batch.id);
                 const transferAmount = Math.min(batch.quantity, remainingToTransfer);
 
                 const newHistoryEntry: TransferHistory = {
                     date: transferTimestamp,
                     quantity: transferAmount,
-                    batchId: batch.id, // Add batchId to history
-                };
-                
-                const updateData: { quantity?: number; transferHistory: any } = {
-                    transferHistory: arrayUnion(newHistoryEntry)
+                    batchId: batch.id,
                 };
                 
                 if (batch.quantity - transferAmount <= 0) {
+                    // If the entire batch is used, delete it but keep its history in the log
                     transaction.delete(batchRef);
                 } else {
-                    updateData.quantity = batch.quantity - transferAmount;
-                    transaction.update(batchRef, updateData);
+                    transaction.update(batchRef, {
+                        quantity: batch.quantity - transferAmount,
+                        transferHistory: arrayUnion(newHistoryEntry)
+                    });
                 }
-
+                
                 remainingToTransfer -= transferAmount;
             }
             
@@ -214,10 +210,6 @@ export function useGodownInventory() {
             };
             
             currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
-            currentDailyItem.prevStock = prevStockFromYesterday; 
-
-            currentDailyItem.opening = currentDailyItem.prevStock + (currentDailyItem.added || 0);
-            currentDailyItem.closing = currentDailyItem.opening - (currentDailyItem.sales || 0);
             
             transaction.set(dailyInventoryRef, { [productId]: currentDailyItem }, { merge: true });
         });

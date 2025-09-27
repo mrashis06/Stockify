@@ -8,6 +8,7 @@ import {
   getDoc,
   writeBatch,
   getDocs,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, addDays } from 'date-fns';
@@ -78,8 +79,6 @@ export function useEndOfDay() {
             prevStock: closingStock,
             added: 0, 
             sales: 0,
-            opening: closingStock,
-            closing: closingStock,
           };
           
           const masterInventoryRef = doc(db, 'inventory', itemId);
@@ -87,7 +86,7 @@ export function useEndOfDay() {
       }
       
       // Set the prepared data for tomorrow
-      batch.set(tomorrowDocRef, newDailyData);
+      batch.set(tomorrowDocRef, newDailyData, { merge: true });
 
       await batch.commit();
 
