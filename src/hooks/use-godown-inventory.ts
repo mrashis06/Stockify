@@ -40,7 +40,6 @@ export type GodownItem = {
   category: string;
   quantity: number;
   dateAdded: Timestamp;
-  transferHistory?: TransferHistory[];
 };
 
 export type ExtractedItem = {
@@ -100,7 +99,7 @@ export function useGodownInventory() {
   }, []);
 
 
-  const addGodownItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'transferHistory'>) => {
+  const addGodownItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded'>) => {
     setSaving(true);
     try {
         const productId = generateProductId(newItemData.brand, newItemData.size);
@@ -110,7 +109,6 @@ export function useGodownInventory() {
             ...newItemData,
             productId: productId,
             dateAdded: serverTimestamp(),
-            transferHistory: [],
         });
 
     } catch (error) {
@@ -147,7 +145,6 @@ export function useGodownInventory() {
                 ...item,
                 productId,
                 dateAdded: serverTimestamp(),
-                transferHistory: [],
             });
             addedCount++;
             existingProductIds.add(productId); // Add to set to prevent duplicates from the same bill
@@ -252,7 +249,8 @@ export function useGodownInventory() {
                     size: firstBatch.size,
                     category: firstBatch.category,
                     price: 0, // Price needs to be set manually
-                    prevStock: 0
+                    prevStock: 0,
+                    transferHistory: [],
                 };
                 transaction.set(shopItemRef, shopItemData);
             } else {
@@ -276,7 +274,6 @@ export function useGodownInventory() {
                 };
                 
                 if (batch.quantity - transferAmount <= 0) {
-                    // If the entire batch is used, delete it but log the transfer history to the shop item
                     transaction.delete(batchRef);
                 } else {
                     transaction.update(batchRef, {
@@ -323,5 +320,3 @@ export function useGodownInventory() {
 
   return { godownInventory, loading, saving, addGodownItem, addMultipleGodownItems, updateGodownItem, deleteGodownItem, deleteGodownProduct, transferToShop, forceRefetch: fetchGodownInventory };
 }
-
-    

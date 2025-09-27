@@ -46,6 +46,7 @@ export type InventoryItem = {
   closing?: number;
   barcodeId?: string | null;
   qrCodeId?: string | null;
+  transferHistory?: TransferHistory[];
 };
 
 // Generates a Firestore-safe ID from brand and size
@@ -141,7 +142,7 @@ export function useInventory() {
   }, [today, fetchInventoryData]);
   
 
-  const addBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing'>) => {
+  const addBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing' | 'transferHistory'>) => {
     setSaving(true);
     try {
         const id = generateProductId(newItemData.brand, newItemData.size);
@@ -155,6 +156,7 @@ export function useInventory() {
             prevStock: newItemData.prevStock,
             barcodeId: newItemData.barcodeId || null,
             qrCodeId: newItemData.qrCodeId || null,
+            transferHistory: [],
         };
 
         await setDoc(docRef, masterItemData, { merge: true });
@@ -227,45 +229,9 @@ export function useInventory() {
 
         const addedToday = itemToday?.added || 0;
         
-        if (addedToday > 0) {
-            let amountToReturn = addedToday;
-
-            const godownQuery = query(
-                collection(db, "godownInventory"),
-                where("productId", "==", id)
-            );
-
-            const godownDocsSnapshot = await getDocs(godownQuery);
-            const godownDocs = godownDocsSnapshot.docs.filter(doc => doc.data().transferHistory && doc.data().transferHistory.length > 0);
-            
-            for (const docSnap of godownDocs) {
-                if (amountToReturn <= 0) break;
-                
-                const batch = { id: docSnap.id, ...docSnap.data() } as GodownItem;
-                const batchRef = doc(db, "godownInventory", batch.id);
-
-                const recentHistory = (batch.transferHistory || [])
-                    .filter(h => h.batchId === batch.id)
-                    .sort((a,b) => b.date.toMillis() - a.date.toMillis());
-
-                if (recentHistory.length > 0) {
-                    const lastTransfer = recentHistory[0];
-                    const returnable = Math.min(amountToReturn, lastTransfer.quantity);
-
-                    transaction.update(batchRef, {
-                        quantity: batch.quantity + returnable,
-                        transferHistory: arrayRemove(lastTransfer)
-                    });
-
-                    if (lastTransfer.quantity - returnable > 0) {
-                        transaction.update(batchRef, {
-                            transferHistory: arrayUnion({ ...lastTransfer, quantity: lastTransfer.quantity - returnable })
-                        });
-                    }
-                    amountToReturn -= returnable;
-                }
-            }
-        }
+        // This stock return logic is now handled in updateItemField.
+        // If we reach here, it means added is 0 or sales is 0.
+        // We can safely delete the record.
 
         transaction.delete(inventoryDocRef);
         if (itemToday) {
@@ -378,82 +344,80 @@ export function useInventory() {
                 transaction.get(masterRef),
                 transaction.get(yesterdayDocRef)
             ]);
+
+            if (!masterSnap.exists()) throw new Error("Item does not exist.");
+            const masterData = masterSnap.data() as InventoryItem;
             
             let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
-            const itemInDaily = dailyData[id];
+            let itemDailyData = dailyData[id];
             
-            if (!itemInDaily) {
-                if (!masterSnap.exists()) throw new Error("Item does not exist.");
+            if (!itemDailyData) {
                 const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
-                const masterData = masterSnap.data();
                 const prevStock = yesterdayData[id]?.closing ?? masterData.prevStock ?? 0;
-
-                dailyData[id] = {
-                    ...masterData,
-                    prevStock: prevStock, added: 0, sales: 0
-                };
+                itemDailyData = { ...masterData, prevStock, added: 0, sales: 0 };
+                dailyData[id] = itemDailyData;
             }
             
-            const opening = dailyData[id].prevStock || 0;
-            const oldClosingStock = opening + (dailyData[id].added || 0) - (dailyData[id].sales || 0);
+            const opening = itemDailyData.prevStock || 0;
+            const oldClosingStock = opening + (itemDailyData.added || 0) - (itemDailyData.sales || 0);
             
             // Handle stock return to godown
             if (field === 'added') {
-                const currentAdded = itemInDaily?.added || 0;
+                const currentAdded = itemDailyData.added || 0;
                 const newAdded = Number(value);
-                const diff = newAdded - currentAdded;
-
-                if (diff < 0) { // Returning stock to godown
-                    let amountToReturn = Math.abs(diff);
-
-                    const godownQuery = query(
-                        collection(db, "godownInventory"),
-                        where("productId", "==", id)
-                    );
+                
+                if (newAdded < currentAdded) { // Returning stock to godown
+                    let amountToReturn = currentAdded - newAdded;
+                    const transferHistory = (masterData.transferHistory || []).sort((a,b) => b.date.toMillis() - a.date.toMillis());
                     
-                    const godownDocs = await getDocs(godownQuery);
-                    // Sort in-code to avoid index requirement
-                    const sortedGodownDocs = godownDocs.docs.sort((a, b) => b.data().dateAdded.toMillis() - a.data().toMillis());
-                    
-                    for (const docSnap of sortedGodownDocs) {
+                    const newTransferHistory = [...transferHistory];
+
+                    for (const transfer of transferHistory) {
                         if (amountToReturn <= 0) break;
-                        const batch = { id: docSnap.id, ...docSnap.data() } as GodownItem;
-                        const batchRef = doc(db, "godownInventory", batch.id);
+                        const returnable = Math.min(amountToReturn, transfer.quantity);
 
-                        const recentHistory = batch.transferHistory
-                            ?.filter(h => h.batchId === batch.id)
-                            .sort((a,b) => b.date.toMillis() - a.date.toMillis());
+                        const batchRef = doc(db, "godownInventory", transfer.batchId);
+                        const batchDoc = await transaction.get(batchRef);
 
-                        if (recentHistory && recentHistory.length > 0) {
-                            const lastTransfer = recentHistory[0];
-                            const returnable = Math.min(amountToReturn, lastTransfer.quantity);
-
-                            transaction.update(batchRef, {
-                                quantity: batch.quantity + returnable,
-                                transferHistory: arrayRemove(lastTransfer)
-                            });
-                            
-                            if (lastTransfer.quantity - returnable > 0) {
-                                transaction.update(batchRef, {
-                                    transferHistory: arrayUnion({ ...lastTransfer, quantity: lastTransfer.quantity - returnable })
-                                });
+                        if (batchDoc.exists()) {
+                            transaction.update(batchRef, { quantity: batchDoc.data().quantity + returnable });
+                        } else {
+                            // If batch was deleted, we might need to recreate it or handle it differently.
+                            // For now, let's assume we recreate it.
+                            console.warn(`Godown batch ${transfer.batchId} not found. Recreating.`);
+                            const godownItem = {
+                                brand: masterData.brand, size: masterData.size, category: masterData.category,
+                                quantity: returnable, dateAdded: transfer.date, productId: id,
                             }
-                            amountToReturn -= returnable;
+                            transaction.set(batchRef, godownItem);
                         }
+
+                        // Adjust transfer history
+                        const historyIndex = newTransferHistory.findIndex(h => h.date.isEqual(transfer.date) && h.batchId === transfer.batchId);
+                        if (historyIndex > -1) {
+                            if (transfer.quantity - returnable > 0) {
+                                newTransferHistory[historyIndex].quantity -= returnable;
+                            } else {
+                                newTransferHistory.splice(historyIndex, 1);
+                            }
+                        }
+                        
+                        amountToReturn -= returnable;
                     }
+                     transaction.update(masterRef, { transferHistory: newTransferHistory });
                 }
             }
 
-            dailyData[id][field] = value;
+            itemDailyData[field] = value;
 
-            if (field === 'price' && masterSnap.exists()) {
+            if (field === 'price') {
                 transaction.update(masterRef, { price: value });
             }
 
-            dailyData[id].opening = opening + (dailyData[id].added || 0);
-            dailyData[id].closing = dailyData[id].opening - (dailyData[id].sales || 0);
+            itemDailyData.opening = opening + (itemDailyData.added || 0);
+            itemDailyData.closing = itemDailyData.opening - (itemDailyData.sales || 0);
 
-            const newClosingStock = dailyData[id].closing;
+            const newClosingStock = itemDailyData.closing;
 
             // Check for low stock alert
             if (notificationSettings.lowStockAlerts) {
@@ -461,22 +425,20 @@ export function useInventory() {
                     if(user && user.shopId) {
                          createAdminNotification(user.shopId, {
                             title: 'Low Stock Alert',
-                            description: `${dailyData[id].brand} (${dailyData[id].size}) is running low. Only ${newClosingStock} units left.`,
+                            description: `${itemDailyData.brand} (${itemDailyData.size}) is running low. Only ${newClosingStock} units left.`,
                             type: 'low-stock',
                             link: '/dashboard/inventory',
                             productId: id // Add productId to identify the notification
                         });
                     }
                  } else if (newClosingStock > LOW_STOCK_THRESHOLD && oldClosingStock <= LOW_STOCK_THRESHOLD) {
-                    // Stock has been replenished, remove notification
                      if (user?.shopId) {
-                        // This function needs to be awaited if we want to ensure it completes in the transaction
                         await deleteAdminNotificationByProductId(transaction, user.shopId, id);
                      }
                  }
             }
 
-
+            dailyData[id] = itemDailyData;
             transaction.set(dailyDocRef, dailyData, { merge: true });
         });
 

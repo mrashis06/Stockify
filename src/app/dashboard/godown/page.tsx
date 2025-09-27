@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -78,7 +79,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const { toast } = useToast();
 
-    const handleAddItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded' | 'transferHistory'>) => {
+    const handleAddItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded'>) => {
         try {
             await addGodownItem(newItemData);
             toast({ title: 'Success', description: 'New batch added to godown.' });
@@ -362,7 +363,6 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                                                     <TableHeader>
                                                         <TableRow>
                                                             <TableHead className="text-foreground">Date Added</TableHead>
-                                                            <TableHead className="text-foreground">Transfer History</TableHead>
                                                             <TableHead className="text-foreground w-40">Quantity</TableHead>
                                                             <TableHead className="text-foreground w-24 text-right">Actions</TableHead>
                                                         </TableRow>
@@ -371,17 +371,6 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                                                         {item.batches.map(batch => (
                                                             <TableRow key={batch.id}>
                                                                 <TableCell>{batch.dateAdded ? formatDate(batch.dateAdded.toDate()) : 'N/A'}</TableCell>
-                                                                <TableCell>
-                                                                    {batch.transferHistory && batch.transferHistory.length > 0 ? (
-                                                                         <ScrollArea className="h-20 w-48 rounded-md border p-2 text-xs">
-                                                                            {batch.transferHistory.sort((a,b) => b.date.toMillis() - a.date.toMillis()).map((th, index) => (
-                                                                                <div key={index} className="mb-1">
-                                                                                    {th.quantity} units on {formatDate(th.date.toDate())}
-                                                                                </div>
-                                                                            ))}
-                                                                         </ScrollArea>
-                                                                    ) : "N/A"}
-                                                                </TableCell>
                                                                 <TableCell>
                                                                     <Input
                                                                         type="number"
@@ -414,5 +403,3 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     </main>
   );
 }
-
-    
