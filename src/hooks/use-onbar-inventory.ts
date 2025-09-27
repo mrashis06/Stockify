@@ -30,6 +30,8 @@ export type OnBarItem = {
   salesVolume: number; // Volume sold today in ml (for liquor) or units (for beer)
   salesValue: number; // Monetary value of sales today
   price: number; // Price of the full bottle (for liquor) or a single unit (for beer)
+  pegPrice30ml?: number;
+  pegPrice60ml?: number;
   openedAt: any; // Firestore Timestamp
 };
 
@@ -56,7 +58,7 @@ export function useOnBarInventory() {
     return () => unsubscribe();
   }, []);
 
-  const addOnBarItem = async (inventoryItemId: string, volume: number, quantity: number = 1) => {
+  const addOnBarItem = async (inventoryItemId: string, volume: number, quantity: number = 1, pegPrices?: { '30ml': number; '60ml': number }) => {
       if (saving) return;
       setSaving(true);
       try {
@@ -77,7 +79,7 @@ export function useOnBarInventory() {
         
         const isBeer = itemInShop.category === 'Beer';
 
-        const onBarItemPayload = {
+        const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
             inventoryId: inventoryItemId,
             brand: itemInShop.brand,
             size: itemInShop.size,
@@ -88,10 +90,14 @@ export function useOnBarInventory() {
             totalQuantity: isBeer ? quantity : 1,
             salesVolume: 0,
             salesValue: 0,
-            openedAt: serverTimestamp(),
         };
 
-        await setDoc(newOnBarDocRef, onBarItemPayload);
+        if (!isBeer && pegPrices) {
+            onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
+            onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
+        }
+
+        await setDoc(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
 
       } catch (error) {
           console.error("Error opening bottle: ", error);
@@ -101,102 +107,61 @@ export function useOnBarInventory() {
       }
   };
 
-  const addOnBarItemManual = async (manualItem: OnBarManualItem) => {
-      if (saving) return;
-      setSaving(true);
-      try {
-          const onBarCollectionRef = collection(db, "onBarInventory");
-          
-          if (manualItem.category === 'Beer') {
-              // Create a single item for a group of beers
-              await addDoc(onBarCollectionRef, {
-                  brand: manualItem.brand,
-                  size: manualItem.size,
-                  category: manualItem.category,
-                  totalVolume: manualItem.totalVolume, // This is the volume of ONE bottle
-                  price: manualItem.price || 0,
-                  inventoryId: 'manual',
-                  remainingVolume: manualItem.quantity, // remainingVolume tracks UNITS for beer
-                  totalQuantity: manualItem.quantity,   // totalQuantity tracks total UNITS
-                  salesVolume: 0, // salesVolume will track units sold
-                  salesValue: 0,
-                  openedAt: serverTimestamp(),
-              });
-          } else {
-              // Create a single item for one bottle of liquor
-              await addDoc(onBarCollectionRef, {
-                  brand: manualItem.brand,
-                  size: manualItem.size,
-                  category: manualItem.category,
-                  totalVolume: manualItem.totalVolume,
-                  price: manualItem.price || 0,
-                  inventoryId: 'manual',
-                  remainingVolume: manualItem.totalVolume,
-                  salesVolume: 0,
-                  salesValue: 0,
-                  openedAt: serverTimestamp(),
-              });
-          }
-
-      } catch(error) {
-          console.error("Error adding manual on-bar item:", error);
-          throw error;
-      } finally {
-          setSaving(false);
-      }
-  };
-
-  const sellCustomPeg = async (id: string, volume: number, price: number) => {
+  const sellPeg = async (id: string, pegSize: 30 | 60 | 'custom', customVolume?: number, customPrice?: number) => {
     if (saving) return;
     setSaving(true);
+
     try {
-      const itemRef = doc(db, 'onBarInventory', id);
-      await runTransaction(db, async (transaction) => {
-        const itemDoc = await transaction.get(itemRef);
-        if (!itemDoc.exists()) {
-          throw new Error("Item not found on bar.");
-        }
-        const itemData = itemDoc.data() as OnBarItem;
-
-        if (itemData.category === 'Beer') {
-            const quantityToSell = volume; // For beer, 'volume' is quantity
-            if (itemData.remainingVolume < quantityToSell) {
-                throw new Error(`Not enough bottles to sell. Available: ${itemData.remainingVolume}`);
-            }
-            const newRemainingUnits = itemData.remainingVolume - quantityToSell;
-            const newSalesUnits = (itemData.salesVolume || 0) + quantityToSell;
-            const newSalesValue = (itemData.salesValue || 0) + price;
+        const itemRef = doc(db, 'onBarInventory', id);
+        await runTransaction(db, async (transaction) => {
+            const itemDoc = await transaction.get(itemRef);
+            if (!itemDoc.exists()) throw new Error("Item not found on bar.");
             
+            const itemData = itemDoc.data() as OnBarItem;
+            
+            let volumeToSell: number;
+            let priceOfSale: number;
+
+            if (itemData.category === 'Beer') {
+                volumeToSell = customVolume || 1; // For beer, volume is quantity
+                priceOfSale = customPrice || (itemData.price * volumeToSell);
+                if (itemData.remainingVolume < volumeToSell) {
+                    throw new Error(`Not enough bottles to sell. Available: ${itemData.remainingVolume}`);
+                }
+            } else { // Liquor
+                if (pegSize === 'custom') {
+                    if (!customVolume || customPrice === undefined) throw new Error("Custom volume and price are required.");
+                    volumeToSell = customVolume;
+                    priceOfSale = customPrice;
+                } else {
+                    volumeToSell = pegSize;
+                    const priceKey = `pegPrice${pegSize}ml` as keyof OnBarItem;
+                    const pegPrice = itemData[priceKey] as number | undefined;
+                    if (pegPrice === undefined) throw new Error(`Price for ${pegSize}ml peg is not set for this item.`);
+                    priceOfSale = pegPrice;
+                }
+                 if (itemData.remainingVolume < volumeToSell) {
+                    throw new Error(`Not enough liquor remaining. Available: ${itemData.remainingVolume}ml`);
+                }
+            }
+            
+            const newRemainingVolume = itemData.remainingVolume - volumeToSell;
+            const newSalesVolume = (itemData.salesVolume || 0) + volumeToSell;
+            const newSalesValue = (itemData.salesValue || 0) + priceOfSale;
+
             transaction.update(itemRef, {
-                remainingVolume: newRemainingUnits,
-                salesVolume: newSalesUnits,
-                salesValue: newSalesValue,
-            });
-
-        } else {
-            // Selling a liquor peg
-            if (itemData.remainingVolume < volume) {
-              throw new Error("Not enough liquor remaining to sell this peg.");
-            }
-            
-            const newRemainingVolume = itemData.remainingVolume - volume;
-            const newSalesVolume = (itemData.salesVolume || 0) + volume;
-            const newSalesValue = (itemData.salesValue || 0) + price;
-            
-            transaction.update(itemRef, { 
                 remainingVolume: newRemainingVolume,
                 salesVolume: newSalesVolume,
                 salesValue: newSalesValue,
             });
-        }
-      });
-    } catch (error) {
-      console.error("Error selling custom peg: ", error);
-      throw error;
+        });
+    } catch(error) {
+        console.error("Error selling peg: ", error);
+        throw error;
     } finally {
-      setSaving(false);
+        setSaving(false);
     }
-  };
+  }
 
 
   const refillPeg = async (id: string, amount: number) => {
@@ -279,5 +244,5 @@ export function useOnBarInventory() {
       }
   }
 
-  return { onBarInventory, loading, saving, addOnBarItem, addOnBarItemManual, sellCustomPeg, refillPeg, removeOnBarItem };
+  return { onBarInventory, loading, saving, addOnBarItem, sellPeg, refillPeg, removeOnBarItem };
 }

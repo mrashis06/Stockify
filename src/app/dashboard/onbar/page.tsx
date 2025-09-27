@@ -24,7 +24,7 @@ import { usePageLoading } from '@/hooks/use-loading';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
-    const { onBarInventory, loading, sellCustomPeg, removeOnBarItem, refillPeg, addOnBarItem } = useOnBarInventory();
+    const { onBarInventory, loading, sellPeg, removeOnBarItem, refillPeg, addOnBarItem } = useOnBarInventory();
     const { inventory: shopInventory } = useInventory();
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
     const { toast } = useToast();
@@ -43,7 +43,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     
     const handleSell = async (id: string, volume: number, price: number) => {
         try {
-            await sellCustomPeg(id, volume, price);
+            await sellPeg(id, 'custom', volume, price);
             const item = onBarInventory.find(i => i.id === id);
             const message = item?.category === 'Beer' ? `${volume} unit(s) sold for ₹${price}.` : `${volume}ml sold for ₹${price}.`;
             toast({ title: 'Success', description: message });
@@ -51,6 +51,18 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         } catch (error) {
             console.error('Error selling item:', error);
             const errorMessage = (error as Error).message || 'Failed to sell item.';
+            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+        }
+    };
+    
+    const handleOneClickSell = async (item: OnBarItem, pegSize: 30 | 60) => {
+        try {
+            await sellPeg(item.id, pegSize);
+            const price = pegSize === 30 ? item.pegPrice30ml : item.pegPrice60ml;
+            toast({ title: 'Success', description: `${pegSize}ml sold for ₹${price}.` });
+        } catch (error) {
+            console.error(`Error selling ${pegSize}ml peg:`, error);
+            const errorMessage = (error as Error).message || `Failed to sell ${pegSize}ml peg.`;
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     };
@@ -182,17 +194,18 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                         const remaining = item.remainingVolume;
                         const total = isBeer ? (item.totalQuantity || 1) : item.totalVolume;
                         const unitLabel = isBeer ? 'units' : 'ml';
-                        const beerSaleQuantities = [1, 2, 3, 4, 6];
+                        const canSell30 = !isBeer && remaining >= 30 && item.pegPrice30ml !== undefined;
+                        const canSell60 = !isBeer && remaining >= 60 && item.pegPrice60ml !== undefined;
 
                         return (
                         <Card key={item.id} className="flex flex-col h-full relative">
-                            <CardHeader className="flex flex-row items-center justify-between">
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
                                 <CardTitle className="text-lg truncate pr-8">{item.brand}</CardTitle>
                                 <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8" onClick={() => handleRemove(item.id)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                             </CardHeader>
-                             <CardContent className="flex-1 flex flex-col justify-between p-6">
+                             <CardContent className="flex-1 flex flex-col justify-between p-6 pt-0">
                                 <div className="text-center flex-1 flex flex-col justify-center">
                                     <div className="flex justify-center items-baseline gap-2">
                                         <span className="text-5xl font-bold tracking-tighter">{Math.max(0, remaining)}</span>
@@ -210,6 +223,17 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                 </div>
                                 
                                 <div className="space-y-2">
+                                     {!isBeer ? (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button onClick={() => handleOneClickSell(item, 30)} disabled={!canSell30}>
+                                                Sell 30ml
+                                            </Button>
+                                            <Button onClick={() => handleOneClickSell(item, 60)} disabled={!canSell60}>
+                                                Sell 60ml
+                                            </Button>
+                                        </div>
+                                     ) : null}
+
                                      <Button
                                         variant="outline"
                                         className="w-full"
@@ -217,7 +241,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                         onClick={() => handleOpenSellDialog(item)}
                                     >
                                         {isBeer ? <Beer className="mr-2 h-4 w-4" /> : <Minus className="mr-2 h-4 w-4" />}
-                                        {isBeer ? 'Sell Beer' : 'Sell Peg'}
+                                        {isBeer ? 'Sell Beer' : 'Custom Sale'}
                                     </Button>
 
                                      <Button

@@ -56,7 +56,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
   
   const form = useForm<SellFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: isBeer ? { quantity: '' as any } : { servingSize: 30, salePrice: '' as any },
+    defaultValues: isBeer ? { quantity: '' as any } : { servingSize: '' as any, salePrice: '' as any },
   });
   
   const quantity = form.watch(isBeer ? 'quantity' : undefined);
@@ -74,7 +74,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
   
   useEffect(() => {
     if (isOpen) {
-      form.reset(isBeer ? { quantity: '' as any } : { servingSize: 30, salePrice: '' as any });
+      form.reset(isBeer ? { quantity: '' as any } : { servingSize: '' as any, salePrice: '' as any });
     }
   }, [isOpen, item, form, isBeer]);
 
@@ -82,9 +82,9 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isBeer ? 'Sell Beer' : 'Sell Peg'}</DialogTitle>
+          <DialogTitle>{isBeer ? 'Sell Beer' : 'Custom Peg Sale'}</DialogTitle>
           <DialogDescription>
-             {isBeer ? 'Enter the number of units to sell.' : 'Enter the serving size and sale price for this transaction.'}
+             {isBeer ? 'Enter the number of units to sell.' : 'Enter the custom serving size and sale price.'}
           </DialogDescription>
         </DialogHeader>
         <div className="text-sm space-y-1 py-2">
@@ -121,7 +121,7 @@ export default function SellOnBarItemDialog({ isOpen, onOpenChange, item, onSell
                     <FormItem>
                       <FormLabel>Serving Size (ml)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="e.g. 30" {...field} autoFocus />
+                        <Input type="number" placeholder="e.g. 50" {...field} autoFocus />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

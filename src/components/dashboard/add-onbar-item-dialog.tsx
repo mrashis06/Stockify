@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Search } from 'lucide-react';
+import { Search, IndianRupee } from 'lucide-react';
 
 import {
   Dialog,
@@ -26,21 +26,25 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { InventoryItem } from '@/hooks/use-inventory';
 
 
 const formSchema = z.object({
   inventoryId: z.string().min(1, 'Please select a product.'),
   quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1.'),
+  pegPrice30ml: z.coerce.number().optional(),
+  pegPrice60ml: z.coerce.number().optional(),
+}).refine(data => {
+    // This validation runs if a product is selected and it is NOT a beer.
+    const productIsLiquor = data.inventoryId && !data.inventoryId.toLowerCase().includes('beer');
+    if (productIsLiquor) {
+        return data.pegPrice30ml !== undefined && data.pegPrice30ml > 0;
+    }
+    return true;
+}, {
+    message: "Price for 30ml peg is required.",
+    path: ["pegPrice30ml"],
 });
 
 type AddOnBarItemFormValues = z.infer<typeof formSchema>;
@@ -48,7 +52,7 @@ type AddOnBarItemFormValues = z.infer<typeof formSchema>;
 type AddOnBarItemDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onAddItem: (inventoryId: string, volume: number, quantity: number) => Promise<void>;
+  onAddItem: (inventoryId: string, volume: number, quantity: number, pegPrices?: { '30ml': number, '60ml': number }) => Promise<void>;
   shopInventory: InventoryItem[];
 };
 
@@ -61,6 +65,8 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
     defaultValues: {
       inventoryId: '',
       quantity: 1,
+      pegPrice30ml: undefined,
+      pegPrice60ml: undefined,
     },
   });
 
@@ -84,7 +90,12 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
         const volumeMatch = item.size.match(/(\d+)/);
         const volume = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
         
-        await onAddItem(data.inventoryId, volume, data.quantity);
+        const pegPrices = data.pegPrice30ml ? {
+            '30ml': data.pegPrice30ml,
+            '60ml': data.pegPrice60ml || data.pegPrice30ml * 2, // Default 60ml if not provided
+        } : undefined;
+
+        await onAddItem(data.inventoryId, volume, data.quantity, pegPrices);
         onOpenChange(false);
     } catch(error) {
         console.error("Failed to add item to On-Bar", error);
@@ -126,7 +137,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
                   render={({ field }) => (
                       <FormItem>
                           <FormLabel>Product</FormLabel>
-                          <ScrollArea className="h-64 border rounded-md">
+                          <ScrollArea className="h-48 border rounded-md">
                               {filteredInventory.length > 0 ? (
                                   filteredInventory.map(item => (
                                       <div key={item.id} className="flex items-center justify-between p-3 border-b last:border-b-0">
@@ -154,7 +165,8 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
                   )}
               />
               
-              {isBeer && (
+              {selectedProduct && (
+                isBeer ? (
                   <FormField
                       control={form.control}
                       name="quantity"
@@ -168,7 +180,32 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
                           </FormItem>
                       )}
                   />
+                ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="pegPrice30ml" render={({ field }) => (
+                             <FormItem>
+                                <FormLabel>30ml Peg Price</FormLabel>
+                                <div className="relative">
+                                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <FormControl><Input type="number" placeholder="e.g. 100" {...field} className="pl-8" /></FormControl>
+                                </div>
+                                <FormMessage />
+                             </FormItem>
+                        )} />
+                        <FormField control={form.control} name="pegPrice60ml" render={({ field }) => (
+                             <FormItem>
+                                <FormLabel>60ml Peg Price</FormLabel>
+                                 <div className="relative">
+                                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <FormControl><Input type="number" placeholder="e.g. 200" {...field} className="pl-8" /></FormControl>
+                                 </div>
+                                <FormMessage />
+                             </FormItem>
+                        )} />
+                    </div>
+                )
               )}
+
                <DialogFooter>
                   <DialogClose asChild>
                       <Button type="button" variant="secondary">Cancel</Button>
