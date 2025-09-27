@@ -56,17 +56,38 @@ const billExtractionPrompt = ai.definePrompt({
     schema: BillExtractionOutputSchema,
     format: 'json'
   },
-  prompt: `You are an expert data entry agent for a liquor store. Your task is to extract all line items from the provided bill/invoice image.
+  prompt: `
+You are an expert data entry agent for a liquor store. Your task is to extract all line items from the provided bill/invoice image.
 
-Analyze the document carefully and identify each product. For each product, extract the following details:
-- brand: The brand name of the product, extracted *exactly* as it appears on the bill. Do not normalize or change it.
-- size: The volume of the bottle. Extract this value *exactly* as it appears on the document. For example, if the bill says "650", the size is "650". If it says "750ml", the size is "750ml". DO NOT add 'ml' if it is not present in the text. This is very important.
+Extract for each product:
+- brand: The brand name of the product, *exactly* as shown on the bill.
+- size: **Extract ONLY the numeric value of the size. Discard any unit labels like "ml", "ML", "Ml.", "mL", etc.**  
+  For example:
+    - "750ml" → "750"
+    - "650 ML" → "650"
+    - "375 mL." → "375"
 - quantity: The number of units or bottles.
-- category: The type of liquor (e.g., Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
+- category: The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
 
-Return the data as a structured array of items. If you cannot determine a piece of information for an item, make your best guess.
+STRICT RULES for size:
+1. Always output size as a numeric string only (e.g., "750", "650", "375").
+2. Never include "ml", "ML", "mL", or any other text in the size field.
+3. If no numeric size is visible, return an empty string "".
 
-Bill document: {{media url=billDataUri}}`,
+Return the final result as valid JSON:
+{
+  "items": [
+    {
+      "brand": "Tuborg",
+      "size": "650",
+      "quantity": 10,
+      "category": "Beer"
+    }
+  ]
+}
+
+Bill document: {{media url=billDataUri}}
+`,
   model: 'googleai/gemini-2.5-flash',
   requestOptions: {
     timeout: 30000,
