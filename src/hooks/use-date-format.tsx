@@ -36,10 +36,10 @@ export const DateFormatProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('dateFormat', newFormat);
   };
   
-  const formatDate = useCallback((date: Date | string | number, formatOverride?: string): string => {
+  const formatDate = useCallback((date: Date | string | number, formatOverride: string = dateFormat): string => {
     try {
         let dateObj = date instanceof Date ? date : typeof date === 'string' ? parseISO(date) : new Date(date);
-        return formatDateFns(dateObj, formatOverride || dateFormat);
+        return formatDateFns(dateObj, formatOverride);
     } catch (error) {
         console.error("Invalid date for formatting:", date);
         return 'Invalid Date';

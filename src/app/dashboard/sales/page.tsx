@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMediaQuery } from 'react-responsive';
-import { collection, query, where, getDocs, or } from 'firebase/firestore';
+import { collection, query, where, getDocs, or, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import { useToast } from '@/hooks/use-toast';
@@ -15,13 +15,16 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/use-auth';
 import { Barcode, HelpCircle, IndianRupee, Scan, X } from 'lucide-react';
 import SharedScanner from '@/components/dashboard/shared-scanner';
+import { useDateFormat } from '@/hooks/use-date-format';
+import { subDays } from 'date-fns';
 
 export default function SalesPage() {
-    const { inventory, recordSale, forceRefetch } = useInventory();
+    const { recordSale, forceRefetch } = useInventory();
     const { user } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+    const { formatDate } = useDateFormat();
 
     const [isClient, setIsClient] = useState(false);
     const [scannedItem, setScannedItem] = useState<InventoryItem | null>(null);
@@ -40,7 +43,6 @@ export default function SalesPage() {
         setIsScannerPaused(true);
 
         try {
-            // No forceRefetch() here for faster lookup. We query directly.
             const inventoryRef = collection(db, "inventory");
             const q = query(inventoryRef, or(
                 where("barcodeId", "==", decodedText),
@@ -49,17 +51,37 @@ export default function SalesPage() {
             const querySnapshot = await getDocs(q);
 
             if (!querySnapshot.empty) {
-                const itemId = querySnapshot.docs[0].id;
-                // Since inventory might be stale, we fetch the specific item's full, fresh data
-                const itemFromHook = inventory.find(i => i.id === itemId);
+                const masterDoc = querySnapshot.docs[0];
+                const itemId = masterDoc.id;
+                const masterData = masterDoc.data() as Omit<InventoryItem, 'id'>;
 
-                // Combine master data with potentially live daily data for accuracy
-                const itemData = {
-                    ...(querySnapshot.docs[0].data() as Omit<InventoryItem, 'id' | 'added' | 'sales'>), // master data
+                // Fetch fresh daily and master data directly for accuracy
+                const today = formatDate(new Date(), 'yyyy-MM-dd');
+                const yesterday = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
+
+                const dailyDocRef = doc(db, 'dailyInventory', today);
+                const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
+
+                const [dailySnap, yesterdaySnap] = await Promise.all([
+                    getDoc(dailyDocRef),
+                    getDoc(yesterdayDocRef)
+                ]);
+
+                const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+                const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
+                
+                const itemDailyData = dailyData[itemId];
+                
+                const prevStock = yesterdayData[itemId]?.closing ?? masterData.prevStock ?? 0;
+                const added = itemDailyData?.added ?? 0;
+                const sales = itemDailyData?.sales ?? 0;
+
+                const itemData: InventoryItem = {
+                    ...masterData,
                     id: itemId,
-                    prevStock: itemFromHook?.prevStock ?? 0,
-                    added: itemFromHook?.added ?? 0,
-                    sales: itemFromHook?.sales ?? 0,
+                    prevStock,
+                    added,
+                    sales,
                 };
                 
                 setScannedItem(itemData);
@@ -84,9 +106,6 @@ export default function SalesPage() {
             toast({ title: 'Invalid Quantity', description: 'Please enter a valid whole number greater than zero.', variant: 'destructive' });
             return;
         }
-
-        const opening = (scannedItem.prevStock || 0) + (scannedItem.added || 0);
-        const availableStock = opening - (scannedItem.sales || 0);
 
         if (quantityNum > availableStock) {
             toast({ title: 'Error', description: `Cannot sell more than available stock (${availableStock}).`, variant: 'destructive' });
