@@ -250,7 +250,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                     <div className={isRead ? 'pl-4' : ''}>
                                         <p className="font-semibold">{n.title}</p>
                                         <p className="text-xs text-muted-foreground truncate">{n.description}</p>
-                                        <p className="text-xs text-muted-foreground mt-1">{formatDate(n.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
+                                        {n.createdAt && (
+                                            <p className="text-xs text-muted-foreground mt-1">{formatDate(n.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
+                                        )}
                                     </div>
                                 </DropdownMenuItem>
                             )})}
