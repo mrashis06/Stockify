@@ -152,14 +152,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   }, [yesterdaySalesData, inventory]);
 
   const totalPrevStock = useMemo(() => {
-    if (!yesterdaySalesData) return 0;
-    // Correctly calculate total stock from yesterday's closing numbers
-    return Object.values(yesterdaySalesData).reduce((sum, item: any) => {
-        const opening = (item.prevStock || 0) + (item.added || 0);
-        const closing = opening - (item.sales || 0);
-        return sum + closing;
-    }, 0);
-  }, [yesterdaySalesData]);
+    // This now calculates the total previous stock from the inventory state,
+    // which is the most reliable source for today's opening stock.
+    return inventory.reduce((sum, item) => sum + (item.prevStock ?? 0), 0);
+  }, [inventory]);
   
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const lowStock: InventoryItem[] = [];
