@@ -81,7 +81,10 @@ export default function MapBarcodePage() {
             console.error("Error starting scanner:", err);
             if (err.name === 'NotAllowedError') {
                  setScanError("Camera access was denied. Please go to your browser settings and allow camera access for this site.");
-            } else {
+            } else if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
+                // This error can be ignored as it's a race condition handled by our refs
+            }
+            else {
                  setScanError("Could not start camera. Please check permissions and refresh.");
             }
         }
@@ -93,7 +96,9 @@ export default function MapBarcodePage() {
             startScanner();
         }
         return () => {
-            stopScanner();
+            if (html5QrCodeRef.current && scannerRunningRef.current) {
+                stopScanner();
+            }
         };
     }, [isMobile, startScanner, stopScanner]);
 
@@ -286,3 +291,5 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
         </Dialog>
     )
 }
+
+    
