@@ -151,9 +151,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     return calculateTotalSales(yesterdaySalesData, inventory)
   }, [yesterdaySalesData, inventory]);
 
-  const totalPrevStock = useMemo(() => {
-    // This now calculates the total previous stock from the inventory state,
-    // which is the most reliable source for today's opening stock.
+  const totalOpeningStock = useMemo(() => {
+    // This is the correct calculation for the total opening stock.
+    // It sums the 'prevStock' from our processed inventory which is derived
+    // from yesterday's closing or the master record.
     return inventory.reduce((sum, item) => sum + (item.prevStock ?? 0), 0);
   }, [inventory]);
   
@@ -208,7 +209,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
                 <PackageCheck className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalPrevStock} Units</div>
+                <div className="text-2xl font-bold">{totalOpeningStock} Units</div>
                 <p className="text-xs text-muted-foreground">
                   Yesterday's closing stock across all items
                 </p>
