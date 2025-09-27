@@ -65,6 +65,8 @@ export function useOnBarInventory() {
         const itemInShop = inventory.find(item => item.id === inventoryItemId);
         if (!itemInShop) throw new Error("Item not found in shop inventory.");
         
+        // This logic is now removed as per user request. Opening a bottle does not affect off-counter stock.
+        /*
         const currentSales = itemInShop.sales || 0;
         const opening = (itemInShop.prevStock || 0) + (itemInShop.added || 0);
         const closingStock = opening - currentSales;
@@ -72,8 +74,8 @@ export function useOnBarInventory() {
         if (closingStock < quantity) {
             throw new Error(`Not enough stock. Available: ${closingStock}, trying to open: ${quantity}`);
         }
-
         await updateItemField(inventoryItemId, 'sales', currentSales + quantity);
+        */
         
         const newOnBarDocRef = doc(collection(db, "onBarInventory"));
         
@@ -219,13 +221,14 @@ export function useOnBarInventory() {
           const itemSnap = await getDoc(itemRef);
           if (!itemSnap.exists()) throw new Error("On-bar item not found");
           const onBarItemData = itemSnap.data() as OnBarItem;
+          
+          // Logic for returning stock to off-counter is removed as per user request
+          /*
           const inventoryId = onBarItemData.inventoryId;
-
           if (inventoryId && inventoryId !== 'manual') {
               const itemInShop = inventory.find(item => item.id === inventoryId);
               if (itemInShop) {
                   const currentSales = itemInShop.sales || 0;
-                  // For beer, remainingVolume is units. For liquor, it's 1 bottle if not empty.
                   const quantityToReturn = onBarItemData.category === 'Beer' ? onBarItemData.remainingVolume : onBarItemData.remainingVolume > 0 ? 1 : 0;
                   
                   if (quantityToReturn > 0) {
@@ -233,6 +236,7 @@ export function useOnBarInventory() {
                   }
               }
           }
+          */
           
           await deleteDoc(itemRef);
 
@@ -246,3 +250,5 @@ export function useOnBarInventory() {
 
   return { onBarInventory, loading, saving, addOnBarItem, sellPeg, refillPeg, removeOnBarItem };
 }
+
+    

@@ -56,6 +56,7 @@ type AddOnBarItemDialogProps = {
   shopInventory: InventoryItem[];
 };
 
+const allowedCategories = ['Whiskey', 'Rum', 'Vodka', 'Beer', 'Wine'];
 
 export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, shopInventory }: AddOnBarItemDialogProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -69,14 +70,17 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
       pegPrice60ml: undefined,
     },
   });
+  
+  const baseFilteredInventory = useMemo(() => {
+    return shopInventory.filter(item => item.category && allowedCategories.includes(item.category));
+  }, [shopInventory]);
 
   const filteredInventory = useMemo(() => {
-    if (!searchTerm) return shopInventory;
-    return shopInventory.filter(item =>
-        item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
+    if (!searchTerm) return baseFilteredInventory;
+    return baseFilteredInventory.filter(item =>
+        item.brand.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [shopInventory, searchTerm]);
+  }, [baseFilteredInventory, searchTerm]);
 
   const selectedProductId = form.watch('inventoryId');
   const selectedProduct = useMemo(() => shopInventory.find(item => item.id === selectedProductId), [shopInventory, selectedProductId]);
@@ -117,7 +121,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
         <DialogHeader>
           <DialogTitle>Open a Bottle</DialogTitle>
           <DialogDescription>
-             Select an item from your shop inventory to move it to the on-bar service area.
+             Select an item from your shop inventory to add it to the on-bar service area. This will not affect your off-counter stock.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -125,7 +129,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
               <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                      placeholder="Search shop inventory..."
+                      placeholder="Search for Whiskey, Rum, Vodka..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
@@ -218,3 +222,5 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
     </Dialog>
   );
 }
+
+    
