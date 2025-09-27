@@ -86,9 +86,15 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     }
   };
 
+  const handleQuickAdd = async () => {
+    const isValid = await form.trigger();
+    if(isValid) {
+      handleFormSubmit(form.getValues(), true);
+    }
+  }
+
   const handleFinalSubmit = (data: AddBrandFormValues) => {
-    onAddBrand(data);
-    onOpenChange(false);
+    handleFormSubmit(data, false);
   }
   
   // Reset state when dialog is closed
@@ -190,7 +196,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                  <DialogClose asChild>
                   <Button type="button" variant="secondary" className="w-full sm:w-auto hover:bg-destructive hover:text-destructive-foreground">Cancel</Button>
                 </DialogClose>
-                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))} className="w-full sm:w-auto">
+                 <Button type="button" variant="outline" onClick={handleQuickAdd} className="w-full sm:w-auto">
                     Save & Add Another
                  </Button>
                 <Button type="submit" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Save & Close</Button>
