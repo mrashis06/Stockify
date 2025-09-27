@@ -25,7 +25,7 @@ const BillExtractionInputSchema = z.object({
   billDataUri: z
     .string()
     .describe(
-      "A bill or invoice as a data URI that must include a MIME type (image or pdf) and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "A bill or invoice as a data URI that must include a MIME type (image or pdf) and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
 });
 export type BillExtractionInput = z.infer<typeof BillExtractionInputSchema>;
@@ -67,7 +67,7 @@ Analyze the document carefully and identify each product. For each product, extr
 Return the data as a structured array of items. If you cannot determine a piece of information for an item, make your best guess.
 
 Bill document: {{media url=billDataUri}}`,
-  model: 'googleai/gemini-2.5-flash',
+  model: 'googleai/gemini-pro',
   requestOptions: {
     timeout: 30000,
   },
