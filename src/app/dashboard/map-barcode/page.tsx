@@ -30,34 +30,36 @@ export default function MapBarcodePage() {
     const [alreadyMappedItem, setAlreadyMappedItem] = useState<InventoryItem | null>(null);
     
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
-    const scannerRunningRef = useRef<boolean>(false);
+    const scannerStateRef = useRef<'idle' | 'starting' | 'running' | 'stopping'>('idle');
     const processingRef = useRef<boolean>(false);
 
-    const stopScanner = useCallback(async (shouldRestart = false) => {
-        if (!scannerRunningRef.current || !html5QrCodeRef.current) {
+    const stopScanner = useCallback(async () => {
+        if (scannerStateRef.current !== 'running' || !html5QrCodeRef.current) {
             return;
         }
 
+        scannerStateRef.current = 'stopping';
         try {
-            if (html5QrCodeRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
-                await html5QrCodeRef.current.stop();
+            const scanner = html5QrCodeRef.current;
+            if (scanner && scanner.getState() === Html5QrcodeScannerState.SCANNING) {
+                await scanner.stop();
             }
         } catch (err: any) {
-            if (err.name !== 'NotAllowedError' && !err.message.includes("Cannot transition to a new state, already under transition")) {
-                console.error("Failed to stop scanner gracefully.", err);
+            if (!err.message.includes("Cannot transition to a new state, already under transition")) {
+                 console.error("Failed to stop scanner gracefully.", err);
             }
         } finally {
-            scannerRunningRef.current = false;
+            scannerStateRef.current = 'idle';
             setIsScannerActive(false);
-            if (shouldRestart) {
-                // Slight delay to allow camera to release before restarting
-                setTimeout(() => startScanner(), 100);
-            }
         }
     }, []);
 
     const startScanner = useCallback(async () => {
-        if (scannerRunningRef.current || !isMobile) return;
+        if (!isMobile || scannerStateRef.current === 'running' || scannerStateRef.current === 'starting') {
+             return;
+        }
+        scannerStateRef.current = 'starting';
+
         resetScanState();
 
         if (!html5QrCodeRef.current) {
@@ -72,16 +74,16 @@ export default function MapBarcodePage() {
                     if (processingRef.current) return;
                     processingRef.current = true;
                     setScanResult(decodedText);
-                    html5QrCodeRef.current?.pause();
+                    // Do NOT pause here for continuous scanning
                     handleScanSuccess(decodedText);
                 },
                 (errorMessage) => { /* onFailure, do nothing */ }
             );
-            scannerRunningRef.current = true;
+            scannerStateRef.current = 'running';
             setIsScannerActive(true);
         } catch (err: any) {
             if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
-                // This specific error is a race condition that can be ignored.
+                scannerStateRef.current = 'running'; // Assume it's running
                 return;
             }
             console.error("Error starting scanner:", err);
@@ -90,7 +92,7 @@ export default function MapBarcodePage() {
             } else {
                  setScanError("Could not start camera. Please check permissions and refresh.");
             }
-             scannerRunningRef.current = false;
+             scannerStateRef.current = 'idle';
              setIsScannerActive(false);
         }
     }, [isMobile]);
@@ -99,10 +101,9 @@ export default function MapBarcodePage() {
         if(isMobile) {
             startScanner();
         }
+        // Cleanup function to stop the scanner when the component unmounts
         return () => {
-            if (html5QrCodeRef.current && scannerRunningRef.current) {
-                stopScanner();
-            }
+             stopScanner();
         };
     }, [isMobile, startScanner, stopScanner]);
 
@@ -122,7 +123,7 @@ export default function MapBarcodePage() {
             console.error("Error fetching product by barcode:", error);
             setScanError("An error occurred while fetching the product.");
         } finally {
-            processingRef.current = false;
+            // Keep processingRef true until the dialog is closed or action is taken
         }
     };
 
@@ -137,6 +138,8 @@ export default function MapBarcodePage() {
         } catch (error) {
             console.error("Error mapping barcode:", error);
             toast({ title: 'Error', description: 'Mapping failed. Please try again.', variant: 'destructive' });
+        } finally {
+             processingRef.current = false;
         }
     };
 
@@ -146,10 +149,12 @@ export default function MapBarcodePage() {
         setAlreadyMappedItem(null);
         setIsMappingDialogOpen(false);
         processingRef.current = false;
-        if(html5QrCodeRef.current?.isPaused) {
-            html5QrCodeRef.current.resume();
-        }
     };
+
+    const handleCancelMapping = () => {
+        setIsMappingDialogOpen(false);
+        processingRef.current = false;
+    }
 
     const resetForNextScan = () => {
         resetScanState();
@@ -162,7 +167,7 @@ export default function MapBarcodePage() {
                 onOpenChange={setIsMappingDialogOpen}
                 barcodeId={scanResult}
                 onMap={handleMapBarcode}
-                onCancel={resetForNextScan}
+                onCancel={handleCancelMapping}
             />
 
             <Card className="max-w-2xl mx-auto">
@@ -252,7 +257,10 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <Dialog open={isOpen} onOpenChange={(open) => {
+            if (!open) onCancel(); // Call cancel when dialog is closed
+            onOpenChange(open);
+        }}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>Map New Barcode</DialogTitle>

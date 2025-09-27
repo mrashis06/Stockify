@@ -34,30 +34,37 @@ export default function SalesPage() {
     const [editedPrice, setEditedPrice] = useState<number | null>(null);
     
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
-    const scannerRunningRef = useRef<boolean>(false);
+    const scannerStateRef = useRef<'idle' | 'starting' | 'running' | 'stopping'>('idle');
     const processingRef = useRef<boolean>(false);
 
     const stopScanner = useCallback(async () => {
-        if (!scannerRunningRef.current || !html5QrCodeRef.current) {
+        if (scannerStateRef.current !== 'running' || !html5QrCodeRef.current) {
             return;
         }
 
+        scannerStateRef.current = 'stopping';
         try {
-            if (html5QrCodeRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
-                await html5QrCodeRef.current.stop();
+            const scanner = html5QrCodeRef.current;
+            if (scanner && scanner.getState() === Html5QrcodeScannerState.SCANNING) {
+                await scanner.stop();
             }
         } catch (err: any) {
-            if (err.name !== 'NotAllowedError' && !err.message.includes("Cannot transition to a new state, already under transition")) {
+            if (!err.message.includes("Cannot transition to a new state, already under transition")) {
                 console.error("Failed to stop scanner gracefully.", err);
             }
         } finally {
-            scannerRunningRef.current = false;
+            scannerStateRef.current = 'idle';
             setIsScannerActive(false);
         }
     }, []);
 
+
     const startScanner = useCallback(async () => {
-        if (scannerRunningRef.current || !isMobile) return;
+        if (!isMobile || scannerStateRef.current === 'running' || scannerStateRef.current === 'starting') {
+            return;
+        }
+        scannerStateRef.current = 'starting';
+
         resetScanState();
 
         if (!html5QrCodeRef.current) {
@@ -72,17 +79,16 @@ export default function SalesPage() {
                     if (processingRef.current) return;
                     processingRef.current = true;
                     
-                    html5QrCodeRef.current?.pause();
                     setScanResult(decodedText);
                     handleScanSuccess(decodedText);
                 },
                 (errorMessage) => { /* ignore */ }
             );
-            scannerRunningRef.current = true;
+            scannerStateRef.current = 'running';
             setIsScannerActive(true);
         } catch (err: any) {
              if (err.message && err.message.includes("Cannot transition to a new state, already under transition")) {
-                // This specific error is a race condition that can be ignored.
+                scannerStateRef.current = 'running'; // Assume it is running
                 return;
             }
             console.error("Error starting scanner:", err);
@@ -91,6 +97,7 @@ export default function SalesPage() {
                  errorMessage = "Camera access was denied. Please go to your browser settings and allow camera access for this site.";
             }
             setScanError(errorMessage);
+            scannerStateRef.current = 'idle';
         }
     }, [isMobile]);
 
@@ -132,7 +139,7 @@ export default function SalesPage() {
             console.error("Error fetching product by barcode:", error);
             setScanError("An error occurred while fetching the product.");
         } finally {
-            processingRef.current = false;
+            // Keep processingRef true until user confirms or cancels sale
         }
     };
     
@@ -154,6 +161,8 @@ export default function SalesPage() {
             console.error("Error processing sale:", error);
             const errorMessage = (error as Error).message || 'Failed to process sale.';
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+        } finally {
+             processingRef.current = false;
         }
     };
 
@@ -164,10 +173,6 @@ export default function SalesPage() {
         setSaleQuantity(1);
         setEditedPrice(null);
         processingRef.current = false;
-
-        if (isMobile && html5QrCodeRef.current?.isPaused) {
-            html5QrCodeRef.current.resume();
-        }
     };
 
     const availableStock = Number(scannedItem?.closing ?? scannedItem?.opening ?? 0);
