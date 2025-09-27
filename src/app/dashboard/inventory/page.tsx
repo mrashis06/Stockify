@@ -105,7 +105,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         if (!originalItem) return;
 
         let processedValue: number | string = value;
-        if (field === 'added' || field === 'sales' || field === 'price') {
+        if (field === 'added' || field === 'sales' || 'price') {
              processedValue = Number(value);
              if (isNaN(processedValue) || processedValue < 0) {
                  toast({ title: 'Invalid Input', description: 'Please enter a valid non-negative number.', variant: 'destructive'});
@@ -190,13 +190,20 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         return ['All Categories', ...Array.from(cats).sort()];
     }, [inventory]);
 
+    const { totalOpening, totalAdded, totalSalesUnits, totalClosing } = useMemo(() => {
+        return filteredInventory.reduce((acc, item) => {
+            acc.totalOpening += item.opening ?? 0;
+            acc.totalAdded += item.added ?? 0;
+            acc.totalSalesUnits += item.sales ?? 0;
+            acc.totalClosing += item.closing ?? 0;
+            return acc;
+        }, { totalOpening: 0, totalAdded: 0, totalSalesUnits: 0, totalClosing: 0 });
+    }, [filteredInventory]);
+
     const totalAmount = useMemo(() => {
         return filteredInventory.reduce((total, item) => total + (item.sales ?? 0) * item.price, 0);
     }, [filteredInventory]);
 
-    const totalPrevStock = useMemo(() => {
-        return filteredInventory.reduce((total, item) => total + (item.prevStock ?? 0), 0);
-    }, [filteredInventory]);
 
   if (loading) {
     return null;
@@ -404,13 +411,22 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                         })}
                         </TableBody>
                          <TableFooter>
-                             <TableRow>
-                                <TableCell colSpan={4} className="text-right font-bold text-lg">Total Previous Stock</TableCell>
-                                <TableCell className="font-bold text-lg">{totalPrevStock}</TableCell>
-                                <TableCell colSpan={showOpening && showClosing ? 5 : 4}></TableCell>
+                             <TableRow className="bg-muted/50 font-medium">
+                                <TableCell colSpan={4} className="text-right">Totals</TableCell>
+                                <TableCell className="font-bold">{filteredInventory.reduce((sum, item) => sum + (item.prevStock ?? 0), 0)}</TableCell>
+                                <TableCell className="font-bold">{totalAdded}</TableCell>
+                                {showOpening && <TableCell className="font-bold">{totalOpening}</TableCell>}
+                                <TableCell className="font-bold">{totalSalesUnits}</TableCell>
+                                {showClosing && <TableCell className="font-bold">{totalClosing}</TableCell>}
+                                <TableCell className="font-bold">
+                                    <div className="flex items-center">
+                                        <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                        {totalAmount.toLocaleString('en-IN')}
+                                    </div>
+                                </TableCell>
                             </TableRow>
                             <TableRow className="border-t-2 border-primary/50">
-                                <TableCell colSpan={showOpening && showClosing ? 9 : 7} className="text-right font-extrabold text-xl text-primary">Total Bottle Sales</TableCell>
+                                <TableCell colSpan={showOpening && showClosing ? 9 : (showOpening || showClosing ? 8 : 7)} className="text-right font-extrabold text-xl text-primary">Total Sales Value</TableCell>
                                 <TableCell colSpan={1} className="font-extrabold text-xl text-primary">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-6 w-6 mr-1 shrink-0" />
@@ -427,3 +443,5 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
