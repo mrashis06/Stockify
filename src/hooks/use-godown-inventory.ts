@@ -120,15 +120,27 @@ export function useGodownInventory() {
     }
   };
   
-  const addMultipleGodownItems = async (items: ExtractedItem[]) => {
-      if (items.length === 0) return;
+  const addMultipleGodownItems = async (items: ExtractedItem[]): Promise<{ addedCount: number, skippedCount: number }> => {
+      if (items.length === 0) return { addedCount: 0, skippedCount: 0 };
       setSaving(true);
+      let addedCount = 0;
+      let skippedCount = 0;
+
       try {
         const batch = writeBatch(db);
         const godownRef = collection(db, 'godownInventory');
+        
+        // Fetch existing product IDs to check against
+        const existingProductIds = new Set(godownInventory.map(item => item.productId));
 
-        items.forEach(item => {
+        for (const item of items) {
             const productId = generateProductId(item.brand, item.size);
+
+            if (existingProductIds.has(productId)) {
+                skippedCount++;
+                continue; // Skip this item as it already exists
+            }
+
             const docRef = doc(godownRef);
             batch.set(docRef, {
                 ...item,
@@ -136,8 +148,15 @@ export function useGodownInventory() {
                 dateAdded: serverTimestamp(),
                 transferHistory: [],
             });
-        });
-        await batch.commit();
+            addedCount++;
+            existingProductIds.add(productId); // Add to set to prevent duplicates from the same bill
+        }
+        
+        if (addedCount > 0) {
+            await batch.commit();
+        }
+        
+        return { addedCount, skippedCount };
 
       } catch(e) {
           console.error("Error adding multiple godown items:", e);

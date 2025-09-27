@@ -203,9 +203,25 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
             onOpenChange={setIsScanBillOpen}
             onAddItems={async (items) => {
                 try {
-                    await addMultipleGodownItems(items);
-                    toast({ title: 'Success', description: `${items.length} item types added to godown from the bill.`});
-                    forceRefetch();
+                    const { addedCount, skippedCount } = await addMultipleGodownItems(items);
+                    
+                    let description = '';
+                    if (addedCount > 0) {
+                        description += `${addedCount} item types added from the bill. `;
+                    }
+                    if (skippedCount > 0) {
+                        description += `${skippedCount} item types were skipped as they already exist in the godown.`;
+                    }
+
+                    if (addedCount === 0 && skippedCount > 0) {
+                         toast({ title: 'No new items added', description: description.trim() });
+                    } else {
+                         toast({ title: 'Success', description: description.trim() });
+                    }
+                    
+                    if (addedCount > 0) {
+                        forceRefetch();
+                    }
                 } catch(e) {
                     toast({ title: 'Error', description: 'Failed to add items from bill.', variant: 'destructive'});
                 }
