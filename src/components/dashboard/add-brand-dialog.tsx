@@ -72,35 +72,31 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
   });
 
   const handleFormSubmit = (data: AddBrandFormValues, addAnother: boolean = false) => {
-    setFormData(data);
-    setIsAddingAnother(addAnother);
-    setStep('review');
-  };
-
-  const handleConfirmSubmit = (isAddingAnother: boolean) => {
-    if (formData) {
-      onAddBrand(formData);
-
-      if (isAddingAnother) {
+    onAddBrand(data);
+    if(addAnother) {
         toast({
           title: 'Brand Added',
-          description: `${formData.brand} (${formData.size}) has been saved.`,
+          description: `${data.brand} (${data.size}) has been saved.`,
         });
-        // Go back to form, keeping the category.
         form.reset({
           brand: '',
           size: '',
           price: 0,
-          category: formData.category, // Keep category for next item
+          category: data.category, // Keep category for next item
           prevStock: 0,
           barcodeId: '',
         });
-        setStep('form');
-      } else {
-        onOpenChange(false); // Close dialog on final submission
-      }
+    } else {
+        onOpenChange(false);
     }
   };
+
+  const handleReviewAndSubmit = (data: AddBrandFormValues) => {
+    setFormData(data);
+    setIsAddingAnother(false); // This path is for single submission
+    onAddBrand(data);
+    onOpenChange(false);
+  }
   
   // Reset state when dialog is closed
   useEffect(() => {
@@ -116,18 +112,14 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{step === 'form' ? 'Add New Brand' : 'Review Details'}</DialogTitle>
+          <DialogTitle>{'Add New Brand'}</DialogTitle>
           <DialogDescription>
-            {step === 'form' 
-              ? 'Enter the details for the new brand.' 
-              : 'Please review the information before saving.'
-            }
+            {'Enter the details for the new brand.'}
           </DialogDescription>
         </DialogHeader>
         
-        {step === 'form' ? (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit((data) => handleFormSubmit(data, false))}>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleReviewAndSubmit)}>
               <div className="space-y-4 py-4">
                 <FormField
                   control={form.control}
@@ -204,26 +196,17 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                   )}
                 />
               </div>
-              <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-4">
+              <DialogFooter className="flex-col sm:flex-row sm:justify-end gap-2 pt-4">
                  <DialogClose asChild>
-                  <Button type="button" variant="secondary">Cancel</Button>
+                  <Button type="button" variant="secondary" className="w-full sm:w-auto">Cancel</Button>
                 </DialogClose>
-                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))}>
+                 <Button type="button" variant="outline" onClick={form.handleSubmit((data) => handleFormSubmit(data, true))} className="w-full sm:w-auto">
                     Save & Add Another
                  </Button>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700">Proceed to Review</Button>
+                <Button type="submit" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">Save & Close</Button>
               </DialogFooter>
             </form>
           </Form>
-        ) : formData ? (
-          <AddBrandReviewStep 
-            formData={formData}
-            isAddingAnother={isAddingAnother}
-            onEdit={() => setStep('form')}
-            onConfirm={handleConfirmSubmit}
-            onCancel={() => onOpenChange(false)}
-          />
-        ) : null}
       </DialogContent>
     </Dialog>
   );
