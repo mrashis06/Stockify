@@ -18,9 +18,10 @@ const ExtractedItemSchema = z.object({
     quantity: z.number().describe('The number of units for this item.'),
     category: z.string().describe('The category of the liquor (e.g., "Whiskey", "Rum", "Beer", "Wine").'),
 });
+export type ExtractedItem = z.infer<typeof ExtractedItemSchema>;
 
 // Define the input schema for the flow
-export const BillExtractionInputSchema = z.object({
+const BillExtractionInputSchema = z.object({
   billDataUri: z
     .string()
     .describe(
@@ -31,7 +32,7 @@ export type BillExtractionInput = z.infer<typeof BillExtractionInputSchema>;
 
 
 // Define the output schema for the flow
-export const BillExtractionOutputSchema = z.object({
+const BillExtractionOutputSchema = z.object({
   items: z.array(ExtractedItemSchema).describe('An array of items extracted from the bill.'),
 });
 export type BillExtractionOutput = z.infer<typeof BillExtractionOutputSchema>;
