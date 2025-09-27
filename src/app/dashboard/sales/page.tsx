@@ -31,7 +31,7 @@ export default function SalesPage() {
     const [isScannerPaused, setIsScannerPaused] = useState(false);
     const [saleCompleted, setSaleCompleted] = useState(false);
     
-    const [saleQuantity, setSaleQuantity] = useState<number | ''>(1);
+    const [saleQuantity, setSaleQuantity] = useState<number | ''>('');
     const [editedPrice, setEditedPrice] = useState<number | null>(null);
 
     useEffect(() => {
@@ -91,7 +91,7 @@ export default function SalesPage() {
             
             setScannedItem(itemData);
             setEditedPrice(itemData.price);
-            setSaleQuantity(1);
+            setSaleQuantity('');
 
         } catch (error) {
             console.error("Error fetching product by barcode:", error);
@@ -156,8 +156,8 @@ export default function SalesPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {isClient && isMobile && !saleCompleted ? (
-                        <SharedScanner 
+                    {isClient && isMobile ? (
+                         <SharedScanner 
                             onScanSuccess={handleScanSuccess}
                             isPaused={isScannerPaused}
                         />
@@ -232,7 +232,6 @@ export default function SalesPage() {
                                             max={availableStock}
                                             className="max-w-[120px]"
                                             autoFocus
-                                            onFocus={(e) => e.target.select()}
                                         />
                                     </div>
                                     <div className="flex gap-2 pt-4">
