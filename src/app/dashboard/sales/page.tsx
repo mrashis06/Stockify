@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/use-auth';
-import { Barcode, HelpCircle, IndianRupee, Scan, X } from 'lucide-react';
+import { Barcode, HelpCircle, IndianRupee, Scan, X, CheckCircle } from 'lucide-react';
 import SharedScanner from '@/components/dashboard/shared-scanner';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { subDays } from 'date-fns';
@@ -29,6 +29,7 @@ export default function SalesPage() {
     const [isClient, setIsClient] = useState(false);
     const [scannedItem, setScannedItem] = useState<InventoryItem | null>(null);
     const [isScannerPaused, setIsScannerPaused] = useState(false);
+    const [saleCompleted, setSaleCompleted] = useState(false);
     
     const [saleQuantity, setSaleQuantity] = useState<number | ''>('');
     const [editedPrice, setEditedPrice] = useState<number | null>(null);
@@ -44,7 +45,6 @@ export default function SalesPage() {
 
         try {
             const inventoryRef = collection(db, "inventory");
-            // Always perform a direct query to Firestore for the most up-to-date check
             const q = query(inventoryRef, or(
                 where("barcodeId", "==", decodedText),
                 where("qrCodeId", "==", decodedText)
@@ -52,13 +52,11 @@ export default function SalesPage() {
             const querySnapshot = await getDocs(q);
 
             if (querySnapshot.empty) {
-                // If the direct query finds nothing, THEN it's safe to assume it's unmapped
                 toast({ title: 'Product Not Mapped', description: 'Redirecting to mapping page...', variant: 'destructive' });
                 router.push(`/dashboard/map-barcode?code=${decodedText}`);
-                return; // Stop execution here
+                return;
             }
 
-            // If found, proceed with fetching all necessary data for the sale
             const masterDoc = querySnapshot.docs[0];
             const itemId = masterDoc.id;
             const masterData = masterDoc.data() as Omit<InventoryItem, 'id'>;
@@ -93,7 +91,7 @@ export default function SalesPage() {
             
             setScannedItem(itemData);
             setEditedPrice(itemData.price);
-            setSaleQuantity(''); // Reset to empty for better UX
+            setSaleQuantity('');
 
         } catch (error) {
             console.error("Error fetching product by barcode:", error);
@@ -116,19 +114,16 @@ export default function SalesPage() {
             return;
         }
         
-        // Optimistic UI update
         toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
-        resetScanState();
+        setSaleCompleted(true);
+        // We don't reset the scanner state here anymore, we wait for user to click "Scan Next"
 
         try {
             await recordSale(scannedItem.id, quantityNum, editedPrice, user.uid);
-            // After the sale is confirmed in the backend, force a refetch to ensure data consistency
-            // This happens silently in the background
             await forceRefetch();
         } catch (error) {
             console.error("Error processing sale:", error);
             const errorMessage = (error as Error).message || 'Failed to process sale.';
-            // Optionally, show an error toast if the background operation fails
             toast({ title: 'Sync Error', description: `Sale recorded locally, but failed to sync. ${errorMessage}`, variant: 'destructive' });
         }
     };
@@ -138,6 +133,7 @@ export default function SalesPage() {
         setSaleQuantity('');
         setEditedPrice(null);
         setIsScannerPaused(false);
+        setSaleCompleted(false);
     };
 
     const availableStock = useMemo(() => {
@@ -160,19 +156,21 @@ export default function SalesPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {isClient && isMobile ? (
+                    {isClient && isMobile && !saleCompleted ? (
                         <SharedScanner 
                             onScanSuccess={handleScanSuccess}
                             isPaused={isScannerPaused}
                         />
                     ) : (
-                        <Alert>
-                            <HelpCircle className="h-4 w-4" />
-                            <AlertTitle>Desktop Mode</AlertTitle>
-                            <AlertDescription>
-                                Barcode scanning is optimized for mobile devices. Please use your phone to access this feature.
-                            </AlertDescription>
-                        </Alert>
+                        !isMobile && (
+                            <Alert>
+                                <HelpCircle className="h-4 w-4" />
+                                <AlertTitle>Desktop Mode</AlertTitle>
+                                <AlertDescription>
+                                    Barcode scanning is optimized for mobile devices. Please use your phone to access this feature.
+                                </AlertDescription>
+                            </Alert>
+                        )
                     )}
 
                     {scannedItem && (
@@ -182,48 +180,66 @@ export default function SalesPage() {
                                 <CardDescription>{scannedItem.size} &bull; {scannedItem.category}</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                     <div className="space-y-2">
-                                        <label className="font-medium text-sm">Price</label>
-                                         <div className="relative">
-                                            <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                type="number"
-                                                value={editedPrice ?? ''}
-                                                onChange={(e) => setEditedPrice(Number(e.target.value))}
-                                                className="pl-10"
-                                            />
-                                         </div>
+                                {saleCompleted ? (
+                                    <div className="space-y-4 text-center">
+                                        <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-500/50">
+                                            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                            <AlertTitle className="text-green-800 dark:text-green-300">Sale Confirmed</AlertTitle>
+                                            <AlertDescription className="text-green-700 dark:text-green-400">
+                                                The sale has been successfully recorded.
+                                            </AlertDescription>
+                                        </Alert>
+                                        <Button onClick={resetScanState} className="w-full">
+                                            <Scan className="mr-2 h-4 w-4" />
+                                            Scan Next Item
+                                        </Button>
                                     </div>
+                                ) : (
+                                <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="font-medium text-sm">Price</label>
+                                            <div className="relative">
+                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    type="number"
+                                                    value={editedPrice ?? ''}
+                                                    onChange={(e) => setEditedPrice(Number(e.target.value))}
+                                                    className="pl-10"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="font-medium text-sm">Available Stock</label>
+                                            <Input
+                                                type="text"
+                                                value={availableStock}
+                                                readOnly
+                                                className={`font-bold ${availableStock < 10 ? 'text-destructive' : ''}`}
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-2">
-                                        <label className="font-medium text-sm">Available Stock</label>
+                                        <label htmlFor="quantity" className="font-medium text-sm">Quantity to Sell</label>
                                         <Input
-                                            type="text"
-                                            value={availableStock}
-                                            readOnly
-                                            className={`font-bold ${availableStock < 10 ? 'text-destructive' : ''}`}
+                                            id="quantity"
+                                            type="number"
+                                            value={saleQuantity}
+                                            onChange={(e) => setSaleQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+                                            placeholder="Enter quantity"
+                                            min="1"
+                                            max={availableStock}
+                                            className="max-w-[120px]"
+                                            autoFocus
                                         />
                                     </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label htmlFor="quantity" className="font-medium text-sm">Quantity to Sell</label>
-                                    <Input
-                                        id="quantity"
-                                        type="number"
-                                        value={saleQuantity}
-                                        onChange={(e) => setSaleQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                                        placeholder="Enter quantity"
-                                        min="1"
-                                        max={availableStock}
-                                        className="max-w-[120px]"
-                                        autoFocus
-                                    />
-                                </div>
-                                <div className="flex gap-2 pt-4">
-                                    <Button onClick={handleSale} className="flex-1 bg-green-600 hover:bg-green-700">Confirm Sale</Button>
-                                    <Button onClick={resetScanState} variant="outline" className="flex-1">Cancel</Button>
-                                </div>
+                                    <div className="flex gap-2 pt-4">
+                                        <Button onClick={handleSale} className="flex-1 bg-green-600 hover:bg-green-700">Confirm Sale</Button>
+                                        <Button onClick={resetScanState} variant="outline" className="flex-1">Cancel</Button>
+                                    </div>
+                                </>
+                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -232,3 +248,5 @@ export default function SalesPage() {
         </main>
     );
 }
+
+  
