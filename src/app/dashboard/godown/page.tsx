@@ -6,7 +6,7 @@ import React, { useState, useMemo } from 'react';
 import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -39,6 +39,7 @@ import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import ProcessDeliveryDialog from '@/components/dashboard/process-delivery-dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function GodownPage() {
     const { 
@@ -88,16 +89,15 @@ export default function GodownPage() {
     };
 
     const handleDeleteSelected = async () => {
+        setIsDeleteDialogOpen(false);
         try {
             await Promise.all(Array.from(selectedRows).map(id => deleteProduct(id)));
             toast({ title: 'Success', description: 'Selected products removed.' });
             setSelectedRows(new Set());
-            await forceRefetch();
         } catch (error) {
             console.error('Error removing products:', error);
             toast({ title: 'Error', description: (error as Error).message || 'Failed to remove selected products.', variant: 'destructive' });
         }
-        setIsDeleteDialogOpen(false);
     };
     
     const handleRowSelect = (productId: string) => {
@@ -163,7 +163,7 @@ export default function GodownPage() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will permanently delete the selected product(s). This action can only be done if both Godown and Shop stock are zero.
+                        This will permanently delete the selected product(s) and all associated data. This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -177,23 +177,28 @@ export default function GodownPage() {
 
         {unprocessedItems.length > 0 && (
             <Card className="mb-6 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
-                <CardContent className="p-4">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <Unplug className="h-8 w-8 text-amber-600" />
-                            <div>
-                                <h3 className="font-semibold text-amber-800 dark:text-amber-200">Unprocessed Deliveries</h3>
-                                <p className="text-sm text-amber-700 dark:text-amber-300">You have {unprocessedItems.length} item types from scanned bills that need to be mapped to your inventory.</p>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                        <Unplug className="h-6 w-6" /> Unprocessed Deliveries
+                    </CardTitle>
+                    <CardDescription className="text-amber-700 dark:text-amber-300">
+                        You have {unprocessedItems.length} item types from scanned bills that need to be mapped to your inventory.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="h-48 w-full">
+                        <div className="space-y-3">
+                        {unprocessedItems.map(item => (
+                             <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                                <div>
+                                    <p className="font-semibold">{item.brand}</p>
+                                    <p className="text-sm text-muted-foreground">{item.size} &bull; {item.quantity} units</p>
+                                </div>
+                                <Button size="sm" onClick={() => handleOpenProcessDialog(item)}>Process</Button>
                             </div>
+                        ))}
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto">
-                            {unprocessedItems.slice(0, 2).map(item => (
-                                <Button key={item.id} variant="outline" className="bg-amber-100 dark:bg-amber-900" onClick={() => handleOpenProcessDialog(item)}>
-                                    Process: {item.brand} ({item.quantity})
-                                </Button>
-                            ))}
-                        </div>
-                    </div>
+                    </ScrollArea>
                 </CardContent>
             </Card>
         )}
