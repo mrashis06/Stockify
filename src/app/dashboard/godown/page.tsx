@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan } from 'lucide-react';
+import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,12 +38,15 @@ import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog
 import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
+import ProcessDeliveryDialog from '@/components/dashboard/process-delivery-dialog';
 
 export default function GodownPage() {
     const { 
         inventory,
+        unprocessedItems,
         loading,
-        addMultipleItemsFromBill,
+        addItemsFromBillToHolding,
+        processScannedDelivery,
         deleteBrand: deleteProduct,
         transferToShop,
         forceRefetch
@@ -55,7 +58,9 @@ export default function GodownPage() {
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [isScanBillOpen, setIsScanBillOpen] = useState(false);
     const [isTransferOpen, setIsTransferOpen] = useState(false);
+    const [isProcessDeliveryOpen, setIsProcessDeliveryOpen] = useState(false);
     const [transferringItem, setTransferringItem] = useState<InventoryItem | null>(null);
+    const [processingItem, setProcessingItem] = useState<any | null>(null);
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const { toast } = useToast();
@@ -64,6 +69,11 @@ export default function GodownPage() {
         setTransferringItem(item);
         setIsTransferOpen(true);
     };
+
+    const handleOpenProcessDialog = (item: any) => {
+        setProcessingItem(item);
+        setIsProcessDeliveryOpen(true);
+    }
 
     const handleTransfer = async (productId: string, quantity: number, price?: number) => {
         try {
@@ -133,33 +143,24 @@ export default function GodownPage() {
                 onTransfer={handleTransfer}
             />
         )}
+        {processingItem && (
+            <ProcessDeliveryDialog 
+                isOpen={isProcessDeliveryOpen}
+                onOpenChange={setIsProcessDeliveryOpen}
+                unprocessedItem={processingItem}
+                onProcess={processScannedDelivery}
+            />
+        )}
         <ScanBillDialog 
             isOpen={isScanBillOpen}
             onOpenChange={setIsScanBillOpen}
             onAddItems={async (items) => {
                 try {
-                    const { addedCount, skippedCount } = await addMultipleItemsFromBill(items);
-                    
-                    let description = '';
-                    if (addedCount > 0) {
-                        description += `${addedCount} new product types added to godown. `;
-                    }
-                    if (skippedCount > 0) {
-                        description += `Stock for ${skippedCount} existing product types was updated.`;
-                    }
-
-                     toast({ title: 'Bill Processed', description: description.trim() || 'No new items found.' });
-                    
-                    if (addedCount > 0 || skippedCount > 0) {
-                        forceRefetch();
-                    }
+                    const count = await addItemsFromBillToHolding(items);
+                    toast({ title: 'Bill Scanned', description: `${count} item types sent to the holding area for processing.` });
                 } catch(e) {
                     const errorMessage = e instanceof Error ? e.message : 'Failed to add items from bill.';
-                    if (errorMessage.includes("quota")) {
-                        toast({ title: 'AI Service Unavailable', description: 'Could not process bill. Please check your API key billing status or try again later.', variant: 'destructive'});
-                    } else {
-                        toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
-                    }
+                    toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
                 }
             }}
         />
@@ -179,6 +180,29 @@ export default function GodownPage() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+
+        {unprocessedItems.length > 0 && (
+            <Card className="mb-6 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+                <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <Unplug className="h-8 w-8 text-amber-600" />
+                            <div>
+                                <h3 className="font-semibold text-amber-800 dark:text-amber-200">Unprocessed Deliveries</h3>
+                                <p className="text-sm text-amber-700 dark:text-amber-300">You have {unprocessedItems.length} item types from scanned bills that need to be mapped to your inventory.</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto">
+                            {unprocessedItems.slice(0, 2).map(item => (
+                                <Button key={item.id} variant="outline" className="bg-amber-100 dark:bg-amber-900" onClick={() => handleOpenProcessDialog(item)}>
+                                    Process: {item.brand} ({item.quantity})
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        )}
        
         <h1 className="text-2xl font-bold tracking-tight mb-6">Godown Stock</h1>
         <Card>
@@ -258,3 +282,6 @@ export default function GodownPage() {
     </main>
   );
 }
+
+
+    

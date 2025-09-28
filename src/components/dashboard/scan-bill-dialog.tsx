@@ -229,7 +229,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
                 <DialogHeader>
                     <DialogTitle>Scan New Bill</DialogTitle>
                     <DialogDescription>
-                        Upload an image or PDF of your bill to automatically add stock to your godown.
+                        Upload an image or PDF of your bill. Items will be added to a holding area for processing.
                     </DialogDescription>
                 </DialogHeader>
                 
@@ -243,7 +243,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
                     </DialogClose>
                      {extractedData && (
                         <Button onClick={handleConfirm} className="bg-green-600 hover:bg-green-700">
-                            Confirm & Add to Godown
+                            Confirm & Add to Holding Area
                         </Button>
                     )}
                 </DialogFooter>

@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Barcode, HelpCircle, Search, CheckCircle, Info, Scan, X } from 'lucide-react';
+import { Barcode, HelpCircle, Search, CheckCircle, Info, Scan } from 'lucide-react';
 import SharedScanner from '@/components/dashboard/shared-scanner';
 
 export default function MapBarcodePage() {
@@ -25,6 +25,8 @@ export default function MapBarcodePage() {
     const [isScannerPaused, setIsScannerPaused] = useState(false);
     const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
     const [alreadyMappedItem, setAlreadyMappedItem] = useState<InventoryItem | null>(null);
+    const [mappingComplete, setMappingComplete] = useState(false);
+    const [mappedItemDetails, setMappedItemDetails] = useState<{ brand: string, size: string } | null>(null);
 
     useEffect(() => {
         setIsClient(true);
@@ -49,23 +51,18 @@ export default function MapBarcodePage() {
         if (!scannedBarcode) return;
 
         try {
-            // Check if this barcode is already used by another product.
-            const existingMapping = inventory.find(item => item.barcodeId === scannedBarcode);
-            if(existingMapping) {
-                 toast({ title: 'Error', description: `This barcode is already mapped to ${existingMapping.brand}.`, variant: 'destructive' });
-                 resetForNextScan();
-                 return;
-            }
-
             await updateBrand(productId, { barcodeId: scannedBarcode });
             const mappedItem = inventory.find(item => item.id === productId);
-            toast({ title: 'Success', description: `Barcode mapped to ${mappedItem?.brand} successfully.` });
+            if (mappedItem) {
+                setMappedItemDetails({ brand: mappedItem.brand, size: mappedItem.size });
+            }
+            setMappingComplete(true);
             await forceRefetch(); 
         } catch (error) {
             console.error("Error mapping barcode:", error);
             toast({ title: 'Error', description: 'Mapping failed. Please try again.', variant: 'destructive' });
         } finally {
-            resetForNextScan();
+            setIsMappingDialogOpen(false);
         }
     };
     
@@ -77,6 +74,8 @@ export default function MapBarcodePage() {
     const resetForNextScan = () => {
         setScannedBarcode(null);
         setAlreadyMappedItem(null);
+        setMappingComplete(false);
+        setMappedItemDetails(null);
         setIsMappingDialogOpen(false);
         setIsScannerPaused(false);
     };
@@ -124,13 +123,18 @@ export default function MapBarcodePage() {
                                 <CardTitle>Scan Result</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                               <Alert variant={alreadyMappedItem ? 'default' : 'destructive'}>
-                                    {alreadyMappedItem ? <CheckCircle className="h-4 w-4" /> : <Info className="h-4 w-4" />}
-                                    <AlertTitle>{alreadyMappedItem ? "Barcode Already Mapped" : "New Barcode Detected"}</AlertTitle>
+                                <Alert variant={alreadyMappedItem || mappingComplete ? 'default' : 'destructive'}>
+                                    <CheckCircle className="h-4 w-4" />
+                                    <AlertTitle>
+                                        {alreadyMappedItem ? "Barcode Already Mapped" : (mappingComplete ? "Mapping Successful" : "New Barcode Detected")}
+                                    </AlertTitle>
                                     <AlertDescription>
                                         {alreadyMappedItem 
                                             ? `This barcode is linked to: ${alreadyMappedItem.brand} (${alreadyMappedItem.size}).`
-                                            : `This barcode (${scannedBarcode}) is not yet mapped to any product.`
+                                            : (mappingComplete 
+                                                ? `Barcode has been successfully linked to ${mappedItemDetails?.brand} (${mappedItemDetails?.size}).`
+                                                : `This barcode (${scannedBarcode}) is not yet mapped to any product.`
+                                            )
                                         }
                                     </AlertDescription>
                                 </Alert>
@@ -152,7 +156,6 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredInventory = useMemo(() => {
-        // Filter out items that already have a barcode
         const unmappedInventory = inventory.filter(item => !item.barcodeId);
         if (!searchTerm) return unmappedInventory;
         return unmappedInventory.filter(item =>
@@ -167,7 +170,6 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
 
     const handleSelect = (productId: string) => {
         onMap(productId);
-        onOpenChange(false);
     }
 
     return (
@@ -217,3 +219,5 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
         </Dialog>
     )
 }
+
+    

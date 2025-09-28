@@ -36,18 +36,16 @@ export default function SalesPage() {
 
     const handleScanSuccess = async (decodedText: string) => {
         if (isScannerPaused) return;
-        setIsScannerPaused(true);
-
+        
         const itemData = inventory.find(item => item.barcodeId === decodedText);
 
         if (!itemData) {
             toast({ title: 'Product Not Found', description: 'This barcode is not mapped to any product. Please map it first.', variant: 'destructive' });
-            // Option to redirect to mapping page
-            // router.push(`/dashboard/map-barcode?code=${decodedText}`);
-            resetScanState();
+            router.push(`/dashboard/map-barcode`);
             return;
         }
-            
+
+        setIsScannerPaused(true);
         setScannedItem(itemData);
         setEditedPrice(itemData.price);
         setSaleQuantity(1); // Default to selling 1 item
@@ -89,9 +87,11 @@ export default function SalesPage() {
 
     const availableStock = useMemo(() => {
         if (!scannedItem) return 0;
-        const opening = (scannedItem.prevStock || 0) + (scannedItem.added || 0);
-        return opening - (scannedItem.sales || 0);
-    }, [scannedItem]);
+        const liveItem = inventory.find(i => i.id === scannedItem.id);
+        if (!liveItem) return 0;
+        const opening = (liveItem.prevStock || 0) + (liveItem.added || 0);
+        return opening - (liveItem.sales || 0);
+    }, [scannedItem, inventory]);
 
     return (
         <main className="flex-1 p-4 md:p-8">
@@ -199,3 +199,5 @@ export default function SalesPage() {
         </main>
     );
 }
+
+    

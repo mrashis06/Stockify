@@ -32,7 +32,7 @@ import { usePageLoading } from './use-loading';
 import { createAdminNotification, deleteAdminNotificationByProductId } from './use-notifications';
 import { useAuth } from './use-auth';
 import { useNotificationSettings } from './use-notification-settings';
-import type { ExtractedItem as BillExtractedItem } from './use-godown-inventory';
+import type { ExtractedItem } from '@/ai/flows/extract-bill-flow';
 
 export type InventoryItem = {
   id: string; // This will now often be a barcode
@@ -51,10 +51,17 @@ export type InventoryItem = {
   closing?: number; // `opening` - `sales`
 };
 
+export type UnprocessedItem = ExtractedItem & { 
+    id: string;
+    createdAt: Timestamp;
+};
+
+
 const LOW_STOCK_THRESHOLD = 10;
 
 export function useInventory() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [unprocessedItems, setUnprocessedItems] = useState<UnprocessedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
@@ -65,7 +72,7 @@ export function useInventory() {
   const today = format(new Date(), 'yyyy-MM-dd');
   const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
   
-  const fetchInventoryData = useCallback(async () => {
+  const fetchAllData = useCallback(async () => {
       setLoading(true);
       try {
         const inventorySnapshot = await getDocs(collection(db, 'inventory'));
@@ -88,9 +95,7 @@ export function useInventory() {
             const id = masterItem.id;
             const dailyItem = dailyData[id];
             
-            // prevStock for the SHOP is yesterday's closing stock for the SHOP
             const prevStock = (yesterdayData[id]?.closing ?? masterItem.prevStock) ?? 0;
-            
             const added = dailyItem?.added ?? 0;
             const sales = dailyItem?.sales ?? 0;
 
@@ -103,6 +108,16 @@ export function useInventory() {
         });
 
         setInventory(items.sort((a, b) => a.brand.localeCompare(b.brand)));
+
+        // Unprocessed items are now separate
+        const unprocessedSnapshot = await getDocs(query(collection(db, 'unprocessed_deliveries'), orderBy('createdAt', 'desc')));
+        const unprocessed: UnprocessedItem[] = [];
+        unprocessedSnapshot.forEach(doc => {
+            unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
+        });
+        setUnprocessedItems(unprocessed);
+
+
       } catch (error) {
         console.error("Error fetching inventory data: ", error);
         toast({ title: 'Error', description: 'Failed to load inventory data.', variant: 'destructive' });
@@ -112,21 +127,24 @@ export function useInventory() {
   }, [today, yesterday]);
 
   useEffect(() => {
+    // This now fetches everything together.
+    fetchAllData();
+
     const inventoryQuery = query(collection(db, "inventory"));
-    const unsubscribeInventory = onSnapshot(inventoryQuery, () => {
-        fetchInventoryData();
-    });
+    const unsubscribeInventory = onSnapshot(inventoryQuery, () => fetchAllData());
       
     const dailyDocRef = doc(db, 'dailyInventory', today);
-    const unsubscribeDaily = onSnapshot(dailyDocRef, () => {
-        fetchInventoryData();
-    });
+    const unsubscribeDaily = onSnapshot(dailyDocRef, () => fetchAllData());
+
+    const unprocessedQuery = query(collection(db, "unprocessed_deliveries"));
+    const unsubscribeUnprocessed = onSnapshot(unprocessedQuery, () => fetchAllData());
 
     return () => {
         unsubscribeInventory();
         unsubscribeDaily();
+        unsubscribeUnprocessed();
     };
-  }, [today, fetchInventoryData]);
+  }, [today, fetchAllData]);
   
 
   const addBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock'> & {prevStock: number}) => {
@@ -140,7 +158,7 @@ export function useInventory() {
             size: newItemData.size,
             price: newItemData.price,
             category: newItemData.category,
-            stockInGodown: 0, // Manually added items have 0 godown stock initially
+            stockInGodown: 0,
             barcodeId: null,
         };
         
@@ -152,11 +170,11 @@ export function useInventory() {
             category: newItemData.category,
             added: 0,
             sales: 0,
-            closing: newItemData.prevStock, // Initial stock is today's closing stock
+            closing: newItemData.prevStock,
         };
 
         const batch = writeBatch(db);
-        batch.set(docRef, { ...masterItemData, prevStock: newItemData.prevStock }); // prevStock is stored on master for first day
+        batch.set(docRef, { ...masterItemData, prevStock: newItemData.prevStock });
         batch.set(dailyDocRef, { [id]: dailyItemData }, { merge: true });
         
         await batch.commit();
@@ -169,53 +187,70 @@ export function useInventory() {
     }
   };
 
-  const addMultipleItemsFromBill = async (items: BillExtractedItem[]): Promise<{ addedCount: number, skippedCount: number }> => {
-      if (items.length === 0) return { addedCount: 0, skippedCount: 0 };
+  const addItemsFromBillToHolding = async (items: ExtractedItem[]): Promise<number> => {
+      if (items.length === 0) return 0;
       setSaving(true);
-      
-      let addedCount = 0;
-      let skippedCount = 0;
-
       try {
-          await runTransaction(db, async (transaction) => {
-              for (const item of items) {
-                  const masterInventoryRef = collection(db, 'inventory');
-                  const q = query(masterInventoryRef, where('brand', '==', item.brand), where('size', '==', item.size), limit(1));
-                  
-                  // This read happens inside a transaction loop, which is fine
-                  const existingDocs = await getDocs(q);
-
-                  if (!existingDocs.empty) {
-                      const existingDocRef = existingDocs.docs[0].ref;
-                      const existingData = existingDocs.docs[0].data() as InventoryItem;
-                      const newGodownStock = (existingData.stockInGodown || 0) + item.quantity;
-                      transaction.update(existingDocRef, { stockInGodown: newGodownStock });
-                      skippedCount++;
-                  } else {
-                      const id = `manual_${item.brand.toLowerCase().replace(/[^a-z0-9]/g, '')}_${item.size.toLowerCase().replace(/[^0-9]/g, '')}`;
-                      const newDocRef = doc(db, 'inventory', id);
-                      const newMasterItem = {
-                          brand: item.brand,
-                          size: item.size,
-                          category: item.category,
-                          price: 0, // New items from bill have no price until mapped/transferred
-                          stockInGodown: item.quantity,
-                          prevStock: 0,
-                          barcodeId: null,
-                      };
-                      transaction.set(newDocRef, newMasterItem);
-                      addedCount++;
-                  }
-              }
+          const batch = writeBatch(db);
+          items.forEach(item => {
+              const docRef = doc(collection(db, 'unprocessed_deliveries'));
+              batch.set(docRef, { ...item, createdAt: serverTimestamp() });
           });
-          
-          return { addedCount, skippedCount };
+          await batch.commit();
+          return items.length;
       } catch (e) {
-          console.error("Error in addMultipleItemsFromBill transaction:", e);
+          console.error("Error adding items to holding area:", e);
           throw e;
       } finally {
           setSaving(false);
       }
+  }
+
+  const processScannedDelivery = async (
+    unprocessedItemId: string, 
+    barcode: string, 
+    details: { price: number, quantity: number, brand: string, size: string, category: string }
+  ) => {
+    setSaving(true);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const inventoryQuery = query(collection(db, 'inventory'), where('barcodeId', '==', barcode), limit(1));
+            const existingProducts = await getDocs(inventoryQuery);
+
+            let productId: string;
+            
+            if (!existingProducts.empty) { // Barcode exists
+                const existingDoc = existingProducts.docs[0];
+                productId = existingDoc.id;
+                const newStock = (existingDoc.data().stockInGodown || 0) + details.quantity;
+                transaction.update(existingDoc.ref, { stockInGodown: newStock });
+
+            } else { // New barcode, create new product
+                productId = barcode; // The barcode is the new ID
+                const newProductRef = doc(db, 'inventory', productId);
+                const newProductData = {
+                    brand: details.brand,
+                    size: details.size,
+                    category: details.category,
+                    price: details.price,
+                    stockInGodown: details.quantity,
+                    barcodeId: barcode,
+                    prevStock: 0,
+                };
+                transaction.set(newProductRef, newProductData);
+            }
+            
+            // Delete the unprocessed item
+            const unprocessedRef = doc(db, 'unprocessed_deliveries', unprocessedItemId);
+            transaction.delete(unprocessedRef);
+        });
+
+    } catch(e) {
+        console.error("Error processing delivery:", e);
+        throw e;
+    } finally {
+        setSaving(false);
+    }
   }
 
 
@@ -247,22 +282,19 @@ export function useInventory() {
   const deleteBrand = async (id: string) => {
     setSaving(true);
     try {
-        // A product can only be deleted if its shop stock and godown stock are both zero.
         const masterRef = doc(db, 'inventory', id);
         const masterSnap = await getDoc(masterRef);
         if (!masterSnap.exists()) {
             setSaving(false);
-            return; // Already deleted
+            return;
         }
 
         const masterData = masterSnap.data() as InventoryItem;
 
-        // Check godown stock
         if ((masterData.stockInGodown || 0) > 0) {
             throw new Error("Cannot delete. Product still has stock in the godown.");
         }
 
-        // Check shop stock
         const dailyDocRef = doc(db, 'dailyInventory', today);
         const dailySnap = await getDoc(dailyDocRef);
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
@@ -291,7 +323,6 @@ export function useInventory() {
     setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
-            // --- ALL READS FIRST ---
             const masterRef = doc(db, 'inventory', productId);
             const dailyRef = doc(db, 'dailyInventory', today);
 
@@ -304,21 +335,18 @@ export function useInventory() {
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             const masterData = masterDoc.data() as InventoryItem;
 
-            // --- ALL WRITES LAST ---
             const currentGodownStock = masterData.stockInGodown || 0;
             if (currentGodownStock < quantityToTransfer) {
                 throw new Error(`Not enough stock in godown. Available: ${currentGodownStock}`);
             }
             const newGodownStock = currentGodownStock - quantityToTransfer;
             
-            // Update the master doc
             const masterUpdate: { stockInGodown: number; price?: number } = { stockInGodown: newGodownStock };
             if (price !== undefined && masterData.price !== price) {
                 masterUpdate.price = price;
             }
             transaction.update(masterRef, masterUpdate);
 
-            // Update the daily doc
             const itemDailyData = dailyData[productId] || {
                 brand: masterData.brand,
                 size: masterData.size,
@@ -473,5 +501,22 @@ export function useInventory() {
     }
  };
 
-  return { inventory, setInventory, loading, saving, addBrand, deleteBrand, updateBrand, updateItemField, recordSale, addMultipleItemsFromBill, transferToShop, forceRefetch: fetchInventoryData };
+  return { 
+      inventory, 
+      unprocessedItems,
+      setInventory, 
+      loading, 
+      saving, 
+      addBrand, 
+      deleteBrand, 
+      updateBrand, 
+      updateItemField, 
+      recordSale, 
+      addItemsFromBillToHolding,
+      processScannedDelivery,
+      transferToShop, 
+      forceRefetch: fetchAllData 
+    };
 }
+
+    
