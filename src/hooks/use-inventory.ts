@@ -61,7 +61,7 @@ const generateProductId = (brand: string, size: string) => {
     // This list is now very specific to avoid removing important identifiers.
     const junkWords = [
         'premium', 'deluxe', 'matured', 'xxx', 'very', 'old', 'vatted',
-        'reserve', 'original',
+        'reserve', 'original', 'grain',
         'beer', 'whisky', 'rum', 'gin', 'vodka', 'wine', 'brandy', 'lager', 'pilsner',
         'can', 'bottle', 'pet', 'pint', 'quart', 'ml'
     ];
@@ -302,7 +302,7 @@ export function useInventory() {
                             brand: invData?.brand, size: invData?.size, category: invData?.category,
                             quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
                         };
-                        transaction.set(batchDoc.ref, godownItem);
+                        transaction.set(doc(db, "godownInventory", transfer.batchId), godownItem);
                     }
                     amountToReturn -= returnable;
                 }
@@ -417,7 +417,7 @@ export function useInventory() {
             const masterRef = doc(db, 'inventory', id);
             const dailyDocRef = doc(db, 'dailyInventory', today);
             
-            // READ PHASE
+            // --- READ PHASE ---
             const [dailyDocSnap, masterSnap] = await Promise.all([
                 transaction.get(dailyDocRef),
                 transaction.get(masterRef)
@@ -430,7 +430,6 @@ export function useInventory() {
             let itemDailyData = dailyData[id];
 
             if (!itemDailyData) {
-                // If no daily data, we must read yesterday's data to establish prevStock
                 const yesterdayDocSnap = await transaction.get(doc(db, 'dailyInventory', yesterday));
                 const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
                 const prevStock = yesterdayData[id]?.closing ?? masterData.prevStock ?? 0;
@@ -446,19 +445,16 @@ export function useInventory() {
             let batchDocs: any[] = [];
             let transferHistory = (masterData.transferHistory || []).sort((a,b) => b.date.toMillis() - a.date.toMillis());
 
-            // If we are returning stock, we must read the godown batches first
             if (field === 'added' && newAdded < currentAdded) {
                 let amountToReturn = currentAdded - newAdded;
                 if (transferHistory.length === 0 && amountToReturn > 0) {
-                    throw new Error("Cannot return stock to godown: No transfer history found for this item.");
+                    throw new Error("Cannot auto-return stock to godown: No transfer history found for this item.");
                 }
                 const batchRefsToRead = transferHistory.map(t => doc(db, "godownInventory", t.batchId));
                 batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
             }
 
             // --- WRITE PHASE ---
-
-            // Now we can start writing changes
             if (field === 'added' && newAdded < currentAdded) {
                 let amountToReturn = currentAdded - newAdded;
                 const newTransferHistory = [...transferHistory];
@@ -475,7 +471,6 @@ export function useInventory() {
                     if(batchDoc?.exists()){
                         transaction.update(batchDoc.ref, { quantity: batchDoc.data()!.quantity + returnable });
                     } else {
-                        // Batch was deleted, so we recreate it
                         const godownProductId = generateProductId(masterData.brand, masterData.size);
                         transaction.set(doc(db, "godownInventory", transfer.batchId), {
                             brand: masterData.brand, size: masterData.size, category: masterData.category,
@@ -508,8 +503,6 @@ export function useInventory() {
 
             if (notificationSettings.lowStockAlerts && user?.shopId) {
                  if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
-                    // Cannot do another read (getDocs) here for checking existing notifications
-                    // We will just create a new one, duplicates can be handled or ignored
                     const notifId = doc(collection(db, 'shops', user.shopId, 'notifications')).id;
                     transaction.set(doc(db, 'shops', user.shopId, 'notifications', notifId), {
                         title: 'Low Stock Alert',
@@ -521,9 +514,6 @@ export function useInventory() {
                         readBy: [],
                         createdAt: serverTimestamp(),
                     });
-                 } else if (newClosingStock > LOW_STOCK_THRESHOLD && oldClosingStock <= LOW_STOCK_THRESHOLD) {
-                    // Cannot query inside transaction, so we cannot delete notification here.
-                    // This part needs to be handled outside a transaction or by a backend function.
                  }
             }
 
