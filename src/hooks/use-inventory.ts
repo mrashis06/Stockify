@@ -460,9 +460,8 @@ export function useInventory() {
     }
 
     try {
-        // --- Phase 2: Transaction with only Writes ---
         await runTransaction(db, async (transaction) => {
-            let currentDailyData = { ...dailyData }; // Work on a copy
+            let currentDailyData = { ...dailyData };
             let currentItemDaily = currentDailyData[id];
 
             if (!currentItemDaily) {
@@ -472,6 +471,8 @@ export function useInventory() {
 
             const oldAdded = currentItemDaily.added || 0;
             const newAdded = field === 'added' ? Number(value) : oldAdded;
+
+            const shouldDeleteProduct = field === 'added' && newAdded === 0 && (masterData.prevStock ?? 0) === 0 && (currentItemDaily.sales ?? 0) === 0;
 
             if (isReturningStock) {
                 let amountToReturn = oldAdded - newAdded;
@@ -504,16 +505,26 @@ export function useInventory() {
                     }
                     amountToReturn -= returnable;
                 }
-                transaction.update(masterRef, { transferHistory: newTransferHistory });
+                if (!shouldDeleteProduct) {
+                    transaction.update(masterRef, { transferHistory: newTransferHistory });
+                }
             }
 
-            currentItemDaily[field] = value;
-            if (field === 'price') {
-                transaction.update(masterRef, { price: value });
+            if (shouldDeleteProduct) {
+                // If the product is now empty, remove it from shop and daily log
+                transaction.delete(masterRef);
+                const { [id]: _, ...restOfDailyData } = currentDailyData;
+                transaction.set(dailyDocRef, restOfDailyData);
+            } else {
+                // Otherwise, just update the field
+                currentItemDaily[field] = value;
+                if (field === 'price') {
+                    transaction.update(masterRef, { price: value });
+                }
+                
+                currentDailyData[id] = currentItemDaily;
+                transaction.set(dailyDocRef, currentDailyData, { merge: true });
             }
-            
-            currentDailyData[id] = currentItemDaily;
-            transaction.set(dailyDocRef, currentDailyData, { merge: true });
         });
 
     } catch (error) {
