@@ -59,13 +59,13 @@ const generateProductId = (brand: string, size: string) => {
         'ac': 'aristocrat',
         'rc': 'royalchallenge',
         'rs': 'royalspecial',
-        // Add more abbreviations as needed
     };
 
-    // List of "junk" words to be removed. Important identifiers like "strong", "classic", "black" are NOT on this list.
+    // Refined list of "junk" words to be removed.
+    // Important identifiers like "strong", "classic", "black", "signature" are NOT on this list.
     const junkWords = [
         'premium', 'deluxe', 'matured', 'xxx', 'very', 'old', 'vatted',
-        'reserve', 'special', 'original', 'signature', 'green label', 'blue label',
+        'reserve', 'original', 'green label', 'blue label',
         'beer', 'whisky', 'rum', 'gin', 'vodka', 'wine', 'brandy', 'lager', 'pilsner',
         'can', 'bottle', 'pet', 'pint', 'quart'
     ];
@@ -75,16 +75,16 @@ const generateProductId = (brand: string, size: string) => {
         .replace(/\[.*?\]/g, '')
         .replace(/\(.*?\)/g, '');
 
-    // Create a regex from junk words to match them as whole words
+    // Step 1: Expand abbreviations
+    const words = processedBrand.split(' ');
+    const expandedWords = words.map(word => abbreviations[word.replace(/[^a-z0-9]/gi, '')] || word);
+    processedBrand = expandedWords.join(' ');
+    
+    // Step 2: Remove only the true junk words
     const junkRegex = new RegExp(`\\b(${junkWords.join('|')})\\b`, 'g');
     processedBrand = processedBrand.replace(junkRegex, '');
 
-    // Handle abbreviations by checking word by word
-    const words = processedBrand.split(' ');
-    const expandedWords = words.map(word => abbreviations[word] || word);
-    processedBrand = expandedWords.join(' ');
-    
-    // Final cleanup: remove all non-alphanumeric characters and extra spaces
+    // Step 3: Final cleanup
     processedBrand = processedBrand
         .replace(/[^a-z0-9]/g, '') // Remove all non-alphanumeric chars
         .replace(/\s+/g, '')       // In case any spaces are left
