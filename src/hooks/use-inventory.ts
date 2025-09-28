@@ -87,7 +87,7 @@ export function useInventory() {
 
         const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
         const yesterdayDocSnap = await getDoc(yesterdayDocRef);
-        const yesterdayData = yesterdayDocSnap.exists() ? yesterdaySnap.data() : {};
+        const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
         
         const items: InventoryItem[] = [];
 
@@ -283,34 +283,23 @@ export function useInventory() {
     setSaving(true);
     try {
         const masterRef = doc(db, 'inventory', id);
-        const masterSnap = await getDoc(masterRef);
-        if (!masterSnap.exists()) {
-            setSaving(false);
-            return;
-        }
-
-        const masterData = masterSnap.data() as InventoryItem;
-
-        if ((masterData.stockInGodown || 0) > 0) {
-            throw new Error("Cannot delete. Product still has stock in the godown.");
-        }
-
         const dailyDocRef = doc(db, 'dailyInventory', today);
-        const dailySnap = await getDoc(dailyDocRef);
-        const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-        const dailyItem = dailyData[id];
-        
-        const prevStock = masterData.prevStock || 0;
-        const added = dailyItem?.added || 0;
-        const sales = dailyItem?.sales || 0;
-        const shopStock = (prevStock + added) - sales;
 
-        if (shopStock > 0) {
-            throw new Error("Cannot delete. Product still has stock in the shop.");
-        }
+        await runTransaction(db, async (transaction) => {
+            const dailyDoc = await transaction.get(dailyDocRef);
+            
+            // Delete the master product document
+            transaction.delete(masterRef);
 
-        await deleteDoc(masterRef);
-
+            // If the daily document exists, remove the item from it
+            if (dailyDoc.exists()) {
+                const dailyData = dailyDoc.data();
+                if (dailyData[id]) {
+                    delete dailyData[id];
+                    transaction.set(dailyDocRef, dailyData);
+                }
+            }
+        });
     } catch (error) {
         console.error("Error deleting brand:", error);
         throw error;
