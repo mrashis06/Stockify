@@ -231,11 +231,14 @@ export const useInventory = create<InventoryState>((set, get) => ({
   deleteBrand: async (id) => {
     get().setSaving(true);
     try {
-        const masterRef = doc(db, 'inventory', id);
         const batch = writeBatch(db);
+        const masterRef = doc(db, 'inventory', id);
+        
         batch.delete(masterRef);
+        
         await batch.commit();
         await get().fetchAllData();
+
     } catch (error) {
         console.error("Error deleting brand:", error);
         throw error;
@@ -283,8 +286,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
 
   recordSale: async (id, quantity, salePrice, soldBy) => {
       get().setSaving(true);
-      const { user } = useAuth.getState();
-      const { settings } = useNotificationSettings.getState();
       try {
         await runTransaction(db, async (transaction) => {
             const today = format(new Date(), 'yyyy-MM-dd');
