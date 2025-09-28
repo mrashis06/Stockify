@@ -248,48 +248,49 @@ export function useGodownInventory() {
   const transferToShop = async (productId: string, quantityToTransfer: number) => {
     setSaving(true);
     const today = format(new Date(), 'yyyy-MM-dd');
+
+    // --- Phase 1: All Reads, done outside the transaction ---
+    const godownItemsQuery = query(
+      collection(db, 'godownInventory'),
+      where('productId', '==', productId)
+    );
+    const godownItemsSnapshot = await getDocs(godownItemsQuery);
+    const sortedGodownItems = godownItemsSnapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as GodownItem))
+      .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());
+
+    if (sortedGodownItems.length === 0) {
+      setSaving(false);
+      throw new Error(`Product not found in godown.`);
+    }
+
+    const totalGodownStock = sortedGodownItems.reduce((sum, item) => sum + item.quantity, 0);
+    if (totalGodownStock < quantityToTransfer) {
+      setSaving(false);
+      throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
+    }
     
     try {
+        // --- Phase 2: Transaction with only Reads-then-Writes ---
         await runTransaction(db, async (transaction) => {
-            const godownItemsQuery = query(
-                collection(db, 'godownInventory'),
-                where('productId', '==', productId)
-            );
-            
-            const godownItemsSnapshot = await getDocs(godownItemsQuery);
-            const sortedGodownItems = godownItemsSnapshot.docs.sort(
-                (a, b) => a.data().dateAdded.toMillis() - b.data().dateAdded.toMillis()
-            );
-
-            if (sortedGodownItems.length === 0) {
-                 throw new Error(`Product not found in godown.`);
-            }
-
-            const totalGodownStock = sortedGodownItems.reduce((sum, doc) => sum + doc.data().quantity, 0);
-
-            if (totalGodownStock < quantityToTransfer) {
-                throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
-            }
-            
-            const firstGodownBatch = sortedGodownItems[0].data();
+            const firstGodownBatch = sortedGodownItems[0];
             const shopProductId = generateProductId(firstGodownBatch.brand, firstGodownBatch.size);
             
             const shopItemRef = doc(db, 'inventory', shopProductId);
             const dailyInventoryRef = doc(db, 'dailyInventory', today);
 
+            // Transactional reads
             const shopItemDoc = await transaction.get(shopItemRef);
+            const dailyDoc = await transaction.get(dailyInventoryRef);
             
             let shopItemData: any;
-            let isNewShopItem = false;
-
             if (!shopItemDoc.exists()) {
-                isNewShopItem = true;
                 shopItemData = {
                     brand: firstGodownBatch.brand,
                     size: firstGodownBatch.size,
                     category: firstGodownBatch.category,
                     price: 0,
-                    prevStock: 0, // A new item starts with 0 prevStock
+                    prevStock: 0,
                     transferHistory: [],
                 };
                  transaction.set(shopItemRef, shopItemData);
@@ -300,10 +301,9 @@ export function useGodownInventory() {
             let remainingToTransfer = quantityToTransfer;
             const transferTimestamp = Timestamp.now();
 
-            for (const docSnap of sortedGodownItems) {
+            for (const batchData of sortedGodownItems) {
                 if (remainingToTransfer <= 0) break;
                 
-                const batchData = { id: docSnap.id, ...docSnap.data() } as GodownItem;
                 const batchRef = doc(db, 'godownInventory', batchData.id);
                 const transferAmount = Math.min(batchData.quantity, remainingToTransfer);
 
@@ -326,8 +326,6 @@ export function useGodownInventory() {
                 remainingToTransfer -= transferAmount;
             }
             
-             // Fetch dailyDoc inside transaction only when needed
-            const dailyDoc = await transaction.get(dailyInventoryRef);
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             let currentDailyItem = dailyData[shopProductId];
 
