@@ -192,10 +192,10 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const { totalOpening, totalAdded, totalSalesUnits, totalClosing } = useMemo(() => {
         return filteredInventory.reduce((acc, item) => {
-            acc.totalOpening += item.opening ?? 0;
-            acc.totalAdded += item.added ?? 0;
-            acc.totalSalesUnits += item.sales ?? 0;
-            acc.totalClosing += item.closing ?? 0;
+            acc.totalOpening += Number(item.opening ?? 0);
+            acc.totalAdded += Number(item.added ?? 0);
+            acc.totalSalesUnits += Number(item.sales ?? 0);
+            acc.totalClosing += Number(item.closing ?? 0);
             return acc;
         }, { totalOpening: 0, totalAdded: 0, totalSalesUnits: 0, totalClosing: 0 });
     }, [filteredInventory]);
