@@ -53,21 +53,17 @@ export type InventoryItem = {
 const generateProductId = (brand: string, size: string) => {
     // Dictionary for common abbreviations
     const abbreviations: { [key: string]: string } = {
-        'mc': 'mcdowells',
-        'bp': 'blenderspride',
-        'oc': 'officerschoice',
-        'ac': 'aristocrat',
-        'rc': 'royalchallenge',
-        'rs': 'royalspecial',
+        'mc': 'mcdowells', 'bp': 'blenderspride', 'oc': 'officerschoice',
+        'ac': 'aristocrat', 'rc': 'royalchallenge', 'rs': 'royalspecial', 'sig': 'signature'
     };
 
     // Refined list of "junk" words to be removed.
-    // Important identifiers like "strong", "classic", "black", "signature" are NOT on this list.
+    // This list is now very specific to avoid removing important identifiers.
     const junkWords = [
         'premium', 'deluxe', 'matured', 'xxx', 'very', 'old', 'vatted',
-        'reserve', 'original', 'green label', 'blue label',
+        'reserve', 'original',
         'beer', 'whisky', 'rum', 'gin', 'vodka', 'wine', 'brandy', 'lager', 'pilsner',
-        'can', 'bottle', 'pet', 'pint', 'quart'
+        'can', 'bottle', 'pet', 'pint', 'quart', 'ml'
     ];
 
     let processedBrand = brand.toLowerCase()
@@ -77,7 +73,10 @@ const generateProductId = (brand: string, size: string) => {
 
     // Step 1: Expand abbreviations
     const words = processedBrand.split(' ');
-    const expandedWords = words.map(word => abbreviations[word.replace(/[^a-z0-9]/gi, '')] || word);
+    const expandedWords = words.map(word => {
+        const cleanWord = word.replace(/[^a-z0-9]/gi, '');
+        return abbreviations[cleanWord] || word;
+    });
     processedBrand = expandedWords.join(' ');
     
     // Step 2: Remove only the true junk words
@@ -281,34 +280,32 @@ export function useInventory() {
             let amountToReturn = itemToday.added;
             const transferHistory = inventoryDoc.exists() ? (inventoryDoc.data()?.transferHistory || []).sort((a: TransferHistory, b: TransferHistory) => b.date.toMillis() - a.date.toMillis()) : [];
 
-            if (transferHistory.length === 0 && amountToReturn > 0) {
-                throw new Error("Cannot auto-return stock to godown: No transfer history found.");
-            }
+            if (transferHistory.length > 0) {
+                // We only attempt to return stock if there is a history.
+                const batchRefsToRead = transferHistory.map(t => doc(db, "godownInventory", t.batchId));
+                const batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
 
-            // We must read the godown batches before we write to them
-            const batchRefsToRead = transferHistory.map(t => doc(db, "godownInventory", t.batchId));
-            const batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
+                for (let i = 0; i < transferHistory.length; i++) {
+                    if (amountToReturn <= 0) break;
+                    
+                    const transfer = transferHistory[i];
+                    const returnable = Math.min(amountToReturn, transfer.quantity);
 
-            for (let i = 0; i < transferHistory.length; i++) {
-                if (amountToReturn <= 0) break;
-                
-                const transfer = transferHistory[i];
-                const returnable = Math.min(amountToReturn, transfer.quantity);
+                    const batchDoc = batchDocs[i];
 
-                const batchDoc = batchDocs[i];
-
-                if (batchDoc?.exists()) {
-                    transaction.update(batchDoc.ref, { quantity: batchDoc.data()!.quantity + returnable });
-                } else {
-                    const invData = inventoryDoc.data();
-                    const godownProductId = generateProductId(invData?.brand, invData?.size);
-                    const godownItem = {
-                        brand: invData?.brand, size: invData?.size, category: invData?.category,
-                        quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
-                    };
-                    transaction.set(batchDoc.ref, godownItem);
+                    if (batchDoc?.exists()) {
+                        transaction.update(batchDoc.ref, { quantity: batchDoc.data()!.quantity + returnable });
+                    } else {
+                        const invData = inventoryDoc.data();
+                        const godownProductId = generateProductId(invData?.brand, invData?.size);
+                        const godownItem = {
+                            brand: invData?.brand, size: invData?.size, category: invData?.category,
+                            quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
+                        };
+                        transaction.set(batchDoc.ref, godownItem);
+                    }
+                    amountToReturn -= returnable;
                 }
-                amountToReturn -= returnable;
             }
         }
 
