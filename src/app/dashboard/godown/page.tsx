@@ -89,14 +89,7 @@ export default function GodownPage() {
 
     const handleDeleteSelected = async () => {
         try {
-            for (const id of selectedRows) {
-                const item = inventory.find(i => i.id === id);
-                if (item && (item.stockInGodown > 0 || ((item.prevStock || 0) + (item.added || 0) - (item.sales || 0)) > 0)) {
-                    toast({ title: 'Action Denied', description: `Cannot delete "${item.brand}". Stock must be zero in both godown and shop.`, variant: 'destructive' });
-                    continue;
-                }
-                await deleteProduct(id);
-            }
+            await Promise.all(Array.from(selectedRows).map(id => deleteProduct(id)));
             toast({ title: 'Success', description: 'Selected products removed.' });
             setSelectedRows(new Set());
             await forceRefetch();
