@@ -36,8 +36,13 @@ export default function SalesPage() {
 
     const handleScanSuccess = async (decodedText: string) => {
         if (isScannerPaused) return;
+
+        // Ensure we have the latest inventory before processing the scan
+        await forceRefetch();
         
-        const itemData = inventory.find(item => item.barcodeId === decodedText);
+        // Use the freshly fetched inventory state from the hook
+        const updatedInventory = useInventory.getState().inventory;
+        const itemData = updatedInventory.find(item => item.barcodeId === decodedText);
 
         if (!itemData) {
             toast({ title: 'Product Not Found', description: 'This barcode is not mapped to any product. Please map it first.', variant: 'destructive' });
@@ -199,5 +204,3 @@ export default function SalesPage() {
         </main>
     );
 }
-
-    

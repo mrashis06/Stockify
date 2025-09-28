@@ -38,6 +38,7 @@ export default function MapBarcodePage() {
         setIsScannerPaused(true);
         setScannedBarcode(decodedText);
         
+        await forceRefetch(); // Ensure we have the latest inventory before checking
         const mappedItem = inventory.find(item => item.barcodeId === decodedText);
 
         if (mappedItem) {
@@ -52,12 +53,17 @@ export default function MapBarcodePage() {
 
         try {
             await updateBrand(productId, { barcodeId: scannedBarcode });
-            const mappedItem = inventory.find(item => item.id === productId);
-            if (mappedItem) {
-                setMappedItemDetails({ brand: mappedItem.brand, size: mappedItem.size });
+            await forceRefetch(); // Force a refetch after updating
+            
+            const newlyMappedItem = inventory.find(item => item.id === productId);
+            if (newlyMappedItem) {
+                setMappedItemDetails({ brand: newlyMappedItem.brand, size: newlyMappedItem.size });
             }
             setMappingComplete(true);
-            await forceRefetch(); 
+            toast({
+                title: "Mapping Successful",
+                description: `Barcode has been linked to ${newlyMappedItem?.brand} (${newlyMappedItem?.size}).`
+            });
         } catch (error) {
             console.error("Error mapping barcode:", error);
             toast({ title: 'Error', description: 'Mapping failed. Please try again.', variant: 'destructive' });
@@ -123,21 +129,28 @@ export default function MapBarcodePage() {
                                 <CardTitle>Scan Result</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <Alert variant={alreadyMappedItem || mappingComplete ? 'default' : 'destructive'}>
-                                    <CheckCircle className="h-4 w-4" />
-                                    <AlertTitle>
-                                        {alreadyMappedItem ? "Barcode Already Mapped" : (mappingComplete ? "Mapping Successful" : "New Barcode Detected")}
-                                    </AlertTitle>
-                                    <AlertDescription>
-                                        {alreadyMappedItem 
-                                            ? `This barcode is linked to: ${alreadyMappedItem.brand} (${alreadyMappedItem.size}).`
-                                            : (mappingComplete 
-                                                ? `Barcode has been successfully linked to ${mappedItemDetails?.brand} (${mappedItemDetails?.size}).`
-                                                : `This barcode (${scannedBarcode}) is not yet mapped to any product.`
-                                            )
-                                        }
-                                    </AlertDescription>
-                                </Alert>
+                                {alreadyMappedItem ? (
+                                     <Alert>
+                                        <Info className="h-4 w-4" />
+                                        <AlertTitle>Barcode Already Mapped</AlertTitle>
+                                        <AlertDescription>
+                                            This barcode is already linked to: **{alreadyMappedItem.brand} ({alreadyMappedItem.size})**.
+                                        </AlertDescription>
+                                    </Alert>
+                                ) : mappingComplete ? (
+                                    <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-500/50">
+                                        <CheckCircle className="h-4 w-4 text-green-600" />
+                                        <AlertTitle>Mapping Successful</AlertTitle>
+                                        <AlertDescription>
+                                            The barcode has been linked to **{mappedItemDetails?.brand} ({mappedItemDetails?.size})**.
+                                        </AlertDescription>
+                                    </Alert>
+                                ) : (
+                                    <Alert variant="destructive">
+                                        <AlertTitle>New Barcode Detected</AlertTitle>
+                                        <AlertDescription>This barcode is not mapped. An error might have occurred.</AlertDescription>
+                                    </Alert>
+                                )}
                                 <Button onClick={resetForNextScan} variant="outline" className="w-full">
                                     <Scan className="mr-2 h-4 w-4" />
                                     Scan Next Item
@@ -219,5 +232,3 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
         </Dialog>
     )
 }
-
-    

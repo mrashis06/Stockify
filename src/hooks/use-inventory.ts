@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { create } from 'zustand';
 import {
   collection,
   doc,
@@ -21,34 +21,28 @@ import {
   Timestamp,
   orderBy,
   limit,
-  arrayRemove,
-  arrayUnion,
-  DocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { usePageLoading } from './use-loading';
 import { createAdminNotification, deleteAdminNotificationByProductId } from './use-notifications';
 import { useAuth } from './use-auth';
 import { useNotificationSettings } from './use-notification-settings';
 import type { ExtractedItem } from '@/ai/flows/extract-bill-flow';
 
 export type InventoryItem = {
-  id: string; // This will now often be a barcode
+  id: string;
   brand: string;
   size: string;
   price: number;
   category: string;
   stockInGodown: number;
   barcodeId?: string | null;
-  // Daily fields - not stored on master doc
-  prevStock: number; // Yesterday's closing SHOP stock
-  added: number; // Transferred from godown to shop TODAY
-  sales: number; // Sold from shop TODAY
-  // Calculated fields
-  opening?: number; // `prevStock` + `added`
-  closing?: number; // `opening` - `sales`
+  prevStock: number;
+  added: number;
+  sales: number;
+  opening?: number;
+  closing?: number;
 };
 
 export type UnprocessedItem = ExtractedItem & { 
@@ -56,24 +50,42 @@ export type UnprocessedItem = ExtractedItem & {
     createdAt: Timestamp;
 };
 
+type InventoryState = {
+  inventory: InventoryItem[];
+  unprocessedItems: UnprocessedItem[];
+  loading: boolean;
+  saving: boolean;
+  fetchAllData: () => Promise<void>;
+  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock'> & {prevStock: number}) => Promise<void>;
+  addItemsFromBillToHolding: (items: ExtractedItem[]) => Promise<number>;
+  processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
+  updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
+  deleteBrand: (id: string) => Promise<void>;
+  transferToShop: (productId: string, quantityToTransfer: number, price?: number) => Promise<void>;
+  recordSale: (id: string, quantity: number, salePrice: number, soldBy: string) => Promise<void>;
+  updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => Promise<void>;
+  forceRefetch: () => Promise<void>;
+  setLoading: (isLoading: boolean) => void;
+  setSaving: (isSaving: boolean) => void;
+};
 
 const LOW_STOCK_THRESHOLD = 10;
 
-export function useInventory() {
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [unprocessedItems, setUnprocessedItems] = useState<UnprocessedItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const { user } = useAuth();
-  const { settings: notificationSettings } = useNotificationSettings();
+export const useInventory = create<InventoryState>((set, get) => ({
+  inventory: [],
+  unprocessedItems: [],
+  loading: true,
+  saving: false,
+  setLoading: (isLoading) => set({ loading: isLoading }),
+  setSaving: (isSaving) => set({ saving: isSaving }),
+  forceRefetch: async () => {
+    await get().fetchAllData();
+  },
   
-  usePageLoading(loading);
-
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-  
-  const fetchAllData = useCallback(async () => {
-      setLoading(true);
+  fetchAllData: async () => {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+      set({ loading: true });
       try {
         const inventorySnapshot = await getDocs(collection(db, 'inventory'));
         const masterInventory = new Map<string, any>();
@@ -90,65 +102,36 @@ export function useInventory() {
         const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
         
         const items: InventoryItem[] = [];
-
         masterInventory.forEach((masterItem) => {
             const id = masterItem.id;
             const dailyItem = dailyData[id];
-            
             const prevStock = (yesterdayData[id]?.closing ?? masterItem.prevStock) ?? 0;
             const added = dailyItem?.added ?? 0;
             const sales = dailyItem?.sales ?? 0;
-
-            items.push({
-                ...masterItem,
-                prevStock,
-                added,
-                sales,
-            });
+            items.push({ ...masterItem, prevStock, added, sales });
         });
 
-        setInventory(items.sort((a, b) => a.brand.localeCompare(b.brand)));
-
-        // Unprocessed items are now separate
         const unprocessedSnapshot = await getDocs(query(collection(db, 'unprocessed_deliveries'), orderBy('createdAt', 'desc')));
         const unprocessed: UnprocessedItem[] = [];
         unprocessedSnapshot.forEach(doc => {
             unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
         });
-        setUnprocessedItems(unprocessed);
 
+        set({
+          inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)),
+          unprocessedItems: unprocessed
+        });
 
       } catch (error) {
         console.error("Error fetching inventory data: ", error);
         toast({ title: 'Error', description: 'Failed to load inventory data.', variant: 'destructive' });
       } finally {
-        setLoading(false);
+        set({ loading: false });
       }
-  }, [today, yesterday]);
+  },
 
-  useEffect(() => {
-    // This now fetches everything together.
-    fetchAllData();
-
-    const inventoryQuery = query(collection(db, "inventory"));
-    const unsubscribeInventory = onSnapshot(inventoryQuery, () => fetchAllData());
-      
-    const dailyDocRef = doc(db, 'dailyInventory', today);
-    const unsubscribeDaily = onSnapshot(dailyDocRef, () => fetchAllData());
-
-    const unprocessedQuery = query(collection(db, "unprocessed_deliveries"));
-    const unsubscribeUnprocessed = onSnapshot(unprocessedQuery, () => fetchAllData());
-
-    return () => {
-        unsubscribeInventory();
-        unsubscribeDaily();
-        unsubscribeUnprocessed();
-    };
-  }, [today, fetchAllData]);
-  
-
-  const addBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock'> & {prevStock: number}) => {
-    setSaving(true);
+  addBrand: async (newItemData) => {
+    get().setSaving(true);
     try {
         const id = `manual_${newItemData.brand.toLowerCase().replace(/[^a-z0-9]/g, '')}_${newItemData.size.toLowerCase().replace(/[^0-9]/g, '')}`;
         const docRef = doc(db, 'inventory', id);
@@ -160,36 +143,23 @@ export function useInventory() {
             category: newItemData.category,
             stockInGodown: 0,
             barcodeId: null,
+            prevStock: newItemData.prevStock
         };
         
-        const dailyDocRef = doc(db, 'dailyInventory', today);
-        const dailyItemData = {
-            brand: newItemData.brand,
-            size: newItemData.size,
-            price: newItemData.price,
-            category: newItemData.category,
-            added: 0,
-            sales: 0,
-            closing: newItemData.prevStock,
-        };
-
-        const batch = writeBatch(db);
-        batch.set(docRef, { ...masterItemData, prevStock: newItemData.prevStock });
-        batch.set(dailyDocRef, { [id]: dailyItemData }, { merge: true });
-        
-        await batch.commit();
+        await setDoc(docRef, masterItemData);
+        await get().fetchAllData();
 
     } catch (error) {
         console.error('Error adding brand:', error);
         throw error;
     } finally {
-        setSaving(false);
+        get().setSaving(false);
     }
-  };
+  },
 
-  const addItemsFromBillToHolding = async (items: ExtractedItem[]): Promise<number> => {
+  addItemsFromBillToHolding: async (items) => {
       if (items.length === 0) return 0;
-      setSaving(true);
+      get().setSaving(true);
       try {
           const batch = writeBatch(db);
           items.forEach(item => {
@@ -197,37 +167,29 @@ export function useInventory() {
               batch.set(docRef, { ...item, createdAt: serverTimestamp() });
           });
           await batch.commit();
+          await get().fetchAllData();
           return items.length;
       } catch (e) {
           console.error("Error adding items to holding area:", e);
           throw e;
       } finally {
-          setSaving(false);
+          get().setSaving(false);
       }
-  }
+  },
 
-  const processScannedDelivery = async (
-    unprocessedItemId: string, 
-    barcode: string, 
-    details: { price: number, quantity: number, brand: string, size: string, category: string }
-  ) => {
-    setSaving(true);
+  processScannedDelivery: async (unprocessedItemId, barcode, details) => {
+    get().setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
             const inventoryQuery = query(collection(db, 'inventory'), where('barcodeId', '==', barcode), limit(1));
-            const existingProducts = await getDocs(inventoryQuery);
+            const querySnapshot = await getDocs(inventoryQuery);
 
-            let productId: string;
-            
-            if (!existingProducts.empty) { // Barcode exists
-                const existingDoc = existingProducts.docs[0];
-                productId = existingDoc.id;
+            if (!querySnapshot.empty) {
+                const existingDoc = querySnapshot.docs[0];
                 const newStock = (existingDoc.data().stockInGodown || 0) + details.quantity;
                 transaction.update(existingDoc.ref, { stockInGodown: newStock });
-
-            } else { // New barcode, create new product
-                productId = barcode; // The barcode is the new ID
-                const newProductRef = doc(db, 'inventory', productId);
+            } else {
+                const newProductRef = doc(db, 'inventory', barcode);
                 const newProductData = {
                     brand: details.brand,
                     size: details.size,
@@ -240,205 +202,134 @@ export function useInventory() {
                 transaction.set(newProductRef, newProductData);
             }
             
-            // Delete the unprocessed item
             const unprocessedRef = doc(db, 'unprocessed_deliveries', unprocessedItemId);
             transaction.delete(unprocessedRef);
         });
-
+        await get().fetchAllData();
     } catch(e) {
         console.error("Error processing delivery:", e);
         throw e;
     } finally {
-        setSaving(false);
+        get().setSaving(false);
     }
-  }
+  },
 
-
-  const updateBrand = async (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => {
-    setSaving(true);
+  updateBrand: async (id, data) => {
+    get().setSaving(true);
     try {
-        const batch = writeBatch(db);
         const docRef = doc(db, 'inventory', id);
-        batch.update(docRef, data);
-        
-        const dailyDocRef = doc(db, 'dailyInventory', today);
-        const dailyDocSnap = await getDoc(dailyDocRef);
-        if (dailyDocSnap.exists()) {
-            const dailyData = dailyDocSnap.data();
-            if (dailyData[id]) {
-                const updatedDailyItem = { ...dailyData[id], ...data };
-                batch.set(dailyDocRef, { [id]: updatedDailyItem }, { merge: true });
-            }
-        }
-        await batch.commit();
+        await updateDoc(docRef, data);
+        await get().fetchAllData();
     } catch (error) {
       console.error("Error updating brand: ", error);
       throw error;
     } finally {
-        setSaving(false);
+        get().setSaving(false);
     }
-  };
+  },
 
-  const deleteBrand = async (id: string) => {
-    setSaving(true);
+  deleteBrand: async (id) => {
+    get().setSaving(true);
     try {
         const masterRef = doc(db, 'inventory', id);
-        const dailyDocRef = doc(db, 'dailyInventory', today);
-
-        await runTransaction(db, async (transaction) => {
-            const dailyDoc = await transaction.get(dailyDocRef);
-            
-            // Delete the master product document
-            transaction.delete(masterRef);
-
-            // If the daily document exists, remove the item from it
-            if (dailyDoc.exists()) {
-                const dailyData = dailyDoc.data();
-                if (dailyData[id]) {
-                    delete dailyData[id];
-                    transaction.set(dailyDocRef, dailyData);
-                }
-            }
-        });
+        const batch = writeBatch(db);
+        batch.delete(masterRef);
+        await batch.commit();
+        await get().fetchAllData();
     } catch (error) {
         console.error("Error deleting brand:", error);
         throw error;
     } finally {
-        setSaving(false);
+        get().setSaving(false);
     }
-  };
+  },
 
- const transferToShop = async (productId: string, quantityToTransfer: number, price?: number) => {
-    setSaving(true);
+  transferToShop: async (productId, quantityToTransfer, price) => {
+    get().setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
             const masterRef = doc(db, 'inventory', productId);
-            const dailyRef = doc(db, 'dailyInventory', today);
+            const dailyRef = doc(db, 'dailyInventory', format(new Date(), 'yyyy-MM-dd'));
 
             const masterDoc = await transaction.get(masterRef);
-            if (!masterDoc.exists()) {
-                throw new Error("Product master record not found.");
-            }
+            if (!masterDoc.exists()) throw new Error("Product not found.");
             
             const dailyDoc = await transaction.get(dailyRef);
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             const masterData = masterDoc.data() as InventoryItem;
 
-            const currentGodownStock = masterData.stockInGodown || 0;
-            if (currentGodownStock < quantityToTransfer) {
-                throw new Error(`Not enough stock in godown. Available: ${currentGodownStock}`);
+            if ((masterData.stockInGodown || 0) < quantityToTransfer) {
+                throw new Error(`Not enough stock in godown. Available: ${masterData.stockInGodown || 0}`);
             }
-            const newGodownStock = currentGodownStock - quantityToTransfer;
             
-            const masterUpdate: { stockInGodown: number; price?: number } = { stockInGodown: newGodownStock };
-            if (price !== undefined && masterData.price !== price) {
-                masterUpdate.price = price;
-            }
-            transaction.update(masterRef, masterUpdate);
+            transaction.update(masterRef, { 
+              stockInGodown: masterData.stockInGodown - quantityToTransfer,
+              ...(price && { price: price }) 
+            });
 
-            const itemDailyData = dailyData[productId] || {
-                brand: masterData.brand,
-                size: masterData.size,
-                category: masterData.category,
-                price: price ?? masterData.price,
-                added: 0,
-                sales: 0,
-            };
+            const itemDailyData = dailyData[productId] || { added: 0 };
             itemDailyData.added = (itemDailyData.added || 0) + quantityToTransfer;
-            if (price !== undefined) itemDailyData.price = price;
-
+            
             transaction.set(dailyRef, { [productId]: itemDailyData }, { merge: true });
         });
+        await get().fetchAllData();
     } catch (error) {
         console.error("Error transferring to shop:", error);
         throw error;
     } finally {
-        setSaving(false);
+        get().setSaving(false);
     }
- };
+ },
 
-
-  const recordSale = async (id: string, quantity: number, salePrice: number, soldBy: string) => {
-      setSaving(true);
+  recordSale: async (id, quantity, salePrice, soldBy) => {
+      get().setSaving(true);
+      const { user } = useAuth.getState();
+      const { settings } = useNotificationSettings.getState();
       try {
         await runTransaction(db, async (transaction) => {
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
             const dailyDocRef = doc(db, 'dailyInventory', today);
             const masterRef = doc(db, 'inventory', id);
             
-            const [dailyDoc, masterDoc] = await Promise.all([
-                transaction.get(dailyDocRef),
-                transaction.get(masterRef)
-            ]);
-
-            if (!masterDoc.exists()) throw new Error("Master product record not found.");
+            const masterDoc = await transaction.get(masterRef);
+            if (!masterDoc.exists()) throw new Error("Product not found.");
             
+            const dailyDoc = await transaction.get(dailyDocRef);
             const masterData = masterDoc.data();
             let dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             let itemDailyData = dailyData[id];
 
             if (!itemDailyData) {
-                const yesterdayDocSnap = await getDoc(doc(db, 'dailyInventory', yesterday));
-                const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
+                const yesterdayDoc = await transaction.get(doc(db, 'dailyInventory', yesterday));
+                const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
                 const prevStock = yesterdayData[id]?.closing ?? masterData.prevStock ?? 0;
                 itemDailyData = { ...masterData, prevStock, added: 0, sales: 0 };
             }
 
-            const oldSales = itemDailyData.sales || 0;
-            const newSales = oldSales + quantity;
-            
             const openingStock = (itemDailyData.prevStock ?? (masterData.prevStock ?? 0)) + (itemDailyData.added ?? 0);
-            const oldClosingStock = openingStock - oldSales;
-            const newClosingStock = openingStock - newSales;
-
-            if (newClosingStock < 0) {
+            if (openingStock < (itemDailyData.sales || 0) + quantity) {
                 throw new Error("Insufficient stock to complete sale.");
             }
 
-            itemDailyData.sales = newSales;
-            if(salePrice !== itemDailyData.price) itemDailyData.price = salePrice;
-
+            itemDailyData.sales = (itemDailyData.sales || 0) + quantity;
             dailyData[id] = itemDailyData;
-            
-            const salesLogRef = doc(collection(db, 'sales_log'));
-            transaction.set(salesLogRef, {
-                productId: id,
-                barcodeId: masterData.barcodeId || null,
-                quantity: quantity,
-                price: salePrice,
-                total: quantity * salePrice,
-                soldBy: soldBy,
-                createdAt: serverTimestamp(),
-            });
 
-            if (masterData.price !== salePrice) {
-                transaction.update(masterRef, { price: salePrice });
-            }
-            
-            if (notificationSettings.lowStockAlerts && user?.shopId) {
-                 if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
-                    await createAdminNotification(user.shopId, {
-                        title: 'Low Stock Alert',
-                        description: `${masterData.brand} (${masterData.size}) is running low. Only ${newClosingStock} units left.`,
-                        type: 'low-stock',
-                        link: '/dashboard/inventory',
-                        productId: id
-                    });
-                 }
-            }
-
-            transaction.set(dailyDocRef, dailyData, { merge: true });
+            transaction.set(dailyDocRef, { [id]: { sales: itemDailyData.sales } }, { merge: true });
         });
+        await get().fetchAllData();
       } catch (error) {
           console.error(`Error recording sale:`, error);
           throw error;
       } finally {
-          setSaving(false);
+          get().setSaving(false);
       }
-  };
+  },
   
- const updateItemField = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => {
-    setSaving(true);
+ updateItemField: async (id, field, value) => {
+    get().setSaving(true);
     try {
+        const today = format(new Date(), 'yyyy-MM-dd');
         await runTransaction(db, async (transaction) => {
             const masterRef = doc(db, 'inventory', id);
             const dailyRef = doc(db, 'dailyInventory', today);
@@ -448,64 +339,49 @@ export function useInventory() {
             
             const dailyDoc = await transaction.get(dailyRef);
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            const itemDaily = dailyData[id] || {};
             
-            const oldAdded = itemDaily.added || 0;
-            const newAdded = field === 'added' ? Number(value) : oldAdded;
-
-            const isReturningStock = field === 'added' && newAdded < oldAdded;
-
-            if (isReturningStock) {
-                const returnToGodown = oldAdded - newAdded;
-                const newGodownStock = (masterDoc.data()?.stockInGodown || 0) + returnToGodown;
-                transaction.update(masterRef, { stockInGodown: newGodownStock });
+            if (field === 'price') {
+                transaction.update(masterRef, { price: value });
             }
-            
-            const shouldDelete = field === 'added' && newAdded === 0 && (masterDoc.data()?.prevStock || 0) === 0 && (itemDaily.sales || 0) === 0 && (masterDoc.data()?.stockInGodown || 0) === 0;
 
-            if (shouldDelete) {
-                 transaction.delete(masterRef);
-                 delete dailyData[id];
-                 transaction.set(dailyRef, dailyData);
-            } else {
-                 if (field === 'price') {
-                    transaction.update(masterRef, { price: value });
-                }
-                const newDailyItem = {
-                    ...itemDaily,
-                    brand: masterDoc.data()?.brand,
-                    size: masterDoc.data()?.size,
-                    category: masterDoc.data()?.category,
-                    price: field === 'price' ? value : itemDaily.price ?? masterDoc.data()?.price,
-                    [field]: value
-                };
-                transaction.set(dailyRef, { [id]: newDailyItem }, { merge: true });
-            }
+            const updateData = { [field]: value };
+            transaction.set(dailyRef, { [id]: updateData }, { merge: true });
         });
+        await get().fetchAllData();
     } catch (error) {
         console.error(`Error updating field ${field}:`, error);
         throw error;
     } finally {
-        setSaving(false);
+        get().setSaving(false);
     }
- };
+ },
+}));
 
-  return { 
-      inventory, 
-      unprocessedItems,
-      setInventory, 
-      loading, 
-      saving, 
-      addBrand, 
-      deleteBrand, 
-      updateBrand, 
-      updateItemField, 
-      recordSale, 
-      addItemsFromBillToHolding,
-      processScannedDelivery,
-      transferToShop, 
-      forceRefetch: fetchAllData 
-    };
+// Initialize listeners
+let inventoryUnsubscribe: () => void;
+let dailyUnsubscribe: () => void;
+let unprocessedUnsubscribe: () => void;
+
+function initializeListeners() {
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    if (inventoryUnsubscribe) inventoryUnsubscribe();
+    inventoryUnsubscribe = onSnapshot(query(collection(db, "inventory")), () => {
+        useInventory.getState().fetchAllData();
+    });
+
+    if (dailyUnsubscribe) dailyUnsubscribe();
+    dailyUnsubscribe = onSnapshot(doc(db, 'dailyInventory', today), () => {
+        useInventory.getState().fetchAllData();
+    });
+    
+    if (unprocessedUnsubscribe) unprocessedUnsubscribe();
+    unprocessedUnsubscribe = onSnapshot(query(collection(db, "unprocessed_deliveries")), () => {
+        useInventory.getState().fetchAllData();
+    });
 }
 
-    
+// Ensure listeners are initialized on client side
+if (typeof window !== 'undefined') {
+    initializeListeners();
+}
