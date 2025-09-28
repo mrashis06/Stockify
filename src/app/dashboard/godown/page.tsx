@@ -138,6 +138,9 @@ export default function GodownPage() {
 
     const filteredInventory = useMemo(() => {
         return inventory.filter(item => {
+            const hasGodownStock = (item.stockInGodown || 0) > 0;
+            if (!hasGodownStock) return false;
+
             const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
             return matchesSearch && matchesCategory;
@@ -145,7 +148,7 @@ export default function GodownPage() {
     }, [inventory, searchQuery, categoryFilter]);
 
     const allCategories = useMemo(() => {
-        const cats = new Set(inventory.map(i => i.category).filter(Boolean));
+        const cats = new Set(inventory.filter(i => (i.stockInGodown || 0) > 0).map(i => i.category).filter(Boolean));
         return ['All Categories', ...Array.from(cats).sort()];
     }, [inventory]);
     
@@ -311,30 +314,38 @@ export default function GodownPage() {
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {filteredInventory.map(item => (
-                            <React.Fragment key={item.id}>
-                                <TableRow data-state={selectedRows.has(item.id) ? "selected" : ""}>
-                                     <TableCell className="text-center">
-                                        <input
-                                            type="checkbox"
-                                            className="h-4 w-4"
-                                            checked={selectedRows.has(item.id)}
-                                            onChange={() => handleRowSelect(item.id)}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="font-medium">{item.brand}</TableCell>
-                                    <TableCell>{item.size}</TableCell>
-                                    <TableCell>{item.category}</TableCell>
-                                    <TableCell>{item.stockInGodown || 0}</TableCell>
-                                    <TableCell className="text-center">
-                                        <Button variant="outline" size="sm" onClick={() => handleOpenTransferDialog(item)} disabled={(item.stockInGodown || 0) <= 0}>
-                                            <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                            Transfer to Shop
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            </React.Fragment>
-                        ))}
+                        {filteredInventory.length > 0 ? (
+                            filteredInventory.map(item => (
+                                <React.Fragment key={item.id}>
+                                    <TableRow data-state={selectedRows.has(item.id) ? "selected" : ""}>
+                                         <TableCell className="text-center">
+                                            <input
+                                                type="checkbox"
+                                                className="h-4 w-4"
+                                                checked={selectedRows.has(item.id)}
+                                                onChange={() => handleRowSelect(item.id)}
+                                            />
+                                        </TableCell>
+                                        <TableCell className="font-medium">{item.brand}</TableCell>
+                                        <TableCell>{item.size}</TableCell>
+                                        <TableCell>{item.category}</TableCell>
+                                        <TableCell>{item.stockInGodown || 0}</TableCell>
+                                        <TableCell className="text-center">
+                                            <Button variant="outline" size="sm" onClick={() => handleOpenTransferDialog(item)} disabled={(item.stockInGodown || 0) <= 0}>
+                                                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                                Transfer to Shop
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                </React.Fragment>
+                            ))
+                        ) : (
+                             <TableRow>
+                                <TableCell colSpan={6} className="h-24 text-center">
+                                    No stock found in Godown. Use 'Scan Bill' to add new deliveries.
+                                </TableCell>
+                            </TableRow>
+                        )}
                         </TableBody>
                     </Table>
                 </div>
@@ -343,3 +354,4 @@ export default function GodownPage() {
     </main>
   );
 }
+
