@@ -55,15 +55,24 @@ const generateProductId = (brand: string, size: string) => {
     const brandFormatted = brand
         .toLowerCase()
         // Remove common descriptors and filler words
-        .replace(/\b(strong|beer|can|premium|deluxe|matured|xxx|very|old|vatted|reserve|special|classic|whisky|rum|gin|vodka|wine)\b/g, '')
+        .replace(/\b(strong|beer|can|premium|deluxe|matured|xxx|very|old|vatted|reserve|special|classic|whisky|rum|gin|vodka|wine|original|signature|green label)\b/g, '')
         // Remove bracketed content like [pet bottle]
         .replace(/\[.*?\]/g, '')
-        // Remove non-alphanumeric characters
-        .replace(/[^a-z0-9]/g, '')
-        .trim();
+        // Remove non-alphanumeric characters except spaces
+        .replace(/[^a-z0-9 ]/g, '')
+        // Remove multiple spaces
+        .replace(/\s+/g, ' ')
+        .trim()
+        // Finally, remove all spaces
+        .replace(/\s/g, '');
 
     // Normalize size - extract only numbers
     const sizeFormatted = size.toLowerCase().replace(/[^0-9]/g, '');
+
+    if (!brandFormatted || !sizeFormatted) {
+        // Fallback for cases where normalization results in an empty string
+        return `${brand.replace(/[^a-z0-9]/gi, '').toLowerCase()}_${size.replace(/[^0-9]/gi, '')}`;
+    }
 
     return `${brandFormatted}_${sizeFormatted}`;
 }
@@ -142,17 +151,9 @@ export function useGodownInventory() {
         const batch = writeBatch(db);
         const godownRef = collection(db, 'godownInventory');
         
-        // Fetch existing product IDs to check against
-        const existingProductIds = new Set(godownInventory.map(item => item.productId));
-
         for (const item of items) {
+            // We don't check for existence here anymore to allow multiple batches of the same product
             const productId = generateProductId(item.brand, item.size);
-
-            if (existingProductIds.has(productId)) {
-                skippedCount++;
-                continue; // Skip this item as it already exists
-            }
-
             const docRef = doc(godownRef);
             batch.set(docRef, {
                 ...item,
@@ -160,7 +161,6 @@ export function useGodownInventory() {
                 dateAdded: serverTimestamp(),
             });
             addedCount++;
-            existingProductIds.add(productId); // Add to set to prevent duplicates from the same bill
         }
         
         if (addedCount > 0) {
@@ -248,6 +248,7 @@ export function useGodownInventory() {
                 throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
             }
 
+            // Use the first batch to get product details, and generate the Smart ID from it.
             const firstGodownBatch = sortedGodownItems[0].data();
             const shopProductId = generateProductId(firstGodownBatch.brand, firstGodownBatch.size);
             
@@ -262,15 +263,13 @@ export function useGodownInventory() {
             let shopItemData: any;
 
             if (!shopItemDoc.exists()) {
-                // If item doesn't exist in master, create it.
-                // Use a more generic brand name from the first batch if possible
-                const brandNameToCreate = firstGodownBatch.brand;
-
+                // If item doesn't exist in master, create it using details from the godown item.
+                // It will now have the correct standardized ID.
                 shopItemData = {
-                    brand: brandNameToCreate,
+                    brand: firstGodownBatch.brand,
                     size: firstGodownBatch.size,
                     category: firstGodownBatch.category,
-                    price: 0, // Price needs to be set manually
+                    price: 0, // Price needs to be set manually in the main inventory
                     prevStock: 0,
                     transferHistory: [],
                 };
