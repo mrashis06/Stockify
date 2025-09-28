@@ -37,7 +37,7 @@ import {
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
 import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
-import { useInventory, InventoryItem } from '@/hooks/use-inventory';
+import { useInventory, InventoryItem, UnprocessedItem } from '@/hooks/use-inventory';
 import ProcessDeliveryDialog from '@/components/dashboard/process-delivery-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -49,6 +49,7 @@ export default function GodownPage() {
         addItemsFromBillToHolding,
         processScannedDelivery,
         deleteBrand: deleteProduct,
+        deleteUnprocessedItems,
         transferToShop,
         forceRefetch
     } = useInventory();
@@ -63,7 +64,9 @@ export default function GodownPage() {
     const [transferringItem, setTransferringItem] = useState<InventoryItem | null>(null);
     const [processingItem, setProcessingItem] = useState<any | null>(null);
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+    const [selectedUnprocessedRows, setSelectedUnprocessedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isDeleteUnprocessedOpen, setIsDeleteUnprocessedOpen] = useState(false);
     const { toast } = useToast();
     
     const handleOpenTransferDialog = (item: InventoryItem) => {
@@ -81,6 +84,7 @@ export default function GodownPage() {
             await transferToShop(productId, quantity, price);
             toast({ title: 'Success', description: `${quantity} units transferred to shop.` });
             setIsTransferOpen(false);
+            forceRefetch();
         } catch (error) {
             console.error('Error transferring to shop:', error);
             const errorMessage = (error as Error).message || 'Failed to transfer stock.';
@@ -94,9 +98,21 @@ export default function GodownPage() {
             await Promise.all(Array.from(selectedRows).map(id => deleteProduct(id)));
             toast({ title: 'Success', description: 'Selected products removed.' });
             setSelectedRows(new Set());
+            forceRefetch();
         } catch (error) {
             console.error('Error removing products:', error);
             toast({ title: 'Error', description: (error as Error).message || 'Failed to remove selected products.', variant: 'destructive' });
+        }
+    };
+    
+    const handleDeleteUnprocessed = async () => {
+        setIsDeleteUnprocessedOpen(false);
+        try {
+            await deleteUnprocessedItems(Array.from(selectedUnprocessedRows));
+            toast({ title: 'Success', description: 'Selected unprocessed items removed.' });
+            setSelectedUnprocessedRows(new Set());
+        } catch (error) {
+             toast({ title: 'Error', description: (error as Error).message || 'Failed to remove items.', variant: 'destructive' });
         }
     };
     
@@ -108,6 +124,16 @@ export default function GodownPage() {
             newSelection.add(productId);
         }
         setSelectedRows(newSelection);
+    };
+
+    const handleUnprocessedRowSelect = (itemId: string) => {
+        const newSelection = new Set(selectedUnprocessedRows);
+        if (newSelection.has(itemId)) {
+            newSelection.delete(itemId);
+        } else {
+            newSelection.add(itemId);
+        }
+        setSelectedUnprocessedRows(newSelection);
     };
 
     const filteredInventory = useMemo(() => {
@@ -174,25 +200,61 @@ export default function GodownPage() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+        <AlertDialog open={isDeleteUnprocessedOpen} onOpenChange={setIsDeleteUnprocessedOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will permanently delete the selected unprocessed item(s). This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteUnprocessed} className="bg-destructive hover:bg-destructive/90">
+                        Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
 
         {unprocessedItems.length > 0 && (
             <Card className="mb-6 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
-                        <Unplug className="h-6 w-6" /> Unprocessed Deliveries
-                    </CardTitle>
-                    <CardDescription className="text-amber-700 dark:text-amber-300">
-                        You have {unprocessedItems.length} item types from scanned bills that need to be mapped to your inventory.
-                    </CardDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                                <Unplug className="h-6 w-6" /> Unprocessed Deliveries
+                            </CardTitle>
+                            <CardDescription className="text-amber-700 dark:text-amber-300 mt-2">
+                                You have {unprocessedItems.length} item types from scanned bills that need to be mapped to your inventory.
+                            </CardDescription>
+                        </div>
+                         <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            disabled={selectedUnprocessedRows.size === 0} 
+                            onClick={() => setIsDeleteUnprocessedOpen(true)}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedUnprocessedRows.size})
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-48 w-full">
                         <div className="space-y-3">
                         {unprocessedItems.map(item => (
                              <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-amber-100 dark:bg-amber-900/50">
-                                <div>
-                                    <p className="font-semibold">{item.brand}</p>
-                                    <p className="text-sm text-muted-foreground">{item.size} &bull; {item.quantity} units</p>
+                                <div className="flex items-center gap-4">
+                                     <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={selectedUnprocessedRows.has(item.id)}
+                                        onChange={() => handleUnprocessedRowSelect(item.id)}
+                                    />
+                                    <div>
+                                        <p className="font-semibold">{item.brand}</p>
+                                        <p className="text-sm text-muted-foreground">{item.size} &bull; {item.quantity} units</p>
+                                    </div>
                                 </div>
                                 <Button size="sm" onClick={() => handleOpenProcessDialog(item)}>Process</Button>
                             </div>

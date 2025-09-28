@@ -61,6 +61,7 @@ type InventoryState = {
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
   updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
   deleteBrand: (id: string) => Promise<void>;
+  deleteUnprocessedItems: (ids: string[]) => Promise<void>;
   transferToShop: (productId: string, quantityToTransfer: number, price?: number) => Promise<void>;
   recordSale: (id: string, quantity: number, salePrice: number, soldBy: string) => Promise<void>;
   updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => Promise<void>;
@@ -241,6 +242,25 @@ export const useInventory = create<InventoryState>((set, get) => ({
 
     } catch (error) {
         console.error("Error deleting brand:", error);
+        throw error;
+    } finally {
+        get().setSaving(false);
+    }
+  },
+  
+  deleteUnprocessedItems: async (ids: string[]) => {
+    if (ids.length === 0) return;
+    get().setSaving(true);
+    try {
+        const batch = writeBatch(db);
+        ids.forEach(id => {
+            const docRef = doc(db, 'unprocessed_deliveries', id);
+            batch.delete(docRef);
+        });
+        await batch.commit();
+        await get().fetchAllData();
+    } catch (error) {
+        console.error("Error deleting unprocessed items:", error);
         throw error;
     } finally {
         get().setSaving(false);
