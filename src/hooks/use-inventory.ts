@@ -228,6 +228,9 @@ export function useInventory() {
   const deleteBrand = async (id: string) => {
     setSaving(true);
     try {
+      const q = query(collection(db, 'godownInventory'), where('productId', '==', id));
+      const godownSnapshot = await getDocs(q);
+
       await runTransaction(db, async (transaction) => {
         const dailyDocRef = doc(db, 'dailyInventory', today);
         const inventoryDocRef = doc(db, 'inventory', id);
@@ -244,11 +247,32 @@ export function useInventory() {
           throw new Error("Cannot delete a product that has been sold today. Please clear today's sales for this item first.");
         }
         
-        const transferHistory = inventoryDoc.exists() ? (inventoryDoc.data()?.transferHistory || []) : [];
+        if (itemToday && itemToday.added > 0) {
+            let amountToReturn = itemToday.added;
+            const transferHistory = inventoryDoc.exists() ? (inventoryDoc.data()?.transferHistory || []).sort((a: TransferHistory,b: TransferHistory) => b.date.toMillis() - a.date.toMillis()) : [];
 
-        if (transferHistory.length > 0) {
-            if (itemToday && itemToday.added > 0) {
-                throw new Error("This product has stock transferred from the godown. To delete, please set the 'Added' quantity to 0 first to return the stock.");
+            if (transferHistory.length === 0) {
+                throw new Error("Cannot auto-return stock to godown: No transfer history found.");
+            }
+            
+            for (const transfer of transferHistory) {
+                if (amountToReturn <= 0) break;
+                const returnable = Math.min(amountToReturn, transfer.quantity);
+
+                const batchRef = doc(db, "godownInventory", transfer.batchId);
+                const batchDoc = godownSnapshot.docs.find(d => d.id === transfer.batchId);
+
+                if (batchDoc?.exists()) {
+                    transaction.update(batchRef, { quantity: batchDoc.data().quantity + returnable });
+                } else {
+                    const godownProductId = generateProductId(inventoryDoc.data()?.brand, inventoryDoc.data()?.size);
+                    const godownItem = {
+                        brand: inventoryDoc.data()?.brand, size: inventoryDoc.data()?.size, category: inventoryDoc.data()?.category,
+                        quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
+                    }
+                    transaction.set(batchRef, godownItem);
+                }
+                amountToReturn -= returnable;
             }
         }
 
@@ -355,21 +379,30 @@ export function useInventory() {
     const originalItemState = inventory.find(item => item.id === id);
 
     try {
+        const masterRef = doc(db, 'inventory', id);
+        const masterSnap = await getDoc(masterRef);
+        if (!masterSnap.exists()) throw new Error("Item does not exist.");
+        const masterData = masterSnap.data() as InventoryItem;
+
+        // Pre-read godown batches if we might need them
+        let godownBatchesToRead: string[] = [];
+        if (field === 'added') {
+            const transferHistory = (masterData.transferHistory || []).sort((a,b) => b.date.toMillis() - a.date.toMillis());
+            godownBatchesToRead = transferHistory.map(t => t.batchId);
+        }
+
         await runTransaction(db, async (transaction) => {
+            // --- ALL READS MUST HAPPEN FIRST ---
             const dailyDocRef = doc(db, 'dailyInventory', today);
-            const masterRef = doc(db, 'inventory', id);
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
             
-            // --- ALL READS MUST HAPPEN FIRST ---
-
-            const [dailyDocSnap, masterSnap, yesterdaySnap] = await Promise.all([
+            const [dailyDocSnap, yesterdaySnap, ...godownSnaps] = await Promise.all([
                 transaction.get(dailyDocRef),
-                transaction.get(masterRef),
-                transaction.get(yesterdayDocRef)
+                transaction.get(yesterdayDocRef),
+                ...godownBatchesToRead.map(batchId => transaction.get(doc(db, "godownInventory", batchId)))
             ]);
 
-            if (!masterSnap.exists()) throw new Error("Item does not exist.");
-            const masterData = masterSnap.data() as InventoryItem;
+            const godownBatchDocs = new Map(godownBatchesToRead.map((batchId, i) => [batchId, godownSnaps[i]]));
             
             let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
             let itemDailyData = dailyData[id];
@@ -380,12 +413,10 @@ export function useInventory() {
                 itemDailyData = { ...masterData, prevStock, added: 0, sales: 0 };
             }
 
-            // --- PREPARE FOR WRITES ---
-
             const opening = itemDailyData.prevStock || 0;
             const oldClosingStock = opening + (itemDailyData.added || 0) - (itemDailyData.sales || 0);
             
-            // Handle stock return to godown
+            // --- ALL WRITES START HERE ---
             if (field === 'added') {
                 const currentAdded = itemDailyData.added || 0;
                 const newAdded = Number(value);
@@ -400,21 +431,15 @@ export function useInventory() {
                     
                     const newTransferHistory = [...transferHistory];
 
-                    // This block now contains READS inside a write phase, which is the problem.
-                    // We need to move the batchDoc reads outside.
-                    // But we can't without knowing which batches to read.
-                    // The fix is to pre-fetch the batch docs and pass them into the transaction, or restructure the logic.
-                    // Let's restructure.
-
                     for (const transfer of transferHistory) {
                         if (amountToReturn <= 0) break;
                         const returnable = Math.min(amountToReturn, transfer.quantity);
 
                         const batchRef = doc(db, "godownInventory", transfer.batchId);
-                        const batchDoc = await transaction.get(batchRef); // This is a READ after initial reads
+                        const batchDoc = godownBatchDocs.get(transfer.batchId);
 
-                        if (batchDoc.exists()) {
-                            transaction.update(batchRef, { quantity: batchDoc.data().quantity + returnable });
+                        if (batchDoc?.exists()) {
+                            transaction.update(batchRef, { quantity: batchDoc.data()!.quantity + returnable });
                         } else {
                             const godownProductId = generateProductId(masterData.brand, masterData.size);
                             const godownItem = {
@@ -435,12 +460,10 @@ export function useInventory() {
                         
                         amountToReturn -= returnable;
                     }
-                     transaction.update(masterRef, { transferHistory: newTransferHistory });
+                    transaction.update(masterRef, { transferHistory: newTransferHistory });
                 }
             }
-
-            // --- ALL WRITES START HERE ---
-
+            
             itemDailyData[field] = value;
 
             if (field === 'price') {
@@ -452,12 +475,11 @@ export function useInventory() {
 
             const newClosingStock = itemDailyData.closing;
 
-            // Check for low stock alert
             if (notificationSettings.lowStockAlerts && user?.shopId) {
                  if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
-                    createAdminNotification(user.shopId, {
+                    await createAdminNotification(user.shopId, {
                         title: 'Low Stock Alert',
-                        description: `${itemDailyData.brand} (${itemDailyData.size}) is running low. Only ${newClosingStock} units left.`,
+                        description: `${masterData.brand} (${masterData.size}) is running low. Only ${newClosingStock} units left.`,
                         type: 'low-stock',
                         link: '/dashboard/inventory',
                         productId: id
