@@ -152,10 +152,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   }, [yesterdaySalesData, inventory]);
 
   const totalOpeningStock = useMemo(() => {
-    // This is the correct calculation for the total opening stock.
-    // It sums the 'prevStock' from our processed inventory which is derived
-    // from yesterday's closing or the master record.
-    return inventory.reduce((sum, item) => sum + (item.prevStock ?? 0), 0);
+    return inventory.reduce((sum, item) => sum + Number(item.prevStock || 0), 0);
   }, [inventory]);
   
   const { lowStockItems, outOfStockItems } = useMemo(() => {
