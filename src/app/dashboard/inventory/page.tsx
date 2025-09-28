@@ -413,7 +413,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                          <TableFooter>
                              <TableRow className="bg-muted/50 font-medium">
                                 <TableCell colSpan={4} className="text-right">Totals</TableCell>
-                                <TableCell className="font-bold">{filteredInventory.reduce((sum, item) => sum + Number(item.prevStock ?? 0), 0)}</TableCell>
+                                <TableCell className="font-bold">{filteredInventory.reduce((sum, item) => sum + Number(item.prevStock || 0), 0)}</TableCell>
                                 <TableCell className="font-bold">{totalAdded}</TableCell>
                                 {showOpening && <TableCell className="font-bold">{totalOpening}</TableCell>}
                                 <TableCell className="font-bold">{totalSalesUnits}</TableCell>
