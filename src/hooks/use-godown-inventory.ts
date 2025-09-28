@@ -54,21 +54,17 @@ export type ExtractedItem = {
 const generateProductId = (brand: string, size: string) => {
     // Dictionary for common abbreviations
     const abbreviations: { [key: string]: string } = {
-        'mc': 'mcdowells',
-        'bp': 'blenderspride',
-        'oc': 'officerschoice',
-        'ac': 'aristocrat',
-        'rc': 'royalchallenge',
-        'rs': 'royalspecial',
+        'mc': 'mcdowells', 'bp': 'blenderspride', 'oc': 'officerschoice',
+        'ac': 'aristocrat', 'rc': 'royalchallenge', 'rs': 'royalspecial', 'sig': 'signature'
     };
 
     // Refined list of "junk" words to be removed.
-    // Important identifiers like "strong", "classic", "black", "signature" are NOT on this list.
+    // Words like 'strong', 'classic', 'black' are NOT on this list.
     const junkWords = [
         'premium', 'deluxe', 'matured', 'xxx', 'very', 'old', 'vatted',
-        'reserve', 'original', 'green label', 'blue label',
-        'beer', 'whisky', 'rum', 'gin', 'vodka', 'wine', 'brandy', 'lager', 'pilsner',
-        'can', 'bottle', 'pet', 'pint', 'quart'
+        'reserve', 'original', 'grain',
+        'whisky', 'rum', 'gin', 'vodka', 'wine', 'brandy', 'lager', 'pilsner',
+        'can', 'bottle', 'pet', 'pint', 'quart', 'ml', 'beer'
     ];
 
     let processedBrand = brand.toLowerCase()
@@ -76,9 +72,12 @@ const generateProductId = (brand: string, size: string) => {
         .replace(/\[.*?\]/g, '')
         .replace(/\(.*?\)/g, '');
 
-    // Step 1: Expand abbreviations
+    // Step 1: Expand abbreviations first
     const words = processedBrand.split(' ');
-    const expandedWords = words.map(word => abbreviations[word.replace(/[^a-z0-9]/gi, '')] || word);
+    const expandedWords = words.map(word => {
+        const cleanWord = word.replace(/[^a-z0-9]/gi, '');
+        return abbreviations[cleanWord] || word;
+    });
     processedBrand = expandedWords.join(' ');
     
     // Step 2: Remove only the true junk words
@@ -93,7 +92,7 @@ const generateProductId = (brand: string, size: string) => {
 
     // Normalize size - extract only numbers
     const sizeFormatted = size.toLowerCase().replace(/[^0-9]/g, '');
-
+    
     if (!processedBrand || !sizeFormatted) {
         // Fallback for cases where normalization results in an empty string
         return `${brand.replace(/[^a-z0-9]/gi, '').toLowerCase()}_${size.replace(/[^0-9]/gi, '')}`;
@@ -290,9 +289,10 @@ export function useGodownInventory() {
                     size: firstGodownBatch.size,
                     category: firstGodownBatch.category,
                     price: 0,
-                    prevStock: 0,
+                    prevStock: 0, // A new item starts with 0 prevStock
                     transferHistory: [],
                 };
+                 transaction.set(shopItemRef, shopItemData);
             } else {
                 shopItemData = shopItemDoc.data();
             }
@@ -321,7 +321,7 @@ export function useGodownInventory() {
                     });
                 }
                  
-                transaction.set(shopItemRef, { transferHistory: arrayUnion(newHistoryEntry) }, { merge: true });
+                transaction.update(shopItemRef, { transferHistory: arrayUnion(newHistoryEntry) });
                 
                 remainingToTransfer -= transferAmount;
             }
@@ -332,19 +332,14 @@ export function useGodownInventory() {
             let currentDailyItem = dailyData[shopProductId];
 
             if (!currentDailyItem) {
-                const prevStock = shopItemData.prevStock ?? 0;
                  currentDailyItem = {
                      brand: shopItemData.brand,
                      size: shopItemData.size,
                      category: shopItemData.category,
                      price: shopItemData.price,
-                     prevStock: prevStock,
                      added: 0,
                      sales: 0,
                 };
-                 if (isNewShopItem) {
-                    transaction.set(shopItemRef, shopItemData);
-                }
             }
             
             currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
