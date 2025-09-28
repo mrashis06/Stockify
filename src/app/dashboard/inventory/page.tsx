@@ -167,10 +167,16 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const processedInventory = useMemo(() => {
         return inventory.map(item => {
-            const opening = (item.prevStock ?? 0) + (item.added ?? 0);
-            const closing = opening - (item.sales ?? 0);
+            const prevStock = Number(item.prevStock || 0);
+            const added = Number(item.added || 0);
+            const sales = Number(item.sales || 0);
+            const opening = prevStock + added;
+            const closing = opening - sales;
             return {
                 ...item,
+                prevStock,
+                added,
+                sales,
                 opening,
                 closing,
             };
@@ -192,16 +198,16 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const { totalOpening, totalAdded, totalSalesUnits, totalClosing } = useMemo(() => {
         return filteredInventory.reduce((acc, item) => {
-            acc.totalOpening += Number(item.opening ?? 0);
-            acc.totalAdded += Number(item.added ?? 0);
-            acc.totalSalesUnits += Number(item.sales ?? 0);
-            acc.totalClosing += Number(item.closing ?? 0);
+            acc.totalOpening += Number(item.opening || 0);
+            acc.totalAdded += Number(item.added || 0);
+            acc.totalSalesUnits += Number(item.sales || 0);
+            acc.totalClosing += Number(item.closing || 0);
             return acc;
         }, { totalOpening: 0, totalAdded: 0, totalSalesUnits: 0, totalClosing: 0 });
     }, [filteredInventory]);
 
     const totalAmount = useMemo(() => {
-        return filteredInventory.reduce((total, item) => total + (item.sales ?? 0) * item.price, 0);
+        return filteredInventory.reduce((total, item) => total + (Number(item.sales) || 0) * (Number(item.price) || 0), 0);
     }, [filteredInventory]);
 
 
