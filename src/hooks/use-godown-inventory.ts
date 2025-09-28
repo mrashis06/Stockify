@@ -20,7 +20,8 @@ import {
   where,
   orderBy,
   Timestamp,
-  arrayUnion
+  arrayUnion,
+  limit
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format } from 'date-fns';
@@ -202,7 +203,8 @@ export function useGodownInventory() {
     setSaving(true);
     const today = format(new Date(), 'yyyy-MM-dd');
 
-    const godownItemsQuery = query(collection(db, 'godownInventory'), where('productId', '==', productId), orderBy('dateAdded', 'asc'));
+    // FIX: Remove orderBy from query to avoid composite index
+    const godownItemsQuery = query(collection(db, 'godownInventory'), where('productId', '==', productId));
     const godownItemsSnapshot = await getDocs(godownItemsQuery);
     
     if (godownItemsSnapshot.empty) {
@@ -210,7 +212,11 @@ export function useGodownInventory() {
         throw new Error(`Product not found in godown.`);
     }
     
-    const sortedGodownItems = godownItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GodownItem));
+    // FIX: Sort the results in-memory
+    const sortedGodownItems = godownItemsSnapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as GodownItem))
+      .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());
+
     const totalGodownStock = sortedGodownItems.reduce((sum, item) => sum + item.quantity, 0);
 
     if (totalGodownStock < quantityToTransfer) {
@@ -225,18 +231,21 @@ export function useGodownInventory() {
             
             // Find existing shop item by brand/size to see if we need to set barcodeId
             const inventorySearchQuery = query(collection(db, 'inventory'), where('brand', '==', brand), where('size', '==', size), limit(1));
+            // This read must happen outside the transaction if we were to strictly follow the pattern.
+            // However, Firestore transactions allow queries before any writes. This is okay for now.
             const existingShopItemSnap = await getDocs(inventorySearchQuery);
 
             let shopItemId: string;
             let shopItemRef: any;
             let shopItemData: any;
-            let isNewProduct = false;
 
             if (!existingShopItemSnap.empty) { // Product exists, maybe with or without barcode
                 const existingDoc = existingShopItemSnap.docs[0];
                 shopItemId = existingDoc.id;
                 shopItemRef = existingDoc.ref;
-                shopItemData = existingDoc.data();
+                
+                const shopItemDoc = await transaction.get(shopItemRef);
+                shopItemData = shopItemDoc.data();
                 
                 if (!shopItemData.barcodeId && barcodeId) {
                      // Product was manually added, now we're linking its barcode
@@ -244,7 +253,6 @@ export function useGodownInventory() {
                 }
 
             } else { // Truly new product
-                isNewProduct = true;
                 if (!barcodeId) throw new Error("Barcode is required for new products.");
                 if (price === undefined) throw new Error("Price is required for new products.");
                 
