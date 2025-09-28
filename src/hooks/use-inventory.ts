@@ -49,16 +49,25 @@ export type InventoryItem = {
   transferHistory?: TransferHistory[];
 };
 
-// Generates a Firestore-safe ID from brand and size
+// A more robust function to generate a consistent product ID
 const generateProductId = (brand: string, size: string) => {
-    // Normalize brand name: lowercase, remove "strong", "beer", "can", and special chars
-    const brandFormatted = brand.toLowerCase()
-        .replace(/\b(strong|beer|can)\b/g, '')
+    // Normalize brand name
+    const brandFormatted = brand
+        .toLowerCase()
+        // Remove common descriptors and filler words
+        .replace(/\b(strong|beer|can|premium|deluxe|matured|xxx|very|old|vatted|reserve|special|classic|whisky|rum|gin|vodka|wine)\b/g, '')
+        // Remove bracketed content like [pet bottle]
+        .replace(/\[.*?\]/g, '')
+        // Remove non-alphanumeric characters
         .replace(/[^a-z0-9]/g, '')
         .trim();
-    const sizeFormatted = size.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Normalize size - extract only numbers
+    const sizeFormatted = size.toLowerCase().replace(/[^0-9]/g, '');
+
     return `${brandFormatted}_${sizeFormatted}`;
 }
+
 
 const LOW_STOCK_THRESHOLD = 10;
 
@@ -223,19 +232,27 @@ export function useInventory() {
         const dailyDocRef = doc(db, 'dailyInventory', today);
         const inventoryDocRef = doc(db, 'inventory', id);
         
-        const dailyDoc = await transaction.get(dailyDocRef);
+        const [dailyDoc, inventoryDoc] = await Promise.all([
+            transaction.get(dailyDocRef),
+            transaction.get(inventoryDocRef)
+        ]);
+        
         const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
         const itemToday = dailyData[id];
 
         if (itemToday && itemToday.sales > 0) {
           throw new Error("Cannot delete a product that has been sold today. Please clear today's sales for this item first.");
         }
-
-        if (itemToday && itemToday.added > 0) {
-            throw new Error("Cannot delete product. Please set 'Added' to 0 to return transferred stock to godown first.");
+        
+        if (inventoryDoc.exists() && (inventoryDoc.data()?.transferHistory || []).length > 0) {
+            if (itemToday && itemToday.added > 0) {
+                throw new Error("This product has stock transferred from the godown. To delete, please set the 'Added' quantity to 0 first to return the stock.");
+            }
         }
 
+        // If all checks pass, delete the item
         transaction.delete(inventoryDocRef);
+
         if (itemToday) {
             const { [id]: _, ...rest } = dailyData;
             transaction.set(dailyDocRef, rest);
@@ -372,6 +389,10 @@ export function useInventory() {
                     let amountToReturn = currentAdded - newAdded;
                     const transferHistory = (masterData.transferHistory || []).sort((a,b) => b.date.toMillis() - a.date.toMillis());
                     
+                    if (transferHistory.length === 0 && amountToReturn > 0) {
+                        throw new Error("Cannot return stock to godown: No transfer history found for this item.");
+                    }
+                    
                     const newTransferHistory = [...transferHistory];
 
                     for (const transfer of transferHistory) {
@@ -385,9 +406,10 @@ export function useInventory() {
                             transaction.update(batchRef, { quantity: batchDoc.data().quantity + returnable });
                         } else {
                             // If batch was deleted, we recreate it.
+                             const godownProductId = generateProductId(masterData.brand, masterData.size);
                             const godownItem = {
                                 brand: masterData.brand, size: masterData.size, category: masterData.category,
-                                quantity: returnable, dateAdded: transfer.date, productId: id,
+                                quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
                             }
                             transaction.set(batchRef, godownItem);
                         }

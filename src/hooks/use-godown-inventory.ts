@@ -49,16 +49,25 @@ export type ExtractedItem = {
     category: string;
 }
 
-// Generates a Firestore-safe ID from brand and size for grouping
+// A more robust function to generate a consistent product ID
 const generateProductId = (brand: string, size: string) => {
-    // Normalize brand name: lowercase, remove "strong", "beer", "can", and special chars
-    const brandFormatted = brand.toLowerCase()
-        .replace(/\b(strong|beer|can)\b/g, '')
+    // Normalize brand name
+    const brandFormatted = brand
+        .toLowerCase()
+        // Remove common descriptors and filler words
+        .replace(/\b(strong|beer|can|premium|deluxe|matured|xxx|very|old|vatted|reserve|special|classic|whisky|rum|gin|vodka|wine)\b/g, '')
+        // Remove bracketed content like [pet bottle]
+        .replace(/\[.*?\]/g, '')
+        // Remove non-alphanumeric characters
         .replace(/[^a-z0-9]/g, '')
         .trim();
-    const sizeFormatted = size.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Normalize size - extract only numbers
+    const sizeFormatted = size.toLowerCase().replace(/[^0-9]/g, '');
+
     return `${brandFormatted}_${sizeFormatted}`;
 }
+
 
 export function useGodownInventory() {
   const [godownInventory, setGodownInventory] = useState<GodownItem[]>([]);
@@ -255,7 +264,7 @@ export function useGodownInventory() {
             if (!shopItemDoc.exists()) {
                 // If item doesn't exist in master, create it.
                 // Use a more generic brand name from the first batch if possible
-                const brandNameToCreate = firstGodownBatch.brand.replace(/\b(strong|beer|can)\b/gi, '').trim();
+                const brandNameToCreate = firstGodownBatch.brand;
 
                 shopItemData = {
                     brand: brandNameToCreate,
