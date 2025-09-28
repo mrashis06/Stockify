@@ -49,32 +49,56 @@ export type InventoryItem = {
   transferHistory?: TransferHistory[];
 };
 
-// A more robust function to generate a consistent product ID
+// The new, robust "Smart ID" generation function.
 const generateProductId = (brand: string, size: string) => {
-    // Normalize brand name
-    const brandFormatted = brand
-        .toLowerCase()
-        // Remove common descriptors and filler words
-        .replace(/\b(strong|beer|can|premium|deluxe|matured|xxx|very|old|vatted|reserve|special|classic|whisky|rum|gin|vodka|wine|original|signature|green label)\b/g, '')
-        // Remove bracketed content like [pet bottle]
+    // Dictionary for common abbreviations
+    const abbreviations: { [key: string]: string } = {
+        'mc': 'mcdowells',
+        'bp': 'blenderspride',
+        'oc': 'officerschoice',
+        'ac': 'aristocrat',
+        'rc': 'royalchallenge',
+        'rs': 'royalspecial',
+        // Add more abbreviations as needed
+    };
+
+    // List of "junk" words to be removed. Important identifiers like "strong", "classic", "black" are NOT on this list.
+    const junkWords = [
+        'premium', 'deluxe', 'matured', 'xxx', 'very', 'old', 'vatted',
+        'reserve', 'special', 'original', 'signature', 'green label', 'blue label',
+        'beer', 'whisky', 'rum', 'gin', 'vodka', 'wine', 'brandy', 'lager', 'pilsner',
+        'can', 'bottle', 'pet', 'pint', 'quart'
+    ];
+
+    let processedBrand = brand.toLowerCase()
+        // Remove content in brackets e.g., [Can], (PET)
         .replace(/\[.*?\]/g, '')
-        // Remove non-alphanumeric characters except spaces
-        .replace(/[^a-z0-9 ]/g, '')
-        // Remove multiple spaces
-        .replace(/\s+/g, ' ')
-        .trim()
-        // Finally, remove all spaces
-        .replace(/\s/g, '');
+        .replace(/\(.*?\)/g, '');
+
+    // Create a regex from junk words to match them as whole words
+    const junkRegex = new RegExp(`\\b(${junkWords.join('|')})\\b`, 'g');
+    processedBrand = processedBrand.replace(junkRegex, '');
+
+    // Handle abbreviations by checking word by word
+    const words = processedBrand.split(' ');
+    const expandedWords = words.map(word => abbreviations[word] || word);
+    processedBrand = expandedWords.join(' ');
+    
+    // Final cleanup: remove all non-alphanumeric characters and extra spaces
+    processedBrand = processedBrand
+        .replace(/[^a-z0-9]/g, '') // Remove all non-alphanumeric chars
+        .replace(/\s+/g, '')       // In case any spaces are left
+        .trim();
 
     // Normalize size - extract only numbers
     const sizeFormatted = size.toLowerCase().replace(/[^0-9]/g, '');
     
-    if (!brandFormatted || !sizeFormatted) {
+    if (!processedBrand || !sizeFormatted) {
         // Fallback for cases where normalization results in an empty string
         return `${brand.replace(/[^a-z0-9]/gi, '').toLowerCase()}_${size.replace(/[^0-9]/gi, '')}`;
     }
 
-    return `${brandFormatted}_${sizeFormatted}`;
+    return `${processedBrand}_${sizeFormatted}`;
 }
 
 
