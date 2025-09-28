@@ -280,35 +280,34 @@ export function useInventory() {
           throw new Error("Cannot delete a product that has been sold today. Please clear today's sales for this item first.");
         }
         
-        if (itemToday && itemToday.added > 0) {
+        const transferHistory = inventoryDoc.data()?.transferHistory || [];
+        if (itemToday && itemToday.added > 0 && transferHistory.length > 0) {
             let amountToReturn = itemToday.added;
-            const transferHistory = (inventoryDoc.data()?.transferHistory || []).sort((a: TransferHistory, b: TransferHistory) => b.date.toMillis() - a.date.toMillis());
+            const sortedHistory = transferHistory.sort((a: TransferHistory, b: TransferHistory) => b.date.toMillis() - a.date.toMillis());
 
-            if (transferHistory.length > 0) {
-                const batchRefsToRead = transferHistory.map(t => doc(db, "godownInventory", t.batchId));
-                const batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
+            const batchRefsToRead = sortedHistory.map((t: TransferHistory) => doc(db, "godownInventory", t.batchId));
+            const batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
 
-                for (let i = 0; i < transferHistory.length; i++) {
-                    if (amountToReturn <= 0) break;
-                    
-                    const transfer = transferHistory[i];
-                    const returnable = Math.min(amountToReturn, transfer.quantity);
+            for (let i = 0; i < sortedHistory.length; i++) {
+                if (amountToReturn <= 0) break;
+                
+                const transfer = sortedHistory[i];
+                const returnable = Math.min(amountToReturn, transfer.quantity);
 
-                    const batchDoc = batchDocs.find(d => d.id === transfer.batchId);
+                const batchDoc = batchDocs.find(d => d.id === transfer.batchId);
 
-                    if (batchDoc?.exists()) {
-                        transaction.update(batchDoc.ref, { quantity: batchDoc.data()!.quantity + returnable });
-                    } else {
-                        const invData = inventoryDoc.data();
-                        const godownProductId = generateProductId(invData?.brand, invData?.size);
-                        const godownItem = {
-                            brand: invData?.brand, size: invData?.size, category: invData?.category,
-                            quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
-                        };
-                        transaction.set(doc(db, "godownInventory", transfer.batchId), godownItem);
-                    }
-                    amountToReturn -= returnable;
+                if (batchDoc?.exists()) {
+                    transaction.update(batchDoc.ref, { quantity: batchDoc.data()!.quantity + returnable });
+                } else {
+                    const invData = inventoryDoc.data();
+                    const godownProductId = generateProductId(invData?.brand, invData?.size);
+                    const godownItem = {
+                        brand: invData?.brand, size: invData?.size, category: invData?.category,
+                        quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
+                    };
+                    transaction.set(doc(db, "godownInventory", transfer.batchId), godownItem);
                 }
+                amountToReturn -= returnable;
             }
         }
 
@@ -420,7 +419,7 @@ export function useInventory() {
             const masterRef = doc(db, 'inventory', id);
             const dailyDocRef = doc(db, 'dailyInventory', today);
             
-            // --- READ PHASE ---
+            // --- STRICT READ-ONLY PHASE ---
             const masterSnap = await transaction.get(masterRef);
             if (!masterSnap.exists()) throw new Error("Item does not exist.");
             const masterData = masterSnap.data() as InventoryItem;
@@ -436,25 +435,24 @@ export function useInventory() {
                 itemDailyData = { ...masterData, prevStock, added: 0, sales: 0 };
             }
             
-            let batchDocs: any[] = [];
             const currentAdded = itemDailyData.added || 0;
             const newAdded = field === 'added' ? Number(value) : currentAdded;
             
-            if (field === 'added' && newAdded < currentAdded) {
-                const transferHistory = (masterData.transferHistory || []).sort((a,b) => b.date.toMillis() - a.date.toMillis());
-                if (transferHistory.length > 0) {
-                    const batchRefsToRead = transferHistory.map(t => doc(db, "godownInventory", t.batchId));
-                    batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
-                }
+            let batchDocs: any[] = [];
+            const transferHistory = (masterData.transferHistory || []).sort((a,b) => b.date.toMillis() - a.date.toMillis());
+            
+            if (field === 'added' && newAdded < currentAdded && transferHistory.length > 0) {
+                const batchRefsToRead = transferHistory.map(t => doc(db, "godownInventory", t.batchId));
+                batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
             }
 
-            // --- WRITE PHASE ---
+            // --- END OF READS. START OF WRITES ---
+
             const opening = itemDailyData.prevStock || 0;
             const oldClosingStock = opening + (itemDailyData.added || 0) - (itemDailyData.sales || 0);
 
             if (field === 'added' && newAdded < currentAdded) {
                 let amountToReturn = currentAdded - newAdded;
-                const transferHistory = (masterData.transferHistory || []).sort((a,b) => b.date.toMillis() - a.date.toMillis());
                 const newTransferHistory = [...transferHistory];
 
                 for (let i = 0; i < transferHistory.length; i++) {
