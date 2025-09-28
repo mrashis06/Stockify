@@ -119,21 +119,22 @@ export function useInventory() {
   const fetchInventoryData = useCallback(async () => {
       setLoading(true);
       try {
-        const dailyDocRef = doc(db, 'dailyInventory', today);
-        const dailySnap = await getDoc(dailyDocRef);
-        const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-        
         const inventorySnapshot = await getDocs(collection(db, 'inventory'));
         const masterInventory = new Map<string, any>();
         inventorySnapshot.forEach(doc => {
             masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
         });
 
+        const dailyDocRef = doc(db, 'dailyInventory', today);
+        const dailySnap = await getDoc(dailyDocRef);
+        const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+
         const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
         const yesterdayDocSnap = await getDoc(yesterdayDocRef);
         const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
-
+        
         const items: InventoryItem[] = [];
+
         masterInventory.forEach((masterItem) => {
             const id = masterItem.id;
             const dailyItem = dailyData[id];
@@ -143,29 +144,15 @@ export function useInventory() {
             const added = dailyItem?.added ?? 0;
             const sales = dailyItem?.sales ?? 0;
 
-            if (dailyItem) {
-                items.push({ ...masterItem, ...dailyItem, prevStock, added, sales });
-            } else {
-                items.push({
-                    ...masterItem,
-                    prevStock,
-                    added: 0,
-                    sales: 0,
-                });
-            }
+            items.push({
+                ...masterItem,
+                prevStock,
+                added,
+                sales,
+            });
         });
 
-        const processedInventory = items.map(item => {
-             const opening = (item.prevStock ?? 0) + (item.added ?? 0);
-             const closing = opening - (item.sales ?? 0);
-             return { ...item, opening, closing };
-        });
-        
-        const finalInventory = processedInventory.filter(item => {
-            return (item.closing ?? 0) > 0 || (item.prevStock ?? 0) > 0 || (item.added ?? 0) > 0 || (item.sales ?? 0) > 0;
-        });
-
-        setInventory(finalInventory.sort((a, b) => a.brand.localeCompare(b.brand)));
+        setInventory(items.sort((a, b) => a.brand.localeCompare(b.brand)));
       } catch (error) {
         console.error("Error fetching inventory data: ", error);
         toast({ title: 'Error', description: 'Failed to load inventory data.', variant: 'destructive' });
@@ -204,25 +191,25 @@ export function useInventory() {
             qrCodeId: newItemData.qrCodeId || null,
             transferHistory: [],
         };
-
-        await setDoc(docRef, masterItemData, { merge: true });
         
         const dailyDocRef = doc(db, 'dailyInventory', today);
-        
         const dailyItemData = {
             brand: newItemData.brand,
             size: newItemData.size,
             price: newItemData.price,
             category: newItemData.category,
-            prevStock: newItemData.prevStock,
+            // When a new item is added, its prevStock for today *is* its initial stock.
+            // There is no added/sales yet.
+            prevStock: newItemData.prevStock, 
             added: 0,
             sales: 0,
         };
 
-        (dailyItemData as any).opening = dailyItemData.prevStock + dailyItemData.added;
-        (dailyItemData as any).closing = (dailyItemData as any).opening - dailyItemData.sales;
-
-        await setDoc(dailyDocRef, { [id]: dailyItemData }, { merge: true });
+        const batch = writeBatch(db);
+        batch.set(docRef, masterItemData, { merge: true });
+        batch.set(dailyDocRef, { [id]: dailyItemData }, { merge: true });
+        
+        await batch.commit();
 
     } catch (error) {
         console.error('Error adding brand:', error);
@@ -283,13 +270,14 @@ export function useInventory() {
             throw new Error("Cannot delete a product with sales today. Clear sales first.");
         }
         
-        if (itemToday && itemToday.added > 0 && !inventoryData.transferHistory?.length) {
-            // This is the case where stock was added manually and no history exists.
-            // Allow deletion without trying to return stock to godown.
+        // If there's no transfer history and stock was added, just allow deletion.
+        if (itemToday && itemToday.added > 0 && (!inventoryData.transferHistory || inventoryData.transferHistory.length === 0)) {
              await runTransaction(db, async (transaction) => {
                  transaction.delete(inventoryDocRef);
-                 const { [id]: _, ...rest } = dailyData;
-                 transaction.set(dailyDocRef, rest);
+                 if (itemToday) {
+                    const { [id]: _, ...rest } = dailyData;
+                    transaction.set(dailyDocRef, rest);
+                 }
              });
              toast({ title: "Success", description: "Product with manually added stock has been deleted." });
              setSaving(false);
@@ -299,6 +287,7 @@ export function useInventory() {
         let amountToReturn = itemToday?.added ?? 0;
         const transferHistory = inventoryData.transferHistory || [];
         const updatesForGodown = new Map<string, { doc: GodownItem; amount: number }>();
+        let godownDocsToFetch: string[] = [];
 
         if (amountToReturn > 0 && transferHistory.length > 0) {
             const sortedHistory = [...transferHistory].sort((a, b) => b.date.toMillis() - a.date.toMillis());
@@ -312,18 +301,21 @@ export function useInventory() {
                     amount: (updatesForGodown.get(transfer.batchId)?.amount || 0) + returnable,
                 });
                 
+                godownDocsToFetch.push(transfer.batchId);
                 amountToReturn -= returnable;
             }
+        }
+        
+        const godownDocsMap = new Map<string, DocumentSnapshot>();
+        if (godownDocsToFetch.length > 0) {
+            const godownSnaps = await Promise.all(
+                godownDocsToFetch.map(batchId => getDoc(doc(db, "godownInventory", batchId)))
+            );
+            godownSnaps.forEach(snap => godownDocsMap.set(snap.id, snap));
         }
 
         // --- TRANSACTION ---
         await runTransaction(db, async (transaction) => {
-            // Fetch godown docs inside transaction
-            const godownDocs = await Promise.all(
-                Array.from(updatesForGodown.keys()).map(batchId => transaction.get(doc(db, "godownInventory", batchId)))
-            );
-
-            // Now perform all writes
             transaction.delete(inventoryDocRef);
 
             if (itemToday) {
@@ -331,19 +323,17 @@ export function useInventory() {
                 transaction.set(dailyDocRef, rest);
             }
             
-            godownDocs.forEach(batchDoc => {
-                const batchId = batchDoc.id;
-                const updateInfo = updatesForGodown.get(batchId);
-                if (updateInfo) {
-                    if (batchDoc.exists()) {
-                        transaction.update(batchDoc.ref, { quantity: batchDoc.data().quantity + updateInfo.amount });
+            for (const [batchId, updateInfo] of updatesForGodown.entries()) {
+                 const batchDocSnap = godownDocsMap.get(batchId);
+                 if (batchDocSnap) {
+                     if (batchDocSnap.exists()) {
+                        transaction.update(batchDocSnap.ref, { quantity: batchDocSnap.data().quantity + updateInfo.amount });
                     } else {
-                        // Recreate the batch if it was deleted
                         const { id: docId, ...dataToSet } = updateInfo.doc;
-                        transaction.set(batchDoc.ref, { ...dataToSet, quantity: updateInfo.amount });
+                        transaction.set(batchDocSnap.ref, { ...dataToSet, quantity: updateInfo.amount });
                     }
-                }
-            });
+                 }
+            }
         });
 
     } catch (error) {
@@ -377,9 +367,9 @@ export function useInventory() {
             let itemDailyData = dailyData[id];
 
             if (!itemDailyData) {
-                // If no entry for today, create one from master data
-                const yesterdayDoc = await getDoc(doc(db, 'dailyInventory', yesterday));
-                const prevStock = yesterdayDoc.exists() ? (yesterdayDoc.data()[id]?.closing ?? masterData.prevStock ?? 0) : (masterData.prevStock ?? 0);
+                const yesterdayDocSnap = await getDoc(doc(db, 'dailyInventory', yesterday));
+                const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
+                const prevStock = yesterdayData[id]?.closing ?? masterData.prevStock ?? 0;
                 itemDailyData = { ...masterData, prevStock, added: 0, sales: 0 };
             }
 
@@ -394,11 +384,9 @@ export function useInventory() {
                 throw new Error("Insufficient stock to complete sale.");
             }
 
-            // Update daily sales
             itemDailyData.sales = newSales;
             dailyData[id] = itemDailyData;
             
-            // Create sales log entry
             const salesLogRef = doc(collection(db, 'sales_log'));
             transaction.set(salesLogRef, {
                 productId: id,
@@ -410,12 +398,10 @@ export function useInventory() {
                 createdAt: serverTimestamp(),
             });
 
-            // If price has changed, update master inventory
             if (masterData.price !== salePrice) {
                 transaction.update(masterRef, { price: salePrice });
             }
             
-            // Handle low stock notifications
             if (notificationSettings.lowStockAlerts && user?.shopId) {
                  if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
                     await createAdminNotification(user.shopId, {
@@ -428,7 +414,6 @@ export function useInventory() {
                  }
             }
 
-            // Perform writes at the end
             transaction.set(dailyDocRef, dailyData, { merge: true });
         });
       } catch (error) {
@@ -441,56 +426,47 @@ export function useInventory() {
   
  const updateItemField = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => {
     setSaving(true);
-    
-    // --- Phase 1: Pre-Transaction Reads (ALL reads happen here) ---
-    const masterRef = doc(db, 'inventory', id);
-    const dailyDocRef = doc(db, 'dailyInventory', today);
 
     try {
+        // --- Phase 1: All Reads ---
+        const masterRef = doc(db, 'inventory', id);
+        const dailyDocRef = doc(db, 'dailyInventory', today);
+
         const masterSnap = await getDoc(masterRef);
         if (!masterSnap.exists()) throw new Error("Item does not exist.");
-        
         const masterData = masterSnap.data() as InventoryItem;
-        const currentAdded = (masterData.added || 0); // Assuming added is on master, but we get from daily. Let's fix this.
 
         const dailySnap = await getDoc(dailyDocRef);
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
         const itemDailyData = dailyData[id];
-        const dailyCurrentAdded = itemDailyData?.added || 0;
 
+        const dailyCurrentAdded = itemDailyData?.added || 0;
         const isReturningStock = field === 'added' && Number(value) < dailyCurrentAdded;
 
         let godownDocsMap = new Map<string, DocumentSnapshot>();
         let sortedHistory: TransferHistory[] = [];
 
-        if (isReturningStock && masterData.transferHistory) {
+        if (isReturningStock && masterData.transferHistory && masterData.transferHistory.length > 0) {
             sortedHistory = [...masterData.transferHistory].sort((a,b) => b.date.toMillis() - a.date.toMillis());
             
-            const godownBatchRefs = sortedHistory.map(t => doc(db, "godownInventory", t.batchId));
-            const godownSnaps = await Promise.all(godownBatchRefs.map(ref => getDoc(ref)));
-
-            godownSnaps.forEach(snap => {
-                if (snap.ref.id) godownDocsMap.set(snap.ref.id, snap);
-            });
+            const uniqueBatchIds = [...new Set(sortedHistory.map(t => t.batchId))];
+            const godownSnaps = await Promise.all(uniqueBatchIds.map(batchId => getDoc(doc(db, "godownInventory", batchId))));
+            godownSnaps.forEach(snap => godownDocsMap.set(snap.id, snap));
         }
 
-        // --- Phase 2: Transaction (ONLY writes) ---
+        // --- Phase 2: Transaction with only Writes ---
         await runTransaction(db, async (transaction) => {
-            // Re-fetch daily doc inside transaction to ensure atomicity, this is a required read before write.
-            const dailyDoc = await transaction.get(dailyDocRef);
-            let currentDailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+            let currentDailyData = { ...dailyData }; // Work on a copy
             let currentItemDaily = currentDailyData[id];
 
             if (!currentItemDaily) {
-                 const yesterdayDoc = await getDoc(doc(db, 'dailyInventory', yesterday));
-                 const prevStock = yesterdayDoc.exists() ? (yesterdayDoc.data()[id]?.closing ?? masterData.prevStock ?? 0) : (masterData.prevStock ?? 0);
-                 currentItemDaily = { ...masterData, prevStock, added: 0, sales: 0 };
+                const prevStock = masterData.prevStock ?? 0;
+                currentItemDaily = { ...masterData, prevStock, added: 0, sales: 0 };
             }
 
             const oldAdded = currentItemDaily.added || 0;
             const newAdded = field === 'added' ? Number(value) : oldAdded;
 
-            // --- All calculations are done here based on pre-fetched data ---
             if (isReturningStock) {
                 let amountToReturn = oldAdded - newAdded;
                 let newTransferHistory = [...(masterData.transferHistory || [])];
@@ -501,7 +477,7 @@ export function useInventory() {
                     const returnable = Math.min(amountToReturn, transfer.quantity);
                     const godownSnap = godownDocsMap.get(transfer.batchId);
                     
-                    if (godownSnap) { // Check if we pre-fetched this doc
+                    if (godownSnap) {
                          if (godownSnap.exists()) {
                             transaction.update(godownSnap.ref, { quantity: godownSnap.data().quantity + returnable });
                         } else {
@@ -525,14 +501,13 @@ export function useInventory() {
                 transaction.update(masterRef, { transferHistory: newTransferHistory });
             }
 
-            // Update the changed field in the daily data
             currentItemDaily[field] = value;
-             if (field === 'price') { // Also update master price
+            if (field === 'price') {
                 transaction.update(masterRef, { price: value });
             }
             
-            // Perform the final write to the daily document
-            transaction.set(dailyDocRef, { [id]: currentItemDaily }, { merge: true });
+            currentDailyData[id] = currentItemDaily;
+            transaction.set(dailyDocRef, currentDailyData, { merge: true });
         });
 
     } catch (error) {
