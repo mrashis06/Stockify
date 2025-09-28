@@ -224,8 +224,11 @@ export function useGodownInventory() {
   const transferToShop = async (productId: string, quantityToTransfer: number) => {
     setSaving(true);
     const today = format(new Date(), 'yyyy-MM-dd');
-    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     
+    // This read is now outside the transaction
+    const yesterdayDoc = await getDoc(doc(db, 'dailyInventory', format(subDays(new Date(), 1), 'yyyy-MM-dd')));
+    const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
+
     try {
         await runTransaction(db, async (transaction) => {
             const godownItemsQuery = query(
@@ -233,6 +236,7 @@ export function useGodownInventory() {
                 where('productId', '==', productId)
             );
             
+            // This is a READ inside the transaction
             const godownItemsSnapshot = await getDocs(godownItemsQuery);
             const sortedGodownItems = godownItemsSnapshot.docs.sort(
                 (a, b) => a.data().dateAdded.toMillis() - b.data().dateAdded.toMillis()
@@ -254,30 +258,30 @@ export function useGodownInventory() {
             
             const shopItemRef = doc(db, 'inventory', shopProductId);
             const dailyInventoryRef = doc(db, 'dailyInventory', today);
-            const yesterdayInventoryRef = doc(db, 'dailyInventory', yesterday);
 
+            // These are READS inside the transaction
             const shopItemDoc = await transaction.get(shopItemRef);
             const dailyDoc = await transaction.get(dailyInventoryRef);
-            const yesterdayDoc = await transaction.get(yesterdayInventoryRef);
             
             let shopItemData: any;
 
             if (!shopItemDoc.exists()) {
-                // If item doesn't exist in master, create it using details from the godown item.
-                // It will now have the correct standardized ID.
                 shopItemData = {
                     brand: firstGodownBatch.brand,
                     size: firstGodownBatch.size,
                     category: firstGodownBatch.category,
-                    price: 0, // Price needs to be set manually in the main inventory
+                    price: 0,
                     prevStock: 0,
                     transferHistory: [],
                 };
+                // This is a WRITE
                 transaction.set(shopItemRef, shopItemData);
             } else {
                 shopItemData = shopItemDoc.data();
             }
 
+            // --- ALL WRITES START HERE ---
+            
             let remainingToTransfer = quantityToTransfer;
             const transferTimestamp = Timestamp.now();
 
@@ -295,14 +299,16 @@ export function useGodownInventory() {
                 };
                 
                 if (batch.quantity - transferAmount <= 0) {
+                    // WRITE
                     transaction.delete(batchRef);
                 } else {
+                    // WRITE
                     transaction.update(batchRef, {
                         quantity: batch.quantity - transferAmount,
                     });
                 }
                  
-                // Log the transfer history to the master inventory item
+                // WRITE
                 transaction.update(shopItemRef, {
                     transferHistory: arrayUnion(newHistoryEntry)
                 });
@@ -311,8 +317,6 @@ export function useGodownInventory() {
             }
             
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
-            
             const prevStockFromYesterday = yesterdayData[shopProductId]?.closing ?? shopItemData?.prevStock ?? 0;
             
             const currentDailyItem = dailyData[shopProductId] || {
@@ -327,6 +331,7 @@ export function useGodownInventory() {
             
             currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
             
+            // WRITE
             transaction.set(dailyInventoryRef, { [shopProductId]: currentDailyItem }, { merge: true });
         });
 
