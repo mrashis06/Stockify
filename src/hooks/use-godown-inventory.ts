@@ -199,128 +199,113 @@ export function useGodownInventory() {
     }
   };
 
-  const transferToShop = async (productId: string, quantityToTransfer: number, price?: number, barcodeId?: string) => {
+  const transferToShop = async (productId: string, quantityToTransfer: number, barcodeId: string, price?: number) => {
     setSaving(true);
     const today = format(new Date(), 'yyyy-MM-dd');
-
+  
+    // READS OUTSIDE TRANSACTION
     const godownItemsQuery = query(collection(db, 'godownInventory'), where('productId', '==', productId));
     const godownItemsSnapshot = await getDocs(godownItemsQuery);
-    
+  
     if (godownItemsSnapshot.empty) {
-        setSaving(false);
-        throw new Error(`Product not found in godown.`);
+      setSaving(false);
+      throw new Error(`Product not found in godown.`);
     }
-    
+  
     const sortedGodownItems = godownItemsSnapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as GodownItem))
-      .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());
-
+      .sort((a, b) => (a.dateAdded?.toMillis() ?? 0) - (b.dateAdded?.toMillis() ?? 0));
+  
     const totalGodownStock = sortedGodownItems.reduce((sum, item) => sum + item.quantity, 0);
-
+  
     if (totalGodownStock < quantityToTransfer) {
-        setSaving(false);
-        throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
+      setSaving(false);
+      throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
     }
-    
-    const { brand, size, category } = sortedGodownItems[0];
-    const inventorySearchQuery = query(collection(db, 'inventory'), where('brand', '==', brand), where('size', '==', size), limit(1));
-    const existingShopItemSnap = await getDocs(inventorySearchQuery);
-
+  
     try {
-        await runTransaction(db, async (transaction) => {
-            // --- ALL READS FIRST ---
-            let shopItemId: string | undefined;
-            let shopItemRef: any;
-            let shopItemDoc;
-            let isNewProduct = true;
+      await runTransaction(db, async (transaction) => {
+        // --- ALL READS FIRST ---
+        const inventoryQuery = query(collection(db, 'inventory'), where('barcodeId', '==', barcodeId), limit(1));
+        const inventorySnap = await getDocs(inventoryQuery);
+        const shopItemDoc = !inventorySnap.empty ? inventorySnap.docs[0] : null;
 
-            if (!existingShopItemSnap.empty) {
-                const existingDoc = existingShopItemSnap.docs[0];
-                shopItemId = existingDoc.id;
-                shopItemRef = existingDoc.ref;
-                shopItemDoc = await transaction.get(shopItemRef);
-                isNewProduct = false;
-            }
-            
-            const dailyInventoryRef = doc(db, 'dailyInventory', today);
-            const dailyDoc = await transaction.get(dailyInventoryRef);
+        const dailyInventoryRef = doc(db, 'dailyInventory', today);
+        const dailyDoc = await transaction.get(dailyInventoryRef);
+        const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+  
+        // --- ALL WRITES LAST ---
+        let shopItemId: string;
+        let shopItemRef;
+        const isNewProduct = !shopItemDoc;
+        const { brand, size, category } = sortedGodownItems[0];
+  
+        if (isNewProduct) {
+          if (price === undefined) throw new Error("Price is required for new products.");
+          
+          shopItemId = barcodeId; 
+          shopItemRef = doc(db, 'inventory', shopItemId);
+          
+          const newShopItemData = {
+            brand, size, category, price,
+            prevStock: 0,
+            transferHistory: [],
+            barcodeId,
+          };
+          transaction.set(shopItemRef, newShopItemData);
+        } else {
+          shopItemId = shopItemDoc.id;
+          shopItemRef = shopItemDoc.ref;
+        }
 
-            // --- ALL WRITES LAST ---
-            if (isNewProduct) {
-                if (!barcodeId) throw new Error("Barcode is required for new products.");
-                if (price === undefined) throw new Error("Price is required for new products.");
-                
-                shopItemId = barcodeId;
-                shopItemRef = doc(db, 'inventory', shopItemId);
-                
-                const newShopItemData = {
-                    brand, size, category, price,
-                    prevStock: 0,
-                    transferHistory: [],
-                    barcodeId,
-                };
-                transaction.set(shopItemRef, newShopItemData);
-            } else {
-                if (shopItemDoc && shopItemDoc.exists()) {
-                    const shopItemData = shopItemDoc.data();
-                    if (!shopItemData.barcodeId && barcodeId) {
-                         transaction.update(shopItemRef, { barcodeId: barcodeId });
-                    }
-                }
-            }
-            
-            if (!shopItemId) { // Safety check
-                throw new Error("Could not determine the shop item ID.");
-            }
-
-            let remainingToTransfer = quantityToTransfer;
-            const transferTimestamp = Timestamp.now();
-
-            for (const batchData of sortedGodownItems) {
-                if (remainingToTransfer <= 0) break;
-                
-                const batchRef = doc(db, 'godownInventory', batchData.id);
-                const transferAmount = Math.min(batchData.quantity, remainingToTransfer);
-
-                const newHistoryEntry: TransferHistory = {
-                    date: transferTimestamp,
-                    quantity: transferAmount,
-                    batchId: batchData.id,
-                };
-                
-                if (batchData.quantity - transferAmount <= 0) {
-                    transaction.delete(batchRef);
-                } else {
-                    transaction.update(batchRef, {
-                        quantity: batchData.quantity - transferAmount,
-                    });
-                }
-                 
-                transaction.update(shopItemRef, { transferHistory: arrayUnion(newHistoryEntry) });
-                remainingToTransfer -= transferAmount;
-            }
-            
-            const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            let currentDailyItem = dailyData[shopItemId];
-
-            if (!currentDailyItem) {
-                 currentDailyItem = {
-                     brand, size, category,
-                     price: isNewProduct ? price : (shopItemDoc?.data()?.price ?? 0),
-                     added: 0,
-                     sales: 0,
-                };
-            }
-            
-            currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
-            transaction.set(dailyInventoryRef, { [shopItemId]: currentDailyItem }, { merge: true });
-        });
-
+        let remainingToTransfer = quantityToTransfer;
+        const transferTimestamp = Timestamp.now();
+  
+        for (const batchData of sortedGodownItems) {
+          if (remainingToTransfer <= 0) break;
+  
+          const batchRef = doc(db, 'godownInventory', batchData.id);
+          const transferAmount = Math.min(batchData.quantity, remainingToTransfer);
+  
+          const newHistoryEntry: TransferHistory = {
+            date: transferTimestamp,
+            quantity: transferAmount,
+            batchId: batchData.id,
+          };
+  
+          if (batchData.quantity - transferAmount <= 0) {
+            transaction.delete(batchRef);
+          } else {
+            transaction.update(batchRef, {
+              quantity: batchData.quantity - transferAmount,
+            });
+          }
+  
+          transaction.update(shopItemRef, { transferHistory: arrayUnion(newHistoryEntry) });
+          remainingToTransfer -= transferAmount;
+        }
+  
+        let currentDailyItem = dailyData[shopItemId];
+  
+        if (!currentDailyItem) {
+          const itemPrice = isNewProduct ? price : shopItemDoc?.data()?.price ?? 0;
+          currentDailyItem = {
+            brand, size, category,
+            price: itemPrice,
+            added: 0,
+            sales: 0,
+          };
+        }
+  
+        currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
+        transaction.set(dailyInventoryRef, { [shopItemId]: currentDailyItem }, { merge: true });
+      });
+  
     } catch (error) {
-        console.error("Error transferring stock to shop: ", error);
-        throw error;
+      console.error("Error transferring stock to shop: ", error);
+      throw error;
     } finally {
-        setSaving(false);
+      setSaving(false);
     }
   };
 

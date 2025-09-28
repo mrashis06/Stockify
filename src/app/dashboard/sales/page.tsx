@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -44,21 +45,20 @@ export default function SalesPage() {
         setIsScannerPaused(true);
 
         try {
-            const inventoryRef = collection(db, "inventory");
-            const q = query(inventoryRef, or(
-                where("barcodeId", "==", decodedText),
-                where("qrCodeId", "==", decodedText)
-            ));
-            const querySnapshot = await getDocs(q);
+            // In the "Barcode First" system, the document ID is the barcode.
+            const itemId = decodedText;
+            const masterDocRef = doc(db, "inventory", itemId);
+            const masterDoc = await getDoc(masterDocRef);
 
-            if (querySnapshot.empty) {
-                toast({ title: 'Product Not Mapped', description: 'Redirecting to mapping page...', variant: 'destructive' });
-                router.push(`/dashboard/map-barcode?code=${decodedText}`);
+
+            if (!masterDoc.exists()) {
+                toast({ title: 'Product Not Found', description: 'This barcode is not mapped to any product in your inventory.', variant: 'destructive' });
+                resetScanState();
+                // Optionally redirect to mapping page, but for POS, a clear error is often better.
+                // router.push(`/dashboard/map-barcode?code=${decodedText}`);
                 return;
             }
 
-            const masterDoc = querySnapshot.docs[0];
-            const itemId = masterDoc.id;
             const masterData = masterDoc.data() as Omit<InventoryItem, 'id'>;
 
             const today = formatDate(new Date(), 'yyyy-MM-dd');
@@ -91,7 +91,7 @@ export default function SalesPage() {
             
             setScannedItem(itemData);
             setEditedPrice(itemData.price);
-            setSaleQuantity('');
+            setSaleQuantity(1); // Default to selling 1 item
 
         } catch (error) {
             console.error("Error fetching product by barcode:", error);
