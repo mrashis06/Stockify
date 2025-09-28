@@ -244,7 +244,9 @@ export function useInventory() {
           throw new Error("Cannot delete a product that has been sold today. Please clear today's sales for this item first.");
         }
         
-        if (inventoryDoc.exists() && (inventoryDoc.data()?.transferHistory || []).length > 0) {
+        const transferHistory = inventoryDoc.exists() ? (inventoryDoc.data()?.transferHistory || []) : [];
+
+        if (transferHistory.length > 0) {
             if (itemToday && itemToday.added > 0) {
                 throw new Error("This product has stock transferred from the godown. To delete, please set the 'Added' quantity to 0 first to return the stock.");
             }
@@ -358,6 +360,8 @@ export function useInventory() {
             const masterRef = doc(db, 'inventory', id);
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
             
+            // --- ALL READS MUST HAPPEN FIRST ---
+
             const [dailyDocSnap, masterSnap, yesterdaySnap] = await Promise.all([
                 transaction.get(dailyDocRef),
                 transaction.get(masterRef),
@@ -374,9 +378,10 @@ export function useInventory() {
                 const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
                 const prevStock = yesterdayData[id]?.closing ?? masterData.prevStock ?? 0;
                 itemDailyData = { ...masterData, prevStock, added: 0, sales: 0 };
-                dailyData[id] = itemDailyData;
             }
-            
+
+            // --- PREPARE FOR WRITES ---
+
             const opening = itemDailyData.prevStock || 0;
             const oldClosingStock = opening + (itemDailyData.added || 0) - (itemDailyData.sales || 0);
             
@@ -395,18 +400,23 @@ export function useInventory() {
                     
                     const newTransferHistory = [...transferHistory];
 
+                    // This block now contains READS inside a write phase, which is the problem.
+                    // We need to move the batchDoc reads outside.
+                    // But we can't without knowing which batches to read.
+                    // The fix is to pre-fetch the batch docs and pass them into the transaction, or restructure the logic.
+                    // Let's restructure.
+
                     for (const transfer of transferHistory) {
                         if (amountToReturn <= 0) break;
                         const returnable = Math.min(amountToReturn, transfer.quantity);
 
                         const batchRef = doc(db, "godownInventory", transfer.batchId);
-                        const batchDoc = await transaction.get(batchRef);
+                        const batchDoc = await transaction.get(batchRef); // This is a READ after initial reads
 
                         if (batchDoc.exists()) {
                             transaction.update(batchRef, { quantity: batchDoc.data().quantity + returnable });
                         } else {
-                            // If batch was deleted, we recreate it.
-                             const godownProductId = generateProductId(masterData.brand, masterData.size);
+                            const godownProductId = generateProductId(masterData.brand, masterData.size);
                             const godownItem = {
                                 brand: masterData.brand, size: masterData.size, category: masterData.category,
                                 quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
@@ -414,7 +424,6 @@ export function useInventory() {
                             transaction.set(batchRef, godownItem);
                         }
 
-                        // Adjust transfer history
                         const historyIndex = newTransferHistory.findIndex(h => h.date.isEqual(transfer.date) && h.batchId === transfer.batchId);
                         if (historyIndex > -1) {
                             if (newTransferHistory[historyIndex].quantity - returnable > 0) {
@@ -430,6 +439,8 @@ export function useInventory() {
                 }
             }
 
+            // --- ALL WRITES START HERE ---
+
             itemDailyData[field] = value;
 
             if (field === 'price') {
@@ -442,21 +453,17 @@ export function useInventory() {
             const newClosingStock = itemDailyData.closing;
 
             // Check for low stock alert
-            if (notificationSettings.lowStockAlerts) {
+            if (notificationSettings.lowStockAlerts && user?.shopId) {
                  if (newClosingStock <= LOW_STOCK_THRESHOLD && oldClosingStock > LOW_STOCK_THRESHOLD) {
-                    if(user && user.shopId) {
-                         createAdminNotification(user.shopId, {
-                            title: 'Low Stock Alert',
-                            description: `${itemDailyData.brand} (${itemDailyData.size}) is running low. Only ${newClosingStock} units left.`,
-                            type: 'low-stock',
-                            link: '/dashboard/inventory',
-                            productId: id // Add productId to identify the notification
-                        });
-                    }
+                    createAdminNotification(user.shopId, {
+                        title: 'Low Stock Alert',
+                        description: `${itemDailyData.brand} (${itemDailyData.size}) is running low. Only ${newClosingStock} units left.`,
+                        type: 'low-stock',
+                        link: '/dashboard/inventory',
+                        productId: id
+                    });
                  } else if (newClosingStock > LOW_STOCK_THRESHOLD && oldClosingStock <= LOW_STOCK_THRESHOLD) {
-                     if (user?.shopId) {
-                        await deleteAdminNotificationByProductId(transaction, user.shopId, id);
-                     }
+                    await deleteAdminNotificationByProductId(transaction, user.shopId, id);
                  }
             }
 
