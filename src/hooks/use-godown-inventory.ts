@@ -23,7 +23,7 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { usePageLoading } from './use-loading';
 
 export type TransferHistory = {
@@ -34,7 +34,7 @@ export type TransferHistory = {
 
 export type GodownItem = {
   id: string;
-  productId: string;
+  productId: string; // This is a temporary ID for grouping in godown
   brand: string;
   size: string;
   category: string;
@@ -49,56 +49,11 @@ export type ExtractedItem = {
     category: string;
 }
 
-
-// The new, robust "Smart ID" generation function.
-const generateProductId = (brand: string, size: string) => {
-    // Dictionary for common abbreviations
-    const abbreviations: { [key: string]: string } = {
-        'mc': 'mcdowells', 'bp': 'blenderspride', 'oc': 'officerschoice',
-        'ac': 'aristocrat', 'rc': 'royalchallenge', 'rs': 'royalspecial', 'sig': 'signature'
-    };
-
-    // Refined list of "junk" words to be removed.
-    // Words like 'strong', 'classic', 'black' are NOT on this list.
-    const junkWords = [
-        'premium', 'deluxe', 'matured', 'xxx', 'very', 'old', 'vatted',
-        'reserve', 'original', 'grain',
-        'whisky', 'rum', 'gin', 'vodka', 'wine', 'brandy', 'lager', 'pilsner',
-        'can', 'bottle', 'pet', 'pint', 'quart', 'ml', 'beer'
-    ];
-
-    let processedBrand = brand.toLowerCase()
-        // Remove content in brackets e.g., [Can], (PET)
-        .replace(/\[.*?\]/g, '')
-        .replace(/\(.*?\)/g, '');
-
-    // Step 1: Expand abbreviations first
-    const words = processedBrand.split(' ');
-    const expandedWords = words.map(word => {
-        const cleanWord = word.replace(/[^a-z0-9]/gi, '');
-        return abbreviations[cleanWord] || word;
-    });
-    processedBrand = expandedWords.join(' ');
-    
-    // Step 2: Remove only the true junk words
-    const junkRegex = new RegExp(`\\b(${junkWords.join('|')})\\b`, 'g');
-    processedBrand = processedBrand.replace(junkRegex, '');
-
-    // Step 3: Final cleanup
-    processedBrand = processedBrand
-        .replace(/[^a-z0-9]/g, '') // Remove all non-alphanumeric chars
-        .replace(/\s+/g, '')       // In case any spaces are left
-        .trim();
-
-    // Normalize size - extract only numbers
-    const sizeFormatted = size.toLowerCase().replace(/[^0-9]/g, '');
-    
-    if (!processedBrand || !sizeFormatted) {
-        // Fallback for cases where normalization results in an empty string
-        return `${brand.replace(/[^a-z0-9]/gi, '').toLowerCase()}_${size.replace(/[^0-9]/gi, '')}`;
-    }
-
-    return `${processedBrand}_${sizeFormatted}`;
+// Simple, predictable ID for godown grouping. Not used for main inventory.
+const generateGodownProductId = (brand: string, size: string) => {
+    const brandPart = brand.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sizePart = size.toLowerCase().replace(/[^0-9]/g, '');
+    return `${brandPart}_${sizePart}`;
 }
 
 
@@ -107,7 +62,6 @@ export function useGodownInventory() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
-  // This hook now connects the component's loading state to the global loader
   usePageLoading(loading);
 
   const fetchGodownInventory = useCallback(async () => {
@@ -148,7 +102,7 @@ export function useGodownInventory() {
   const addGodownItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded'>) => {
     setSaving(true);
     try {
-        const productId = generateProductId(newItemData.brand, newItemData.size);
+        const productId = generateGodownProductId(newItemData.brand, newItemData.size);
         const docRef = collection(db, 'godownInventory');
         
         await addDoc(docRef, {
@@ -176,8 +130,7 @@ export function useGodownInventory() {
         const godownRef = collection(db, 'godownInventory');
         
         for (const item of items) {
-            // We don't check for existence here anymore to allow multiple batches of the same product
-            const productId = generateProductId(item.brand, item.size);
+            const productId = generateGodownProductId(item.brand, item.size);
             const docRef = doc(godownRef);
             batch.set(docRef, {
                 ...item,
@@ -245,60 +198,72 @@ export function useGodownInventory() {
     }
   };
 
-  const transferToShop = async (productId: string, quantityToTransfer: number, price?: number) => {
+  const transferToShop = async (productId: string, quantityToTransfer: number, price?: number, barcodeId?: string) => {
     setSaving(true);
     const today = format(new Date(), 'yyyy-MM-dd');
 
-    // --- Phase 1: All Reads, done outside the transaction ---
-    const godownItemsQuery = query(collection(db, 'godownInventory'), where('productId', '==', productId));
+    const godownItemsQuery = query(collection(db, 'godownInventory'), where('productId', '==', productId), orderBy('dateAdded', 'asc'));
     const godownItemsSnapshot = await getDocs(godownItemsQuery);
     
-    const sortedGodownItems = godownItemsSnapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() } as GodownItem))
-      .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());
-
-    if (sortedGodownItems.length === 0) {
-      setSaving(false);
-      throw new Error(`Product not found in godown.`);
+    if (godownItemsSnapshot.empty) {
+        setSaving(false);
+        throw new Error(`Product not found in godown.`);
     }
-
+    
+    const sortedGodownItems = godownItemsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GodownItem));
     const totalGodownStock = sortedGodownItems.reduce((sum, item) => sum + item.quantity, 0);
+
     if (totalGodownStock < quantityToTransfer) {
-      setSaving(false);
-      throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
+        setSaving(false);
+        throw new Error(`Not enough stock in godown. Available: ${totalGodownStock}`);
     }
     
     try {
-        // --- Phase 2: Transaction with only Reads-then-Writes ---
         await runTransaction(db, async (transaction) => {
             const firstGodownBatch = sortedGodownItems[0];
-            const shopProductId = generateProductId(firstGodownBatch.brand, firstGodownBatch.size);
+            const { brand, size, category } = firstGodownBatch;
             
-            const shopItemRef = doc(db, 'inventory', shopProductId);
-            const dailyInventoryRef = doc(db, 'dailyInventory', today);
+            // Find existing shop item by brand/size to see if we need to set barcodeId
+            const inventorySearchQuery = query(collection(db, 'inventory'), where('brand', '==', brand), where('size', '==', size), limit(1));
+            const existingShopItemSnap = await getDocs(inventorySearchQuery);
 
-            // Transactional reads
-            const shopItemDoc = await transaction.get(shopItemRef);
-            const dailyDoc = await transaction.get(dailyInventoryRef);
-            
+            let shopItemId: string;
+            let shopItemRef: any;
             let shopItemData: any;
-            if (!shopItemDoc.exists()) {
-                if (price === undefined) {
-                    throw new Error("A price is required for a new product.");
+            let isNewProduct = false;
+
+            if (!existingShopItemSnap.empty) { // Product exists, maybe with or without barcode
+                const existingDoc = existingShopItemSnap.docs[0];
+                shopItemId = existingDoc.id;
+                shopItemRef = existingDoc.ref;
+                shopItemData = existingDoc.data();
+                
+                if (!shopItemData.barcodeId && barcodeId) {
+                     // Product was manually added, now we're linking its barcode
+                     transaction.update(shopItemRef, { barcodeId: barcodeId });
                 }
+
+            } else { // Truly new product
+                isNewProduct = true;
+                if (!barcodeId) throw new Error("Barcode is required for new products.");
+                if (price === undefined) throw new Error("Price is required for new products.");
+                
+                shopItemId = barcodeId;
+                shopItemRef = doc(db, 'inventory', shopItemId);
+                
                 shopItemData = {
-                    brand: firstGodownBatch.brand,
-                    size: firstGodownBatch.size,
-                    category: firstGodownBatch.category,
-                    price: price,
+                    brand, size, category, price,
                     prevStock: 0,
                     transferHistory: [],
+                    barcodeId,
                 };
-                 transaction.set(shopItemRef, shopItemData);
-            } else {
-                shopItemData = shopItemDoc.data();
+                transaction.set(shopItemRef, shopItemData);
             }
-
+            
+            // --- Update godown and shop stock ---
+            const dailyInventoryRef = doc(db, 'dailyInventory', today);
+            const dailyDoc = await transaction.get(dailyInventoryRef);
+            
             let remainingToTransfer = quantityToTransfer;
             const transferTimestamp = Timestamp.now();
 
@@ -323,27 +288,23 @@ export function useGodownInventory() {
                 }
                  
                 transaction.update(shopItemRef, { transferHistory: arrayUnion(newHistoryEntry) });
-                
                 remainingToTransfer -= transferAmount;
             }
             
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            let currentDailyItem = dailyData[shopProductId];
+            let currentDailyItem = dailyData[shopItemId];
 
             if (!currentDailyItem) {
                  currentDailyItem = {
-                     brand: shopItemData.brand,
-                     size: shopItemData.size,
-                     category: shopItemData.category,
-                     price: shopItemData.price,
+                     brand, size, category,
+                     price: shopItemData.price, // Use existing or new price
                      added: 0,
                      sales: 0,
                 };
             }
             
             currentDailyItem.added = (currentDailyItem.added || 0) + quantityToTransfer;
-            
-            transaction.set(dailyInventoryRef, { [shopProductId]: currentDailyItem }, { merge: true });
+            transaction.set(dailyInventoryRef, { [shopItemId]: currentDailyItem }, { merge: true });
         });
 
     } catch (error) {

@@ -35,7 +35,7 @@ import { useAuth } from './use-auth';
 import { useNotificationSettings } from './use-notification-settings';
 
 export type InventoryItem = {
-  id: string;
+  id: string; // This will now often be a barcode
   brand: string;
   size: string;
   price: number;
@@ -50,55 +50,11 @@ export type InventoryItem = {
   transferHistory?: TransferHistory[];
 };
 
-// The new, robust "Smart ID" generation function.
-const generateProductId = (brand: string, size: string) => {
-    // Dictionary for common abbreviations
-    const abbreviations: { [key: string]: string } = {
-        'mc': 'mcdowells', 'bp': 'blenderspride', 'oc': 'officerschoice',
-        'ac': 'aristocrat', 'rc': 'royalchallenge', 'rs': 'royalspecial', 'sig': 'signature'
-    };
-
-    // Refined list of "junk" words to be removed.
-    // Words like 'strong', 'classic', 'black' are NOT on this list.
-    const junkWords = [
-        'premium', 'deluxe', 'matured', 'xxx', 'very', 'old', 'vatted',
-        'reserve', 'original', 'grain',
-        'whisky', 'rum', 'gin', 'vodka', 'wine', 'brandy', 'lager', 'pilsner',
-        'can', 'bottle', 'pet', 'pint', 'quart', 'ml', 'beer'
-    ];
-
-    let processedBrand = brand.toLowerCase()
-        // Remove content in brackets e.g., [Can], (PET)
-        .replace(/\[.*?\]/g, '')
-        .replace(/\(.*?\)/g, '');
-
-    // Step 1: Expand abbreviations first
-    const words = processedBrand.split(' ');
-    const expandedWords = words.map(word => {
-        const cleanWord = word.replace(/[^a-z0-9]/gi, '');
-        return abbreviations[cleanWord] || word;
-    });
-    processedBrand = expandedWords.join(' ');
-    
-    // Step 2: Remove only the true junk words
-    const junkRegex = new RegExp(`\\b(${junkWords.join('|')})\\b`, 'g');
-    processedBrand = processedBrand.replace(junkRegex, '');
-
-    // Step 3: Final cleanup
-    processedBrand = processedBrand
-        .replace(/[^a-z0-9]/g, '') // Remove all non-alphanumeric chars
-        .replace(/\s+/g, '')       // In case any spaces are left
-        .trim();
-
-    // Normalize size - extract only numbers
-    const sizeFormatted = size.toLowerCase().replace(/[^0-9]/g, '');
-    
-    if (!processedBrand || !sizeFormatted) {
-        // Fallback for cases where normalization results in an empty string
-        return `${brand.replace(/[^a-z0-9]/gi, '').toLowerCase()}_${size.replace(/[^0-9]/gi, '')}`;
-    }
-
-    return `${processedBrand}_${sizeFormatted}`;
+// Simple, predictable ID generator, only used for manual adds without barcode
+const generateManualProductId = (brand: string, size: string) => {
+    const brandPart = brand.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sizePart = size.toLowerCase().replace(/[^0-9]/g, '');
+    return `manual_${brandPart}_${sizePart}`;
 }
 
 
@@ -139,9 +95,7 @@ export function useInventory() {
             const id = masterItem.id;
             const dailyItem = dailyData[id];
             
-            // On a fresh start, masterItem.prevStock will be the initial stock.
-            // On subsequent days, yesterday's closing is the authority.
-            const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
+            const prevStock = (yesterdayData[id]?.closing ?? masterItem.prevStock) ?? 0;
             
             const added = dailyItem?.added ?? 0;
             const sales = dailyItem?.sales ?? 0;
@@ -163,21 +117,17 @@ export function useInventory() {
       }
   }, [today, yesterday]);
 
-  // This effect sets up the listener for the daily inventory data
   useEffect(() => {
-    // A single listener on the inventory collection to catch new brands being added
     const inventoryQuery = query(collection(db, "inventory"));
     const unsubscribeInventory = onSnapshot(inventoryQuery, () => {
-        fetchInventoryData(); // Refetch all data when master inventory changes
+        fetchInventoryData();
     });
       
-    // A listener for today's sales/additions
     const dailyDocRef = doc(db, 'dailyInventory', today);
     const unsubscribeDaily = onSnapshot(dailyDocRef, () => {
-        fetchInventoryData(); // Refetch all data when daily doc changes
+        fetchInventoryData();
     });
 
-    // Initial fetch
     fetchInventoryData();
 
     return () => {
@@ -190,7 +140,7 @@ export function useInventory() {
   const addBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing' | 'transferHistory'>) => {
     setSaving(true);
     try {
-        const id = generateProductId(newItemData.brand, newItemData.size);
+        const id = newItemData.barcodeId || generateManualProductId(newItemData.brand, newItemData.size);
         const docRef = doc(db, 'inventory', id);
 
         const masterItemData = {
@@ -205,8 +155,6 @@ export function useInventory() {
         };
         
         const dailyDocRef = doc(db, 'dailyInventory', today);
-        // For a new brand, it has no activity today, so added/sales are 0.
-        // Its prevStock is its initial stock. This gets correctly calculated in fetchInventoryData.
         const dailyItemData = {
             brand: newItemData.brand,
             size: newItemData.size,
@@ -217,8 +165,8 @@ export function useInventory() {
         };
 
         const batch = writeBatch(db);
-        batch.set(docRef, masterItemData); // Create the master record
-        batch.set(dailyDocRef, { [id]: dailyItemData }, { merge: true }); // Record its existence for today
+        batch.set(docRef, masterItemData);
+        batch.set(dailyDocRef, { [id]: dailyItemData }, { merge: true });
         
         await batch.commit();
 
@@ -295,9 +243,7 @@ export function useInventory() {
 
         let amountToReturn = itemToday?.added ?? 0;
         const transferHistory = inventoryData.transferHistory || [];
-        const updatesForGodown = new Map<string, { doc: GodownItem; amount: number }>();
         
-        // Pre-fetch godown documents
         const uniqueBatchIds = [...new Set(transferHistory.map(t => t.batchId))];
         const godownSnaps = uniqueBatchIds.length > 0
             ? await Promise.all(uniqueBatchIds.map(batchId => getDoc(doc(db, "godownInventory", batchId))))
@@ -326,7 +272,7 @@ export function useInventory() {
                         if (batchDocSnap.exists()) {
                             transaction.update(batchDocSnap.ref, { quantity: batchDocSnap.data().quantity + returnable });
                         } else {
-                            const godownProductId = generateProductId(inventoryData.brand, inventoryData.size);
+                            const godownProductId = `manual_${inventoryData.brand.toLowerCase()}_${inventoryData.size.toLowerCase()}`;
                             transaction.set(batchDocSnap.ref, {
                                 brand: inventoryData.brand, size: inventoryData.size, category: inventoryData.category,
                                 quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
@@ -378,7 +324,7 @@ export function useInventory() {
             const oldSales = itemDailyData.sales || 0;
             const newSales = oldSales + quantity;
             
-            const openingStock = (itemDailyData.prevStock ?? 0) + (itemDailyData.added ?? 0);
+            const openingStock = (itemDailyData.prevStock ?? (masterData.prevStock ?? 0)) + (itemDailyData.added ?? 0);
             const oldClosingStock = openingStock - oldSales;
             const newClosingStock = openingStock - newSales;
 
@@ -447,11 +393,10 @@ export function useInventory() {
     const dailyCurrentAdded = itemDailyData?.added || 0;
     const isReturningStock = field === 'added' && Number(value) < dailyCurrentAdded;
     
-    let godownDocsMap = new Map<string, DocumentSnapshot>();
-    let sortedHistory: TransferHistory[] = [];
+    const godownDocsMap = new Map<string, DocumentSnapshot>();
+    const sortedHistory: TransferHistory[] = [...(masterData.transferHistory || [])].sort((a, b) => b.date.toMillis() - a.date.toMillis());
 
-    if (isReturningStock && masterData.transferHistory && masterData.transferHistory.length > 0) {
-        sortedHistory = [...masterData.transferHistory].sort((a, b) => b.date.toMillis() - a.date.toMillis());
+    if (isReturningStock && sortedHistory.length > 0) {
         const uniqueBatchIds = [...new Set(sortedHistory.map(t => t.batchId))];
         if (uniqueBatchIds.length > 0) {
             const godownSnaps = await Promise.all(uniqueBatchIds.map(batchId => getDoc(doc(db, "godownInventory", batchId))));
@@ -471,7 +416,10 @@ export function useInventory() {
 
             const oldAdded = currentItemDaily.added || 0;
             const newAdded = field === 'added' ? Number(value) : oldAdded;
-
+            
+            const opening = (masterData.prevStock ?? 0) + (itemDailyData?.added ?? 0);
+            const closing = opening - (itemDailyData?.sales ?? 0);
+            
             const shouldDeleteProduct = field === 'added' && newAdded === 0 && (masterData.prevStock ?? 0) === 0 && (currentItemDaily.sales ?? 0) === 0;
 
             if (isReturningStock) {
@@ -488,7 +436,7 @@ export function useInventory() {
                          if (godownSnap.exists()) {
                             transaction.update(godownSnap.ref, { quantity: godownSnap.data().quantity + returnable });
                         } else {
-                            const godownProductId = generateProductId(masterData.brand, masterData.size);
+                            const godownProductId = `manual_${masterData.brand.toLowerCase()}_${masterData.size.toLowerCase()}`;
                             transaction.set(godownSnap.ref, {
                                 brand: masterData.brand, size: masterData.size, category: masterData.category,
                                 quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
@@ -509,19 +457,16 @@ export function useInventory() {
                     transaction.update(masterRef, { transferHistory: newTransferHistory });
                 }
             }
-
+            
             if (shouldDeleteProduct) {
-                // If the product is now empty, remove it from shop and daily log
                 transaction.delete(masterRef);
                 const { [id]: _, ...restOfDailyData } = currentDailyData;
                 transaction.set(dailyDocRef, restOfDailyData);
             } else {
-                // Otherwise, just update the field
                 currentItemDaily[field] = value;
                 if (field === 'price') {
                     transaction.update(masterRef, { price: value });
                 }
-                
                 currentDailyData[id] = currentItemDaily;
                 transaction.set(dailyDocRef, currentDailyData, { merge: true });
             }
