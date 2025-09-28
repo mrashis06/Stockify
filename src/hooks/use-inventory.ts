@@ -228,14 +228,10 @@ export function useInventory() {
   const deleteBrand = async (id: string) => {
     setSaving(true);
     try {
-      const q = query(collection(db, 'godownInventory'), where('productId', '==', id));
-      
       await runTransaction(db, async (transaction) => {
-        // Perform all reads first
         const dailyDocRef = doc(db, 'dailyInventory', today);
         const inventoryDocRef = doc(db, 'inventory', id);
-        const godownSnapshot = await getDocs(q); // Note: getDocs is not a transactional read.
-        
+
         const [dailyDoc, inventoryDoc] = await Promise.all([
             transaction.get(dailyDocRef),
             transaction.get(inventoryDocRef)
@@ -250,36 +246,38 @@ export function useInventory() {
         
         if (itemToday && itemToday.added > 0) {
             let amountToReturn = itemToday.added;
-            const transferHistory = inventoryDoc.exists() ? (inventoryDoc.data()?.transferHistory || []).sort((a: TransferHistory,b: TransferHistory) => b.date.toMillis() - a.date.toMillis()) : [];
+            const transferHistory = inventoryDoc.exists() ? (inventoryDoc.data()?.transferHistory || []).sort((a: TransferHistory, b: TransferHistory) => b.date.toMillis() - a.date.toMillis()) : [];
 
             if (transferHistory.length === 0 && amountToReturn > 0) {
                 throw new Error("Cannot auto-return stock to godown: No transfer history found.");
             }
-            
-            for (const transfer of transferHistory) {
+
+            const batchRefsToRead = transferHistory.map(t => doc(db, "godownInventory", t.batchId));
+            const batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
+
+            for (let i = 0; i < transferHistory.length; i++) {
                 if (amountToReturn <= 0) break;
+                
+                const transfer = transferHistory[i];
                 const returnable = Math.min(amountToReturn, transfer.quantity);
 
-                const batchRef = doc(db, "godownInventory", transfer.batchId);
-                // We must read the batch transactionally
-                const batchDoc = await transaction.get(batchRef);
+                const batchDoc = batchDocs[i];
 
                 if (batchDoc?.exists()) {
-                    transaction.update(batchRef, { quantity: batchDoc.data().quantity + returnable });
+                    transaction.update(batchDoc.ref, { quantity: batchDoc.data()!.quantity + returnable });
                 } else {
                     const invData = inventoryDoc.data();
                     const godownProductId = generateProductId(invData?.brand, invData?.size);
                     const godownItem = {
                         brand: invData?.brand, size: invData?.size, category: invData?.category,
                         quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
-                    }
-                    transaction.set(batchRef, godownItem);
+                    };
+                    transaction.set(batchDoc.ref, godownItem);
                 }
                 amountToReturn -= returnable;
             }
         }
 
-        // --- All writes happen here ---
         transaction.delete(inventoryDocRef);
 
         if (itemToday) {
@@ -384,10 +382,8 @@ export function useInventory() {
     const originalItemState = inventory.find(item => item.id === id);
 
     try {
-        const masterRef = doc(db, 'inventory', id);
-
         await runTransaction(db, async (transaction) => {
-            // --- Step 1: Perform all reads ---
+            const masterRef = doc(db, 'inventory', id);
             const dailyDocRef = doc(db, 'dailyInventory', today);
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
             
@@ -398,11 +394,11 @@ export function useInventory() {
             ]);
 
             if (!masterSnap.exists()) throw new Error("Item does not exist.");
+            
             const masterData = masterSnap.data() as InventoryItem;
-
             let dailyData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
             let itemDailyData = dailyData[id];
-            
+
             if (!itemDailyData) {
                 const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
                 const prevStock = yesterdayData[id]?.closing ?? masterData.prevStock ?? 0;
@@ -412,17 +408,19 @@ export function useInventory() {
             const opening = itemDailyData.prevStock || 0;
             const oldClosingStock = opening + (itemDailyData.added || 0) - (itemDailyData.sales || 0);
             
-            // --- Step 2: Prepare updates ---
             const currentAdded = itemDailyData.added || 0;
             const newAdded = field === 'added' ? Number(value) : currentAdded;
-            
-            if (field === 'added' && newAdded < currentAdded) { // Returning stock to godown
+
+            if (field === 'added' && newAdded < currentAdded) {
                 let amountToReturn = currentAdded - newAdded;
                 const transferHistory = (masterData.transferHistory || []).sort((a,b) => b.date.toMillis() - a.date.toMillis());
                 
                 if (transferHistory.length === 0 && amountToReturn > 0) {
                     throw new Error("Cannot return stock to godown: No transfer history found for this item.");
                 }
+
+                const batchRefsToRead = transferHistory.map(t => doc(db, "godownInventory", t.batchId));
+                const batchDocs = await Promise.all(batchRefsToRead.map(ref => transaction.get(ref)));
                 
                 const newTransferHistory = [...transferHistory];
 
@@ -431,19 +429,17 @@ export function useInventory() {
                     if (amountToReturn <= 0) break;
                     
                     const returnable = Math.min(amountToReturn, transfer.quantity);
-
-                    const batchRef = doc(db, "godownInventory", transfer.batchId);
-                    const batchDoc = await transaction.get(batchRef);
+                    const batchDoc = batchDocs[i];
 
                     if (batchDoc?.exists()) {
-                        transaction.update(batchRef, { quantity: batchDoc.data()!.quantity + returnable });
+                        transaction.update(batchDoc.ref, { quantity: batchDoc.data()!.quantity + returnable });
                     } else {
                         const godownProductId = generateProductId(masterData.brand, masterData.size);
                         const godownItem = {
                             brand: masterData.brand, size: masterData.size, category: masterData.category,
                             quantity: returnable, dateAdded: transfer.date, productId: godownProductId,
-                        }
-                        transaction.set(batchRef, godownItem);
+                        };
+                        transaction.set(batchDoc.ref, godownItem);
                     }
                     
                     const historyIndex = newTransferHistory.findIndex(h => h.date.isEqual(transfer.date) && h.batchId === transfer.batchId);
@@ -454,7 +450,6 @@ export function useInventory() {
                             newTransferHistory.splice(historyIndex, 1);
                         }
                     }
-
                     amountToReturn -= returnable;
                 }
                 transaction.update(masterRef, { transferHistory: newTransferHistory });
