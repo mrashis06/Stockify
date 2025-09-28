@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, ChevronDown, ChevronUp, FileScan } from 'lucide-react';
+import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +24,6 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { useToast } from '@/hooks/use-toast';
-import { useGodownInventory, GodownItem } from '@/hooks/use-godown-inventory';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,77 +34,40 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
 import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
-import { useDateFormat } from '@/hooks/use-date-format';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 
-// A new type for our grouped data structure
-type GroupedGodownItem = {
-    productId: string;
-    brand: string;
-    size: string;
-    category: string;
-    totalQuantity: number;
-    batches: GodownItem[];
-}
-
-export default function GodownPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function GodownPage() {
     const { 
-        godownInventory,
+        inventory,
         loading,
-        addGodownItem,
-        addMultipleGodownItems,
-        updateGodownItem,
-        deleteGodownItem,
-        deleteGodownProduct,
+        addMultipleItemsFromBill,
+        deleteBrand: deleteProduct,
         transferToShop,
         forceRefetch
-    } = useGodownInventory();
-    
-    // We need the main shop inventory to check if an item is new
-    const { inventory: shopInventory } = useInventory();
+    } = useInventory();
     
     usePageLoading(loading);
-    const { formatDate } = useDateFormat();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
-    const [isAddItemOpen, setIsAddItemOpen] = useState(false);
-    const [isTransferOpen, setIsTransferOpen] = useState(false);
     const [isScanBillOpen, setIsScanBillOpen] = useState(false);
-    const [transferringItem, setTransferringItem] = useState<GroupedGodownItem | null>(null);
-    const [correspondingShopItem, setCorrespondingShopItem] = useState<InventoryItem | null>(null);
-    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [isTransferOpen, setIsTransferOpen] = useState(false);
+    const [transferringItem, setTransferringItem] = useState<InventoryItem | null>(null);
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const { toast } = useToast();
-
-    const handleAddItem = async (newItemData: Omit<GodownItem, 'id' | 'productId' | 'dateAdded'>) => {
-        try {
-            await addGodownItem(newItemData);
-            toast({ title: 'Success', description: 'New batch added to godown.' });
-        } catch (error) {
-            console.error('Error adding godown item:', error);
-            const errorMessage = (error as Error).message || 'Failed to add new item.';
-            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
-        }
-    };
     
-    const handleOpenTransferDialog = (item: GroupedGodownItem) => {
-        // Find if a corresponding item exists in the shop inventory by brand and size
-        const shopItem = shopInventory.find(si => si.brand === item.brand && si.size === item.size);
-        setCorrespondingShopItem(shopItem || null);
+    const handleOpenTransferDialog = (item: InventoryItem) => {
         setTransferringItem(item);
         setIsTransferOpen(true);
     };
 
-    const handleTransferToShop = async (productId: string, quantity: number, price?: number, barcodeId?: string) => {
+    const handleTransfer = async (productId: string, quantity: number, price?: number) => {
         try {
-            await transferToShop(productId, quantity, price, barcodeId);
+            await transferToShop(productId, quantity, price);
             toast({ title: 'Success', description: `${quantity} units transferred to shop.` });
             setIsTransferOpen(false);
         } catch (error) {
@@ -115,36 +77,21 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
         }
     };
 
-    const handleQuantityChange = async (id: string, newQuantity: number) => {
-        if (isNaN(newQuantity)) return;
-        
-        if (newQuantity <= 0) {
-             try {
-                await deleteGodownItem(id);
-                toast({ title: 'Success', description: 'Batch removed as quantity is zero.' });
-             } catch (error) {
-                 console.error('Error removing batch:', error);
-                 toast({ title: 'Error', description: 'Failed to remove batch.', variant: 'destructive' });
-             }
-        } else {
-            try {
-                await updateGodownItem(id, { quantity: newQuantity });
-                toast({ title: 'Success', description: 'Quantity updated.' });
-            } catch (error) {
-                 console.error('Error updating quantity:', error);
-                 toast({ title: 'Error', description: 'Failed to update quantity.', variant: 'destructive' });
-            }
-        }
-    };
-
     const handleDeleteSelected = async () => {
         try {
-            await Promise.all(Array.from(selectedRows).map(id => deleteGodownProduct(id)));
+            for (const id of selectedRows) {
+                const item = inventory.find(i => i.id === id);
+                if (item && (item.stockInGodown > 0 || (item.prevStock + item.added - item.sales) > 0)) {
+                    toast({ title: 'Action Denied', description: `Cannot delete "${item.brand}". Stock must be zero in both godown and shop.`, variant: 'destructive' });
+                    continue;
+                }
+                await deleteProduct(id);
+            }
             toast({ title: 'Success', description: 'Selected products removed.' });
             setSelectedRows(new Set());
         } catch (error) {
             console.error('Error removing products:', error);
-            toast({ title: 'Error', description: 'Failed to remove selected products.', variant: 'destructive' });
+            toast({ title: 'Error', description: (error as Error).message || 'Failed to remove selected products.', variant: 'destructive' });
         }
         setIsDeleteDialogOpen(false);
     };
@@ -159,50 +106,18 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
         setSelectedRows(newSelection);
     };
 
-    const toggleRowExpansion = (productId: string) => {
-        const newSet = new Set(expandedRows);
-        if (newSet.has(productId)) {
-            newSet.delete(productId);
-        } else {
-            newSet.add(productId);
-        }
-        setExpandedRows(newSet);
-    };
-
-    const groupedInventory = useMemo(() => {
-        const groups = new Map<string, GroupedGodownItem>();
-        godownInventory.forEach(item => {
-            let group = groups.get(item.productId);
-            if (!group) {
-                group = {
-                    productId: item.productId,
-                    brand: item.brand,
-                    size: item.size,
-                    category: item.category,
-                    totalQuantity: 0,
-                    batches: [],
-                };
-            }
-            group.totalQuantity += item.quantity;
-            group.batches.push(item);
-            groups.set(item.productId, group);
-        });
-        return Array.from(groups.values());
-    }, [godownInventory]);
-
-
     const filteredInventory = useMemo(() => {
-        return groupedInventory.filter(item => {
+        return inventory.filter(item => {
             const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
             return matchesSearch && matchesCategory;
         });
-    }, [groupedInventory, searchQuery, categoryFilter]);
+    }, [inventory, searchQuery, categoryFilter]);
 
     const allCategories = useMemo(() => {
-        const cats = new Set(godownInventory.map(i => i.category).filter(Boolean));
+        const cats = new Set(inventory.map(i => i.category).filter(Boolean));
         return ['All Categories', ...Array.from(cats).sort()];
-    }, [godownInventory]);
+    }, [inventory]);
     
   if (loading) {
       return null;
@@ -210,23 +125,12 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
 
   return (
     <main className="flex-1 p-4 md:p-8">
-        <AddGodownItemDialog
-            isOpen={isAddItemOpen}
-            onOpenChange={setIsAddItemOpen}
-            onAddItem={handleAddItem}
-        />
         {transferringItem && (
             <TransferToShopDialog
                 isOpen={isTransferOpen}
                 onOpenChange={setIsTransferOpen}
-                item={{
-                    ...transferringItem,
-                    id: transferringItem.productId, // The id for the dialog is the grouped productId
-                    quantity: transferringItem.totalQuantity,
-                    dateAdded: new Date(), // Dummy value
-                }}
-                shopItem={correspondingShopItem}
-                onTransfer={handleTransferToShop}
+                item={transferringItem}
+                onTransfer={handleTransfer}
             />
         )}
         <ScanBillDialog 
@@ -234,23 +138,19 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
             onOpenChange={setIsScanBillOpen}
             onAddItems={async (items) => {
                 try {
-                    const { addedCount, skippedCount } = await addMultipleGodownItems(items);
+                    const { addedCount, skippedCount } = await addMultipleItemsFromBill(items);
                     
                     let description = '';
                     if (addedCount > 0) {
-                        description += `${addedCount} item types added from the bill. `;
+                        description += `${addedCount} new product types added to godown. `;
                     }
                     if (skippedCount > 0) {
-                        description += `${skippedCount} item types were skipped as they already exist in the godown.`;
+                        description += `Stock for ${skippedCount} existing product types was updated.`;
                     }
 
-                    if (addedCount === 0 && skippedCount > 0) {
-                         toast({ title: 'No new items added', description: description.trim() });
-                    } else {
-                         toast({ title: 'Success', description: description.trim() });
-                    }
+                     toast({ title: 'Bill Processed', description: description.trim() || 'No new items found.' });
                     
-                    if (addedCount > 0) {
+                    if (addedCount > 0 || skippedCount > 0) {
                         forceRefetch();
                     }
                 } catch(e) {
@@ -268,7 +168,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will permanently delete the selected product(s) and all their batches from the godown. This action cannot be undone.
+                        This will permanently delete the selected product(s). This action can only be done if both Godown and Shop stock are zero.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -280,7 +180,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
             </AlertDialogContent>
         </AlertDialog>
        
-        <h1 className="text-2xl font-bold tracking-tight mb-6">Godown Inventory</h1>
+        <h1 className="text-2xl font-bold tracking-tight mb-6">Godown Stock</h1>
         <Card>
             <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
@@ -307,9 +207,6 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                         <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsScanBillOpen(true)}>
                             <FileScan className="mr-2 h-4 w-4" /> Scan Bill
                         </Button>
-                        <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={() => setIsAddItemOpen(true)}>
-                            <PackagePlus className="mr-2 h-4 w-4" /> Add Item
-                        </Button>
                         <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)} className="w-full sm:w-auto">
                             <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedRows.size})
                         </Button>
@@ -321,85 +218,38 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                         <TableHeader>
                         <TableRow>
                             <TableHead className="w-12"></TableHead>
-                            <TableHead className="w-12"></TableHead>
                             <TableHead className="font-bold text-foreground">Brand</TableHead>
                             <TableHead className="font-bold text-foreground">Size</TableHead>
                             <TableHead className="font-bold text-foreground">Category</TableHead>
-                            <TableHead className="font-bold text-foreground w-40">Total Quantity</TableHead>
+                            <TableHead className="font-bold text-foreground w-40">Godown Stock</TableHead>
                             <TableHead className="font-bold text-foreground text-center w-48">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {filteredInventory.map(item => {
-                            const isExpanded = expandedRows.has(item.productId);
-                            return (
-                            <React.Fragment key={item.productId}>
-                                <TableRow data-state={selectedRows.has(item.productId) ? "selected" : ""}>
-                                    <TableCell>
-                                        <Button variant="ghost" size="icon" onClick={() => toggleRowExpansion(item.productId)} className="h-8 w-8">
-                                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                        </Button>
-                                    </TableCell>
+                        {filteredInventory.map(item => (
+                            <React.Fragment key={item.id}>
+                                <TableRow data-state={selectedRows.has(item.id) ? "selected" : ""}>
                                      <TableCell className="text-center">
                                         <input
                                             type="checkbox"
                                             className="h-4 w-4"
-                                            checked={selectedRows.has(item.productId)}
-                                            onChange={() => handleRowSelect(item.productId)}
+                                            checked={selectedRows.has(item.id)}
+                                            onChange={() => handleRowSelect(item.id)}
                                         />
                                     </TableCell>
                                     <TableCell className="font-medium">{item.brand}</TableCell>
                                     <TableCell>{item.size}</TableCell>
                                     <TableCell>{item.category}</TableCell>
-                                    <TableCell>{item.totalQuantity}</TableCell>
+                                    <TableCell>{item.stockInGodown || 0}</TableCell>
                                     <TableCell className="text-center">
-                                        <Button variant="outline" size="sm" onClick={() => handleOpenTransferDialog(item)} disabled={item.totalQuantity <= 0}>
+                                        <Button variant="outline" size="sm" onClick={() => handleOpenTransferDialog(item)} disabled={(item.stockInGodown || 0) <= 0}>
                                             <ArrowRightLeft className="mr-2 h-4 w-4" />
                                             Transfer to Shop
                                         </Button>
                                     </TableCell>
                                 </TableRow>
-                                {isExpanded && (
-                                     <TableRow key={`${item.productId}-details`} className="bg-muted/50 hover:bg-muted/50">
-                                        <TableCell colSpan={7} className="p-0">
-                                            <div className="p-4">
-                                                <h4 className="font-semibold mb-2">Batches for {item.brand} ({item.size})</h4>
-                                                <Table>
-                                                    <TableHeader>
-                                                        <TableRow>
-                                                            <TableHead className="text-foreground">Date Added</TableHead>
-                                                            <TableHead className="text-foreground w-40">Quantity</TableHead>
-                                                            <TableHead className="text-foreground w-24 text-right">Actions</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {item.batches.map(batch => (
-                                                            <TableRow key={batch.id}>
-                                                                <TableCell>{batch.dateAdded ? formatDate(batch.dateAdded.toDate()) : 'N/A'}</TableCell>
-                                                                <TableCell>
-                                                                    <Input
-                                                                        type="number"
-                                                                        className="h-8 w-24 bg-card"
-                                                                        defaultValue={batch.quantity}
-                                                                        onBlur={(e) => handleQuantityChange(batch.id, parseInt(e.target.value, 10))}
-                                                                        min="0"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell className="text-right">
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(batch.id, 0)}>
-                                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                                    </Button>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </React.Fragment>
-                        )})}
+                        ))}
                         </TableBody>
                     </Table>
                 </div>

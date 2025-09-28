@@ -5,8 +5,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMediaQuery } from 'react-responsive';
-import { collection, query, where, getDocs, or, doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -16,16 +14,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/use-auth';
 import { Barcode, HelpCircle, IndianRupee, Scan, X, CheckCircle } from 'lucide-react';
 import SharedScanner from '@/components/dashboard/shared-scanner';
-import { useDateFormat } from '@/hooks/use-date-format';
-import { subDays } from 'date-fns';
 
 export default function SalesPage() {
-    const { recordSale, forceRefetch } = useInventory();
+    const { inventory, recordSale, forceRefetch } = useInventory();
     const { user } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
-    const { formatDate } = useDateFormat();
 
     const [isClient, setIsClient] = useState(false);
     const [scannedItem, setScannedItem] = useState<InventoryItem | null>(null);
@@ -41,63 +36,21 @@ export default function SalesPage() {
 
     const handleScanSuccess = async (decodedText: string) => {
         if (isScannerPaused) return;
-
         setIsScannerPaused(true);
 
-        try {
-            // In the "Barcode First" system, the document ID is the barcode.
-            const itemId = decodedText;
-            const masterDocRef = doc(db, "inventory", itemId);
-            const masterDoc = await getDoc(masterDocRef);
+        const itemData = inventory.find(item => item.barcodeId === decodedText);
 
-
-            if (!masterDoc.exists()) {
-                toast({ title: 'Product Not Found', description: 'This barcode is not mapped to any product in your inventory.', variant: 'destructive' });
-                resetScanState();
-                // Optionally redirect to mapping page, but for POS, a clear error is often better.
-                // router.push(`/dashboard/map-barcode?code=${decodedText}`);
-                return;
-            }
-
-            const masterData = masterDoc.data() as Omit<InventoryItem, 'id'>;
-
-            const today = formatDate(new Date(), 'yyyy-MM-dd');
-            const yesterday = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
-
-            const dailyDocRef = doc(db, 'dailyInventory', today);
-            const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
-
-            const [dailySnap, yesterdaySnap] = await Promise.all([
-                getDoc(dailyDocRef),
-                getDoc(yesterdayDocRef)
-            ]);
-
-            const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-            const yesterdayData = yesterdaySnap.exists() ? yesterdaySnap.data() : {};
-            
-            const itemDailyData = dailyData[itemId];
-            
-            const prevStock = yesterdayData[itemId]?.closing ?? masterData.prevStock ?? 0;
-            const added = itemDailyData?.added ?? 0;
-            const sales = itemDailyData?.sales ?? 0;
-
-            const itemData: InventoryItem = {
-                ...masterData,
-                id: itemId,
-                prevStock,
-                added,
-                sales,
-            };
-            
-            setScannedItem(itemData);
-            setEditedPrice(itemData.price);
-            setSaleQuantity(1); // Default to selling 1 item
-
-        } catch (error) {
-            console.error("Error fetching product by barcode:", error);
-            toast({ title: "Error", description: "An error occurred while fetching the product.", variant: "destructive" });
+        if (!itemData) {
+            toast({ title: 'Product Not Found', description: 'This barcode is not mapped to any product. Please map it first.', variant: 'destructive' });
+            // Option to redirect to mapping page
+            // router.push(`/dashboard/map-barcode?code=${decodedText}`);
             resetScanState();
+            return;
         }
+            
+        setScannedItem(itemData);
+        setEditedPrice(itemData.price);
+        setSaleQuantity(1); // Default to selling 1 item
     };
     
     const handleSale = async () => {
@@ -114,17 +67,15 @@ export default function SalesPage() {
             return;
         }
         
-        toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
-        setSaleCompleted(true);
-        // We don't reset the scanner state here anymore, we wait for user to click "Scan Next"
-
         try {
             await recordSale(scannedItem.id, quantityNum, editedPrice, user.uid);
+            toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
+            setSaleCompleted(true);
             await forceRefetch();
         } catch (error) {
             console.error("Error processing sale:", error);
             const errorMessage = (error as Error).message || 'Failed to process sale.';
-            toast({ title: 'Sync Error', description: `Sale recorded locally, but failed to sync. ${errorMessage}`, variant: 'destructive' });
+            toast({ title: 'Sync Error', description: `Sale failed to record. ${errorMessage}`, variant: 'destructive' });
         }
     };
 

@@ -1,10 +1,9 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useMediaQuery } from 'react-responsive';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -36,22 +35,13 @@ export default function MapBarcodePage() {
 
         setIsScannerPaused(true);
         setScannedBarcode(decodedText);
+        
+        const mappedItem = inventory.find(item => item.barcodeId === decodedText);
 
-        try {
-            const inventoryRef = collection(db, "inventory");
-            const q = query(inventoryRef, where("barcodeId", "==", decodedText));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                const mappedItem = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as InventoryItem;
-                setAlreadyMappedItem(mappedItem);
-            } else {
-                setIsMappingDialogOpen(true);
-            }
-        } catch (error) {
-            console.error("Error fetching product by barcode:", error);
-            toast({ title: "Error", description: "An error occurred while fetching the product.", variant: "destructive" });
-            resetForNextScan();
+        if (mappedItem) {
+            setAlreadyMappedItem(mappedItem);
+        } else {
+            setIsMappingDialogOpen(true);
         }
     };
 
@@ -59,10 +49,18 @@ export default function MapBarcodePage() {
         if (!scannedBarcode) return;
 
         try {
+            // Check if this barcode is already used by another product.
+            const existingMapping = inventory.find(item => item.barcodeId === scannedBarcode);
+            if(existingMapping) {
+                 toast({ title: 'Error', description: `This barcode is already mapped to ${existingMapping.brand}.`, variant: 'destructive' });
+                 resetForNextScan();
+                 return;
+            }
+
             await updateBrand(productId, { barcodeId: scannedBarcode });
             const mappedItem = inventory.find(item => item.id === productId);
             toast({ title: 'Success', description: `Barcode mapped to ${mappedItem?.brand} successfully.` });
-            await forceRefetch(); // Force a refetch to ensure data consistency
+            await forceRefetch(); 
         } catch (error) {
             console.error("Error mapping barcode:", error);
             toast({ title: 'Error', description: 'Mapping failed. Please try again.', variant: 'destructive' });
@@ -99,7 +97,7 @@ export default function MapBarcodePage() {
                         <Barcode /> Map Product Barcodes
                     </CardTitle>
                     <CardDescription>
-                        Scan a product's barcode to link it to an item in your inventory.
+                        Scan a product's barcode to link it to an item in your inventory. This only needs to be done once per product type.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -154,8 +152,10 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredInventory = useMemo(() => {
-        if (!searchTerm) return inventory;
-        return inventory.filter(item =>
+        // Filter out items that already have a barcode
+        const unmappedInventory = inventory.filter(item => !item.barcodeId);
+        if (!searchTerm) return unmappedInventory;
+        return unmappedInventory.filter(item =>
             item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
         );
@@ -179,14 +179,14 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
                 <DialogHeader>
                     <DialogTitle>Map New Barcode</DialogTitle>
                     <DialogDescription>
-                        The barcode <span className="font-mono bg-muted p-1 rounded-sm">{barcodeId}</span> is new. Select the product to link it to.
+                        The barcode <span className="font-mono bg-muted p-1 rounded-sm">{barcodeId}</span> is new. Select an unmapped product to link it to.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search inventory..."
+                            placeholder="Search unmapped inventory..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="pl-10"
@@ -205,7 +205,7 @@ function MapProductDialog({ isOpen, onOpenChange, barcodeId, onMap, onCancel }: 
                             ))
                         ) : (
                             <div className="text-center p-8 text-muted-foreground">
-                                No products found.
+                                No unmapped products found.
                             </div>
                         )}
                     </ScrollArea>

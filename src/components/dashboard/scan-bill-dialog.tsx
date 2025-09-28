@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -81,7 +82,12 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
                 }
             } catch (err) {
                 console.error("Extraction error:", err);
-                setError("An error occurred while processing the bill. The AI might be unavailable, or the file could be corrupted.");
+                const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+                if (errorMessage.includes("quota")) {
+                    setError("Could not process bill. The AI service quota may be exceeded. Please check your API key billing status or try again later.");
+                } else {
+                    setError("An error occurred while processing the bill. The AI might be unavailable, or the file could be corrupted.");
+                }
             } finally {
                 setIsLoading(false);
             }
@@ -223,7 +229,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
                 <DialogHeader>
                     <DialogTitle>Scan New Bill</DialogTitle>
                     <DialogDescription>
-                        Upload an image or PDF of your bill to automatically extract and add items to your godown inventory.
+                        Upload an image or PDF of your bill to automatically add stock to your godown.
                     </DialogDescription>
                 </DialogHeader>
                 
