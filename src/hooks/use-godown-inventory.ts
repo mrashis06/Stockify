@@ -245,16 +245,14 @@ export function useGodownInventory() {
     }
   };
 
-  const transferToShop = async (productId: string, quantityToTransfer: number) => {
+  const transferToShop = async (productId: string, quantityToTransfer: number, price?: number) => {
     setSaving(true);
     const today = format(new Date(), 'yyyy-MM-dd');
 
     // --- Phase 1: All Reads, done outside the transaction ---
-    const godownItemsQuery = query(
-      collection(db, 'godownInventory'),
-      where('productId', '==', productId)
-    );
+    const godownItemsQuery = query(collection(db, 'godownInventory'), where('productId', '==', productId));
     const godownItemsSnapshot = await getDocs(godownItemsQuery);
+    
     const sortedGodownItems = godownItemsSnapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as GodownItem))
       .sort((a, b) => a.dateAdded.toMillis() - b.dateAdded.toMillis());
@@ -285,11 +283,14 @@ export function useGodownInventory() {
             
             let shopItemData: any;
             if (!shopItemDoc.exists()) {
+                if (price === undefined) {
+                    throw new Error("A price is required for a new product.");
+                }
                 shopItemData = {
                     brand: firstGodownBatch.brand,
                     size: firstGodownBatch.size,
                     category: firstGodownBatch.category,
-                    price: 0,
+                    price: price,
                     prevStock: 0,
                     transferHistory: [],
                 };

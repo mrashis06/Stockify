@@ -41,6 +41,7 @@ import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useInventory } from '@/hooks/use-inventory';
 
 // A new type for our grouped data structure
 type GroupedGodownItem = {
@@ -65,6 +66,9 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
         forceRefetch
     } = useGodownInventory();
     
+    // We need the main shop inventory to check if an item is new
+    const { inventory: shopInventory } = useInventory();
+    
     usePageLoading(loading);
     const { formatDate } = useDateFormat();
 
@@ -74,6 +78,7 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     const [isTransferOpen, setIsTransferOpen] = useState(false);
     const [isScanBillOpen, setIsScanBillOpen] = useState(false);
     const [transferringItem, setTransferringItem] = useState<GroupedGodownItem | null>(null);
+    const [isNewToShop, setIsNewToShop] = useState(false);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -91,13 +96,16 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
     };
     
     const handleOpenTransferDialog = (item: GroupedGodownItem) => {
+        // Check if the product already exists in the shop inventory
+        const shopItem = shopInventory.find(si => si.id === item.productId);
+        setIsNewToShop(!shopItem);
         setTransferringItem(item);
         setIsTransferOpen(true);
     };
 
-    const handleTransferToShop = async (productId: string, quantity: number) => {
+    const handleTransferToShop = async (productId: string, quantity: number, price?: number) => {
         try {
-            await transferToShop(productId, quantity);
+            await transferToShop(productId, quantity, price);
             toast({ title: 'Success', description: `${quantity} units transferred to shop.` });
             setIsTransferOpen(false);
         } catch (error) {
@@ -212,15 +220,15 @@ export default function GodownPage({ params, searchParams }: { params: { slug: s
                 isOpen={isTransferOpen}
                 onOpenChange={setIsTransferOpen}
                 item={{
-                    // The dialog expects a GodownItem-like structure with quantity
-                    // We'll pass the grouped item but the dialog only uses productId and totalQuantity
                     id: transferringItem.productId, 
                     brand: transferringItem.brand,
                     size: transferringItem.size,
                     category: transferringItem.category,
                     quantity: transferringItem.totalQuantity,
-                    dateAdded: new Date(), // Dummy value, not used in dialog
+                    dateAdded: new Date(), // Dummy value
+                    productId: transferringItem.productId, // explicit
                 }}
+                isNewToShop={isNewToShop}
                 onTransfer={handleTransferToShop}
             />
         )}
