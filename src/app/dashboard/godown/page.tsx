@@ -91,7 +91,7 @@ export default function GodownPage() {
         try {
             for (const id of selectedRows) {
                 const item = inventory.find(i => i.id === id);
-                if (item && (item.stockInGodown > 0 || (item.prevStock + item.added - item.sales) > 0)) {
+                if (item && (item.stockInGodown > 0 || ((item.prevStock || 0) + (item.added || 0) - (item.sales || 0)) > 0)) {
                     toast({ title: 'Action Denied', description: `Cannot delete "${item.brand}". Stock must be zero in both godown and shop.`, variant: 'destructive' });
                     continue;
                 }
@@ -99,6 +99,7 @@ export default function GodownPage() {
             }
             toast({ title: 'Success', description: 'Selected products removed.' });
             setSelectedRows(new Set());
+            await forceRefetch();
         } catch (error) {
             console.error('Error removing products:', error);
             toast({ title: 'Error', description: (error as Error).message || 'Failed to remove selected products.', variant: 'destructive' });
@@ -282,6 +283,3 @@ export default function GodownPage() {
     </main>
   );
 }
-
-
-    
