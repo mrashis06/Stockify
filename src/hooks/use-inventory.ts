@@ -360,9 +360,25 @@ export const useInventory = create<InventoryState>((set, get) => ({
             
             const dailyDoc = await transaction.get(dailyRef);
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            
+            const masterData = masterDoc.data();
+
             if (field === 'price') {
                 transaction.update(masterRef, { price: value });
+            } else if (field === 'added') {
+                const currentAdded = dailyData[id]?.added || 0;
+                const newAdded = Number(value);
+                const difference = currentAdded - newAdded;
+                
+                if (difference > 0) { // Stock is being returned to godown
+                    const currentGodownStock = masterData.stockInGodown || 0;
+                    transaction.update(masterRef, { stockInGodown: currentGodownStock + difference });
+                } else if (difference < 0) { // Stock is being moved from godown
+                    const currentGodownStock = masterData.stockInGodown || 0;
+                    if (currentGodownStock < Math.abs(difference)) {
+                        throw new Error("Not enough stock in Godown to add.");
+                    }
+                    transaction.update(masterRef, { stockInGodown: currentGodownStock + difference });
+                }
             }
 
             const updateData = { [field]: value };
@@ -406,3 +422,5 @@ function initializeListeners() {
 if (typeof window !== 'undefined') {
     initializeListeners();
 }
+
+    
