@@ -50,7 +50,8 @@ export default function GodownPage() {
         deleteBrand: deleteProduct,
         deleteUnprocessedItems,
         transferToShop,
-        forceRefetch
+        forceRefetch,
+        updateBrand
     } = useInventory();
     
     usePageLoading(loading);
@@ -91,15 +92,17 @@ export default function GodownPage() {
         }
     };
 
-    const handleDeleteSelected = async () => {
+    const handleRemoveSelected = async () => {
         setIsDeleteDialogOpen(false);
         try {
-            await Promise.all(Array.from(selectedRows).map(id => deleteProduct(id)));
-            toast({ title: 'Success', description: 'Selected products removed.' });
+            // This is now a safe-delete, only clearing godown stock
+            const promises = Array.from(selectedRows).map(id => updateBrand(id, { stockInGodown: 0 }));
+            await Promise.all(promises);
+            toast({ title: 'Success', description: 'Selected products removed from Godown.' });
             setSelectedRows(new Set());
             forceRefetch();
         } catch (error) {
-            console.error('Error removing products:', error);
+            console.error('Error removing products from Godown:', error);
             toast({ title: 'Error', description: (error as Error).message || 'Failed to remove selected products.', variant: 'destructive' });
         }
     };
@@ -182,13 +185,13 @@ export default function GodownPage() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will permanently delete the selected product(s) and all associated data. This action cannot be undone.
+                        This will remove the selected product(s) from your Godown by setting their stock to zero. This action does not delete the product from your main inventory.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteSelected} className="bg-destructive hover:bg-destructive/90">
-                        Delete
+                    <AlertDialogAction onClick={handleRemoveSelected} className="bg-destructive hover:bg-destructive/90">
+                        Remove Stock
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -344,4 +347,5 @@ export default function GodownPage() {
     </main>
   );
 }
+
 

@@ -142,11 +142,11 @@ export const useInventory = create<InventoryState>((set, get) => ({
         const masterItemData = {
             brand: newItemData.brand,
             size: newItemData.size,
-            price: newItemData.price,
+            price: Number(newItemData.price),
             category: newItemData.category,
             stockInGodown: 0,
             barcodeId: null,
-            prevStock: newItemData.prevStock
+            prevStock: Number(newItemData.prevStock)
         };
         
         await setDoc(docRef, masterItemData);
@@ -192,7 +192,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
         if (result.unmatchedItems && result.unmatchedItems.length > 0) {
             result.unmatchedItems.forEach(item => {
                 const docRef = doc(collection(db, 'unprocessed_deliveries'));
-                batch.set(docRef, { ...item, createdAt: serverTimestamp() });
+                batch.set(docRef, { ...item, quantity: Number(item.quantity), createdAt: serverTimestamp() });
             });
         }
         
@@ -221,7 +221,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
 
             if (!querySnapshot.empty) {
                 const existingDoc = querySnapshot.docs[0];
-                const newStock = (existingDoc.data().stockInGodown || 0) + details.quantity;
+                const newStock = (existingDoc.data().stockInGodown || 0) + Number(details.quantity);
                 transaction.update(existingDoc.ref, { stockInGodown: newStock });
             } else {
                 const newProductRef = doc(db, 'inventory', barcode);
@@ -229,8 +229,8 @@ export const useInventory = create<InventoryState>((set, get) => ({
                     brand: details.brand,
                     size: details.size,
                     category: details.category,
-                    price: details.price,
-                    stockInGodown: details.quantity,
+                    price: Number(details.price),
+                    stockInGodown: Number(details.quantity),
                     barcodeId: barcode,
                     prevStock: 0,
                 };
@@ -253,7 +253,11 @@ export const useInventory = create<InventoryState>((set, get) => ({
     get().setSaving(true);
     try {
         const docRef = doc(db, 'inventory', id);
-        await updateDoc(docRef, data);
+        const updateData: Partial<InventoryItem> = { ...data };
+        if (data.price) {
+          updateData.price = Number(data.price);
+        }
+        await updateDoc(docRef, updateData);
         await get().fetchAllData();
     } catch (error) {
       console.error("Error updating brand: ", error);
@@ -266,12 +270,22 @@ export const useInventory = create<InventoryState>((set, get) => ({
   deleteBrand: async (id) => {
     get().setSaving(true);
     try {
-        const batch = writeBatch(db);
-        const masterRef = doc(db, 'inventory', id);
-        
-        batch.delete(masterRef);
-        
-        await batch.commit();
+        const itemToRemove = get().inventory.find(item => item.id === id);
+        if (!itemToRemove) {
+            throw new Error("Product not found");
+        }
+
+        // If it's just godown stock, just clear it. This is the safe delete.
+        if (itemToRemove.stockInGodown > 0 && itemToRemove.prevStock === 0 && itemToRemove.added === 0) {
+             const docRef = doc(db, 'inventory', id);
+             await updateDoc(docRef, { stockInGodown: 0 });
+        } else {
+            // This is a full delete, which should only be triggered from the main inventory page
+            const batch = writeBatch(db);
+            const masterRef = doc(db, 'inventory', id);
+            batch.delete(masterRef);
+            await batch.commit();
+        }
         await get().fetchAllData();
 
     } catch (error) {
@@ -319,10 +333,13 @@ export const useInventory = create<InventoryState>((set, get) => ({
                 throw new Error(`Not enough stock in godown. Available: ${masterData.stockInGodown || 0}`);
             }
             
-            transaction.update(masterRef, { 
-              stockInGodown: masterData.stockInGodown - quantityToTransfer,
-              ...(price && { price: price }) 
-            });
+            const updateData: any = {
+                 stockInGodown: masterData.stockInGodown - quantityToTransfer
+            };
+            if (price) {
+                updateData.price = Number(price);
+            }
+            transaction.update(masterRef, updateData);
 
             const itemDailyData = dailyData[productId] || { added: 0 };
             itemDailyData.added = (itemDailyData.added || 0) + quantityToTransfer;
@@ -397,7 +414,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
             const masterData = masterDoc.data();
 
             if (field === 'price') {
-                transaction.update(masterRef, { price: value });
+                transaction.update(masterRef, { price: Number(value) });
             } else if (field === 'added') {
                 const currentAdded = dailyData[id]?.added || 0;
                 const newAdded = Number(value);
@@ -415,7 +432,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
                 }
             }
 
-            const updateData = { [field]: value };
+            const updateData = { [field]: Number(value) };
             transaction.set(dailyRef, { [id]: updateData }, { merge: true });
         });
         await get().fetchAllData();
