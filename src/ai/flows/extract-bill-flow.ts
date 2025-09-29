@@ -71,16 +71,16 @@ You are an expert data entry and matching agent for a liquor store. Your task is
 **INSTRUCTIONS:**
 
 1.  **Extract Details**: For each line item on the bill, extract the following details:
-    *   `brand`: The brand name (e.g., "Old Monk", "Kingfisher Ultra").
-    *   `size`: **Extract ONLY the numeric value of the size.** Discard units like "ml", "ML". (e.g., "750ml" -> "750").
-    *   `quantity`: The number of units.
-    *   `category`: The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
+    *   brand: The brand name (e.g., "Old Monk", "Kingfisher Ultra").
+    *   size: **Extract ONLY the numeric value of the size.** Discard units like "ml", "ML". (e.g., "750ml" -> "750").
+    *   quantity: The number of units.
+    *   category: The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
 
-2.  **Match Against Inventory**: For each extracted item, compare it to the `existingInventory` list provided. The goal is to find a perfect match based on brand and size. Brand names might be slightly different (e.g., bill says "Kingfisher Beer" and inventory has "Kingfisher"). Use your best judgment to find the correct match.
+2.  **Match Against Inventory**: For each extracted item, compare it to the \`existingInventory\` list provided. The goal is to find a perfect match based on brand and size. Brand names might be slightly different (e.g., bill says "Kingfisher Beer" and inventory has "Kingfisher"). Use your best judgment to find the correct match.
 
 3.  **Categorize Results**:
-    *   **If a match is found**: Add the item to the \`matchedItems\` array. You must provide the \`productId\` from the `existingInventory` and the \`quantity\` from the bill.
-    *   **If no match is found**: This is a new product. Add its full extracted details (`brand`, `size`, `quantity`, `category`) to the \`unmatchedItems\` array.
+    *   **If a match is found**: Add the item to the \`matchedItems\` array. You must provide the \`productId\` from the \`existingInventory\` and the \`quantity\` from the bill.
+    *   **If no match is found**: This is a new product. Add its full extracted details (\`brand\`, \`size\`, \`quantity\`, \`category\`) to the \`unmatchedItems\` array.
 
 **EXAMPLE:**
 
@@ -89,7 +89,7 @@ You are an expert data entry and matching agent for a liquor store. Your task is
 *   "Tuborg Beer 650ml - 5 units"
 
 *existingInventory contains:*
-*   `{ id: 'mcdowells_750', brand: 'McDowells', size: '750' }`
+*   \`{ id: 'mcdowells_750', brand: 'McDowells', size: '750' }\`
 
 *Expected JSON Output:*
 \`\`\`json
