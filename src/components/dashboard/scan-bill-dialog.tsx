@@ -14,30 +14,34 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { extractItemsFromBill, BillExtractionOutput, ExtractedItem } from '@/ai/flows/extract-bill-flow';
+import { useInventory, UnprocessedItem } from '@/hooks/use-inventory';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UploadCloud, FileCheck2, AlertCircle, Trash2 } from 'lucide-react';
+import { Loader2, UploadCloud, FileCheck2, AlertCircle, Trash2, CheckCircle, Package } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { ScrollArea } from '../ui/scroll-area';
 import { Input } from '../ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { ExtractedItem } from '@/ai/flows/extract-bill-flow';
+
 
 type ScanBillDialogProps = {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
-    onAddItems: (items: ExtractedItem[]) => void;
 };
 
-export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: ScanBillDialogProps) {
+export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogProps) {
+    const { processScannedBill } = useInventory();
+    const { toast } = useToast();
     const [file, setFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [extractedData, setExtractedData] = useState<BillExtractionOutput | null>(null);
+    const [result, setResult] = useState<{ matchedCount: number; unmatchedCount: number; } | null>(null);
 
     const resetState = () => {
         setFile(null);
         setIsLoading(false);
         setError(null);
-        setExtractedData(null);
+        setResult(null);
     };
 
     useEffect(() => {
@@ -68,18 +72,18 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
 
         setIsLoading(true);
         setError(null);
-        setExtractedData(null);
+        setResult(null);
 
         const reader = new FileReader();
         reader.onload = async (event) => {
             const dataUri = event.target?.result as string;
             try {
-                const result = await extractItemsFromBill({ billDataUri: dataUri });
-                if (!result || !result.items || result.items.length === 0) {
-                     setError("The AI couldn't find any items in the bill. Please try a clearer image or a different bill.");
-                } else {
-                    setExtractedData(result);
-                }
+                const processResult = await processScannedBill(dataUri);
+                setResult(processResult);
+                toast({
+                    title: "Bill Processed Successfully",
+                    description: `${processResult.matchedCount} items auto-stocked, ${processResult.unmatchedCount} items need review.`,
+                });
             } catch (err) {
                 console.error("Extraction error:", err);
                 const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -99,24 +103,8 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
         reader.readAsDataURL(file);
     };
     
-    const handleConfirm = () => {
-        if (extractedData?.items) {
-            onAddItems(extractedData.items);
-            onOpenChange(false);
-        }
-    };
-    
-    const handleItemChange = (index: number, field: keyof ExtractedItem, value: string | number) => {
-        if (!extractedData) return;
-        const newItems = [...extractedData.items];
-        (newItems[index] as any)[field] = value;
-        setExtractedData({ items: newItems });
-    };
-
-    const handleRemoveItem = (index: number) => {
-        if (!extractedData) return;
-        const newItems = extractedData.items.filter((_, i) => i !== index);
-        setExtractedData({ items: newItems });
+    const handleClose = () => {
+        onOpenChange(false);
     };
 
     const renderContent = () => {
@@ -125,6 +113,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
                 <div className="flex flex-col items-center justify-center h-48 gap-4">
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
                     <p className="text-muted-foreground">Analyzing your bill, please wait...</p>
+                    <p className="text-xs text-muted-foreground">(This may take up to a minute)</p>
                 </div>
             );
         }
@@ -142,46 +131,24 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
             );
         }
 
-        if (extractedData) {
+        if (result) {
             return (
-                <div className="space-y-4">
-                    <h3 className="font-semibold">Review Extracted Items</h3>
-                    <ScrollArea className="h-72 border rounded-md">
-                        <Table>
-                            <TableHeader className="sticky top-0 bg-muted">
-                                <TableRow>
-                                    <TableHead>Brand</TableHead>
-                                    <TableHead>Size</TableHead>
-                                    <TableHead>Qty</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead className="w-10"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {extractedData.items.map((item, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>
-                                            <Input defaultValue={item.brand} onBlur={(e) => handleItemChange(index, 'brand', e.target.value)} className="h-8" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input defaultValue={item.size} onBlur={(e) => handleItemChange(index, 'size', e.target.value)} className="h-8" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input type="number" defaultValue={item.quantity} onBlur={(e) => handleItemChange(index, 'quantity', Number(e.target.value))} className="h-8 w-16" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Input defaultValue={item.category} onBlur={(e) => handleItemChange(index, 'category', e.target.value)} className="h-8" />
-                                        </TableCell>
-                                        <TableCell>
-                                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                             </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
+                <div className="space-y-4 text-center">
+                    <CheckCircle className="h-16 w-16 mx-auto text-green-500" />
+                    <h3 className="text-xl font-semibold">Processing Complete</h3>
+                    <div className="flex justify-center gap-6">
+                        <div className="p-4 rounded-lg bg-muted">
+                            <p className="text-2xl font-bold">{result.matchedCount}</p>
+                            <p className="text-sm text-muted-foreground">Items Auto-Stocked</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-muted">
+                             <p className="text-2xl font-bold">{result.unmatchedCount}</p>
+                            <p className="text-sm text-muted-foreground">Need Review</p>
+                        </div>
+                    </div>
+                    <p className="text-muted-foreground">
+                        Auto-stocked items have been added to your Godown. Items needing review are in the 'Unprocessed Deliveries' section.
+                    </p>
                 </div>
             )
         }
@@ -199,8 +166,8 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
                         </Button>
                     </div>
                     <Button onClick={handleExtraction} className="w-full" disabled={isLoading}>
-                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Start Extraction
+                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
+                        Process Bill
                     </Button>
                 </div>
             );
@@ -225,11 +192,11 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Scan New Bill</DialogTitle>
                     <DialogDescription>
-                        Upload an image or PDF of your bill. Items will be added to a holding area for processing.
+                        Upload a bill to automatically stock your Godown. New items will be sent to a holding area for review.
                     </DialogDescription>
                 </DialogHeader>
                 
@@ -238,19 +205,13 @@ export default function ScanBillDialog({ isOpen, onOpenChange, onAddItems }: Sca
                 </div>
 
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button variant="secondary" onClick={resetState}>Cancel</Button>
-                    </DialogClose>
-                     {extractedData && (
-                        <Button onClick={handleConfirm} className="bg-green-600 hover:bg-green-700">
-                            Confirm & Add to Holding Area
-                        </Button>
-                    )}
+                    <Button variant="secondary" onClick={handleClose}>
+                        {result ? 'Done' : 'Cancel'}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 }
-
 
     

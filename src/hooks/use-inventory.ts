@@ -28,7 +28,9 @@ import { toast } from '@/hooks/use-toast';
 import { createAdminNotification, deleteAdminNotificationByProductId } from './use-notifications';
 import { useAuth } from './use-auth';
 import { useNotificationSettings } from './use-notification-settings';
-import type { ExtractedItem } from '@/ai/flows/extract-bill-flow';
+import type { ExtractedItem, BillExtractionOutput } from '@/ai/flows/extract-bill-flow';
+import { extractItemsFromBill } from '@/ai/flows/extract-bill-flow';
+
 
 export type InventoryItem = {
   id: string;
@@ -57,7 +59,7 @@ type InventoryState = {
   saving: boolean;
   fetchAllData: () => Promise<void>;
   addBrand: (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock'> & {prevStock: number}) => Promise<void>;
-  addItemsFromBillToHolding: (items: ExtractedItem[]) => Promise<number>;
+  processScannedBill: (billDataUri: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
   updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
   deleteBrand: (id: string) => Promise<void>;
@@ -158,24 +160,56 @@ export const useInventory = create<InventoryState>((set, get) => ({
     }
   },
 
-  addItemsFromBillToHolding: async (items) => {
-      if (items.length === 0) return 0;
-      get().setSaving(true);
-      try {
-          const batch = writeBatch(db);
-          items.forEach(item => {
-              const docRef = doc(collection(db, 'unprocessed_deliveries'));
-              batch.set(docRef, { ...item, createdAt: serverTimestamp() });
-          });
-          await batch.commit();
-          await get().fetchAllData();
-          return items.length;
-      } catch (e) {
-          console.error("Error adding items to holding area:", e);
-          throw e;
-      } finally {
-          get().setSaving(false);
-      }
+  processScannedBill: async (billDataUri: string) => {
+    get().setSaving(true);
+    try {
+        const currentInventory = get().inventory.map(item => ({
+            id: item.id,
+            brand: item.brand,
+            size: item.size
+        }));
+
+        const result: BillExtractionOutput = await extractItemsFromBill({
+            billDataUri,
+            existingInventory: currentInventory,
+        });
+
+        const batch = writeBatch(db);
+
+        // Process matched items
+        if (result.matchedItems && result.matchedItems.length > 0) {
+            for (const item of result.matchedItems) {
+                const productRef = doc(db, 'inventory', item.productId);
+                const productSnap = await getDoc(productRef); // Not in transaction, but acceptable for this use case
+                if (productSnap.exists()) {
+                    const currentStock = productSnap.data().stockInGodown || 0;
+                    batch.update(productRef, { stockInGodown: currentStock + item.quantity });
+                }
+            }
+        }
+
+        // Process unmatched items
+        if (result.unmatchedItems && result.unmatchedItems.length > 0) {
+            result.unmatchedItems.forEach(item => {
+                const docRef = doc(collection(db, 'unprocessed_deliveries'));
+                batch.set(docRef, { ...item, createdAt: serverTimestamp() });
+            });
+        }
+        
+        await batch.commit();
+        await get().fetchAllData();
+        
+        return {
+            matchedCount: result.matchedItems?.length || 0,
+            unmatchedCount: result.unmatchedItems?.length || 0,
+        };
+
+    } catch (e) {
+        console.error("Error processing scanned bill:", e);
+        throw e;
+    } finally {
+        get().setSaving(false);
+    }
   },
 
   processScannedDelivery: async (unprocessedItemId, barcode, details) => {

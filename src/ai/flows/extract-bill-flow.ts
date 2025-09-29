@@ -27,13 +27,22 @@ const BillExtractionInputSchema = z.object({
     .describe(
       "A bill or invoice as a data URI that must include a MIME type (image or pdf) and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
+   existingInventory: z.array(z.object({
+       id: z.string(),
+       brand: z.string(),
+       size: z.string(),
+   })).describe("A list of existing products in the user's inventory.")
 });
 export type BillExtractionInput = z.infer<typeof BillExtractionInputSchema>;
 
 
 // Define the output schema for the flow
 const BillExtractionOutputSchema = z.object({
-  items: z.array(ExtractedItemSchema).describe('An array of items extracted from the bill.'),
+  matchedItems: z.array(z.object({
+      productId: z.string().describe("The ID of the matched product from the existing inventory."),
+      quantity: z.number().describe("The quantity of the matched product."),
+  })).describe("Items from the bill that were successfully matched to existing inventory."),
+  unmatchedItems: z.array(ExtractedItemSchema).describe("Items from the bill that could not be matched and need manual processing."),
 });
 export type BillExtractionOutput = z.infer<typeof BillExtractionOutputSchema>;
 
@@ -57,40 +66,60 @@ const billExtractionPrompt = ai.definePrompt({
     format: 'json'
   },
   prompt: `
-You are an expert data entry agent for a liquor store. Your task is to extract all line items from the provided bill/invoice image.
+You are an expert data entry and matching agent for a liquor store. Your task is to extract all line items from the provided bill and match them against the user's existing inventory.
 
-Extract for each product:
-- brand: The brand name of the product, *exactly* as shown on the bill.
-- size: **Extract ONLY the numeric value of the size. Discard any unit labels like "ml", "ML", "Ml.", "mL", etc.**  
-  For example:
-    - "750ml" → "750"
-    - "650 ML" → "650"
-    - "375 mL." → "375"
-- quantity: The number of units or bottles.
-- category: The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
+**INSTRUCTIONS:**
 
-STRICT RULES for size:
-1. Always output size as a numeric string only (e.g., "750", "650", "375").
-2. Never include "ml", "ML", "mL", or any other text in the size field.
-3. If no numeric size is visible, return an empty string "".
+1.  **Extract Details**: For each line item on the bill, extract the following details:
+    *   `brand`: The brand name (e.g., "Old Monk", "Kingfisher Ultra").
+    *   `size`: **Extract ONLY the numeric value of the size.** Discard units like "ml", "ML". (e.g., "750ml" -> "750").
+    *   `quantity`: The number of units.
+    *   `category`: The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
 
-Return the final result as valid JSON:
+2.  **Match Against Inventory**: For each extracted item, compare it to the `existingInventory` list provided. The goal is to find a perfect match based on brand and size. Brand names might be slightly different (e.g., bill says "Kingfisher Beer" and inventory has "Kingfisher"). Use your best judgment to find the correct match.
+
+3.  **Categorize Results**:
+    *   **If a match is found**: Add the item to the \`matchedItems\` array. You must provide the \`productId\` from the `existingInventory` and the \`quantity\` from the bill.
+    *   **If no match is found**: This is a new product. Add its full extracted details (`brand`, `size`, `quantity`, `category`) to the \`unmatchedItems\` array.
+
+**EXAMPLE:**
+
+*Bill shows:*
+*   "McDowell's No.1 750ml - 10 units"
+*   "Tuborg Beer 650ml - 5 units"
+
+*existingInventory contains:*
+*   `{ id: 'mcdowells_750', brand: 'McDowells', size: '750' }`
+
+*Expected JSON Output:*
+\`\`\`json
 {
-  "items": [
+  "matchedItems": [
     {
-      "brand": "Tuborg",
+      "productId": "mcdowells_750",
+      "quantity": 10
+    }
+  ],
+  "unmatchedItems": [
+    {
+      "brand": "Tuborg Beer",
       "size": "650",
-      "quantity": 10,
+      "quantity": 5,
       "category": "Beer"
     }
   ]
 }
+\`\`\`
 
-Bill document: {{media url=billDataUri}}
+**Bill document to process:** {{media url=billDataUri}}
+**Existing Inventory to match against:**
+{{{jsonStringify existingInventory}}}
+
+Return the final result as valid JSON.
 `,
   model: 'googleai/gemini-2.5-flash',
   requestOptions: {
-    timeout: 30000,
+    timeout: 60000, // Increased timeout for a more complex task
   },
 });
 

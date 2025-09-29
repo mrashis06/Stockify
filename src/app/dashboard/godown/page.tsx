@@ -46,7 +46,6 @@ export default function GodownPage() {
         inventory,
         unprocessedItems,
         loading,
-        addItemsFromBillToHolding,
         processScannedDelivery,
         deleteBrand: deleteProduct,
         deleteUnprocessedItems,
@@ -177,15 +176,6 @@ export default function GodownPage() {
         <ScanBillDialog 
             isOpen={isScanBillOpen}
             onOpenChange={setIsScanBillOpen}
-            onAddItems={async (items) => {
-                try {
-                    const count = await addItemsFromBillToHolding(items);
-                    toast({ title: 'Bill Scanned', description: `${count} item types sent to the holding area for processing.` });
-                } catch(e) {
-                    const errorMessage = e instanceof Error ? e.message : 'Failed to add items from bill.';
-                    toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
-                }
-            }}
         />
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent>
