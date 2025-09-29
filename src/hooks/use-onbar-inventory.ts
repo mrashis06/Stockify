@@ -12,7 +12,8 @@ import {
   serverTimestamp,
   addDoc,
   getDoc,
-  setDoc
+  setDoc,
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useInventory } from './use-inventory'; // To trigger stock updates
@@ -41,7 +42,7 @@ export function useOnBarInventory() {
   const [onBarInventory, setOnBarInventory] = useState<OnBarItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { inventory, updateItemField } = useInventory();
+  const { inventory, updateItemField, forceRefetch } = useInventory();
 
   usePageLoading(loading);
 
@@ -64,18 +65,6 @@ export function useOnBarInventory() {
       try {
         const itemInShop = inventory.find(item => item.id === inventoryItemId);
         if (!itemInShop) throw new Error("Item not found in shop inventory.");
-        
-        // This logic is now removed as per user request. Opening a bottle does not affect off-counter stock.
-        /*
-        const currentSales = itemInShop.sales || 0;
-        const opening = (itemInShop.prevStock || 0) + (itemInShop.added || 0);
-        const closingStock = opening - currentSales;
-
-        if (closingStock < quantity) {
-            throw new Error(`Not enough stock. Available: ${closingStock}, trying to open: ${quantity}`);
-        }
-        await updateItemField(inventoryItemId, 'sales', currentSales + quantity);
-        */
         
         const newOnBarDocRef = doc(collection(db, "onBarInventory"));
         
@@ -213,32 +202,49 @@ export function useOnBarInventory() {
     }
   };
 
-  const removeOnBarItem = async (id: string) => {
+ const removeOnBarItem = async (id: string) => {
       if(saving) return;
       setSaving(true);
       try {
-          const itemRef = doc(db, 'onBarInventory', id);
-          const itemSnap = await getDoc(itemRef);
-          if (!itemSnap.exists()) throw new Error("On-bar item not found");
-          const onBarItemData = itemSnap.data() as OnBarItem;
+          await runTransaction(db, async (transaction) => {
+            const onBarItemRef = doc(db, "onBarInventory", id);
+            const onBarItemDoc = await transaction.get(onBarItemRef);
+
+            if (!onBarItemDoc.exists()) {
+                throw new Error("On-bar item not found.");
+            }
+
+            const onBarItemData = onBarItemDoc.data() as OnBarItem;
+
+            // Only return stock if nothing has been sold from this item
+            if (onBarItemData.salesVolume === 0) {
+                const inventoryId = onBarItemData.inventoryId;
+
+                // Make sure this isn't a manually added item
+                if (inventoryId && inventoryId !== 'manual') {
+                    const masterInventoryRef = doc(db, "inventory", inventoryId);
+                    const masterInventoryDoc = await transaction.get(masterInventoryRef);
+                    
+                    if (masterInventoryDoc.exists()) {
+                        const masterData = masterInventoryDoc.data();
+                        const currentGodownStock = masterData.stockInGodown || 0;
+                        const quantityToReturn = onBarItemData.category === 'Beer'
+                            ? onBarItemData.remainingVolume // Return all remaining units
+                            : 1; // Return 1 bottle
+
+                        transaction.update(masterInventoryRef, {
+                            stockInGodown: currentGodownStock + quantityToReturn
+                        });
+                    }
+                }
+            }
+            
+            // Delete the on-bar item regardless of whether stock was returned
+            transaction.delete(onBarItemRef);
+          });
           
-          // Logic for returning stock to off-counter is removed as per user request
-          /*
-          const inventoryId = onBarItemData.inventoryId;
-          if (inventoryId && inventoryId !== 'manual') {
-              const itemInShop = inventory.find(item => item.id === inventoryId);
-              if (itemInShop) {
-                  const currentSales = itemInShop.sales || 0;
-                  const quantityToReturn = onBarItemData.category === 'Beer' ? onBarItemData.remainingVolume : onBarItemData.remainingVolume > 0 ? 1 : 0;
-                  
-                  if (quantityToReturn > 0) {
-                    await updateItemField(inventoryId, 'sales', Math.max(0, currentSales - quantityToReturn));
-                  }
-              }
-          }
-          */
-          
-          await deleteDoc(itemRef);
+          // forceRefetch from the main inventory hook to update UI
+          await forceRefetch();
 
       } catch (error) {
           console.error("Error removing on-bar item: ", error);
@@ -250,5 +256,3 @@ export function useOnBarInventory() {
 
   return { onBarInventory, loading, saving, addOnBarItem, sellPeg, refillPeg, removeOnBarItem };
 }
-
-    
