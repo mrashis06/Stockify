@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug } from 'lucide-react';
+import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -23,6 +23,12 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -35,21 +41,25 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
+import TransferToOnBarDialog from '@/components/dashboard/transfer-to-onbar-dialog';
 import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useInventory, InventoryItem, UnprocessedItem } from '@/hooks/use-inventory';
 import ProcessDeliveryDialog from '@/components/dashboard/process-delivery-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useDateFormat } from '@/hooks/use-date-format';
+
 
 export default function GodownPage() {
+    const { formatDate } = useDateFormat();
     const { 
         inventory,
         unprocessedItems,
         loading,
         processScannedDelivery,
-        deleteBrand: deleteProduct,
         deleteUnprocessedItems,
         transferToShop,
+        transferToOnBar,
         forceRefetch,
         updateBrand
     } = useInventory();
@@ -59,9 +69,10 @@ export default function GodownPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [isScanBillOpen, setIsScanBillOpen] = useState(false);
-    const [isTransferOpen, setIsTransferOpen] = useState(false);
+    const [isTransferShopOpen, setIsTransferShopOpen] = useState(false);
+    const [isTransferOnBarOpen, setIsTransferOnBarOpen] = useState(false);
     const [isProcessDeliveryOpen, setIsProcessDeliveryOpen] = useState(false);
-    const [transferringItem, setTransferringItem] = useState<InventoryItem | null>(null);
+    const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [processingItem, setProcessingItem] = useState<any | null>(null);
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [selectedUnprocessedRows, setSelectedUnprocessedRows] = useState<Set<string>>(new Set());
@@ -69,9 +80,13 @@ export default function GodownPage() {
     const [isDeleteUnprocessedOpen, setIsDeleteUnprocessedOpen] = useState(false);
     const { toast } = useToast();
     
-    const handleOpenTransferDialog = (item: InventoryItem) => {
-        setTransferringItem(item);
-        setIsTransferOpen(true);
+    const handleOpenTransferDialog = (item: InventoryItem, destination: 'shop' | 'onbar') => {
+        setSelectedItem(item);
+        if (destination === 'shop') {
+            setIsTransferShopOpen(true);
+        } else {
+            setIsTransferOnBarOpen(true);
+        }
     };
 
     const handleOpenProcessDialog = (item: any) => {
@@ -79,11 +94,11 @@ export default function GodownPage() {
         setIsProcessDeliveryOpen(true);
     }
 
-    const handleTransfer = async (productId: string, quantity: number, price?: number) => {
+    const handleTransferToShop = async (productId: string, quantity: number, price?: number) => {
         try {
             await transferToShop(productId, quantity, price);
             toast({ title: 'Success', description: `${quantity} units transferred to shop.` });
-            setIsTransferOpen(false);
+            setIsTransferShopOpen(false);
             forceRefetch();
         } catch (error) {
             console.error('Error transferring to shop:', error);
@@ -91,11 +106,25 @@ export default function GodownPage() {
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     };
+    
+    const handleTransferToOnBar = async (productId: string, quantity: number, pegPrices?: { '30ml': number, '60ml': number }) => {
+        try {
+            await transferToOnBar(productId, quantity, pegPrices);
+            const item = inventory.find(i => i.id === productId);
+            toast({ title: 'Success', description: `${item?.brand} transferred to On-Bar.` });
+            setIsTransferOnBarOpen(false);
+            forceRefetch();
+        } catch (error) {
+            console.error('Error transferring to on-bar:', error);
+            const errorMessage = (error as Error).message || 'Failed to transfer stock.';
+            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+        }
+    }
 
     const handleRemoveSelected = async () => {
         setIsDeleteDialogOpen(false);
         try {
-            // This is now a safe-delete, only clearing godown stock
+            // This is a safe-delete, only clearing godown stock
             const promises = Array.from(selectedRows).map(id => updateBrand(id, { stockInGodown: 0 }));
             await Promise.all(promises);
             toast({ title: 'Success', description: 'Selected products removed from Godown.' });
@@ -160,12 +189,20 @@ export default function GodownPage() {
 
   return (
     <main className="flex-1 p-4 md:p-8">
-        {transferringItem && (
+        {selectedItem && (
             <TransferToShopDialog
-                isOpen={isTransferOpen}
-                onOpenChange={setIsTransferOpen}
-                item={transferringItem}
-                onTransfer={handleTransfer}
+                isOpen={isTransferShopOpen}
+                onOpenChange={setIsTransferShopOpen}
+                item={selectedItem}
+                onTransfer={handleTransferToShop}
+            />
+        )}
+        {selectedItem && (
+            <TransferToOnBarDialog
+                isOpen={isTransferOnBarOpen}
+                onOpenChange={setIsTransferOnBarOpen}
+                item={selectedItem}
+                onTransfer={handleTransferToOnBar}
             />
         )}
         {processingItem && (
@@ -301,9 +338,10 @@ export default function GodownPage() {
                             <TableHead className="w-12"></TableHead>
                             <TableHead className="font-bold text-foreground">Brand</TableHead>
                             <TableHead className="font-bold text-foreground">Size</TableHead>
-                            <TableHead className="font-bold text-foreground">Category</TableHead>
-                            <TableHead className="font-bold text-foreground w-40">Godown Stock</TableHead>
-                            <TableHead className="font-bold text-foreground text-center w-48">Actions</TableHead>
+                            <TableHead className="font-bold text-foreground">Godown Stock</TableHead>
+                            <TableHead className="font-bold text-foreground">Date Added</TableHead>
+                            <TableHead className="font-bold text-foreground">Last Transferred</TableHead>
+                            <TableHead className="font-bold text-foreground text-center w-32">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -321,20 +359,35 @@ export default function GodownPage() {
                                         </TableCell>
                                         <TableCell className="font-medium">{item.brand}</TableCell>
                                         <TableCell>{item.size}</TableCell>
-                                        <TableCell>{item.category}</TableCell>
                                         <TableCell>{item.stockInGodown || 0}</TableCell>
+                                        <TableCell>{item.dateAddedToGodown ? formatDate(item.dateAddedToGodown.toDate()) : 'N/A'}</TableCell>
+                                        <TableCell>{item.lastTransferred ? formatDate(item.lastTransferred.toDate()) : 'N/A'}</TableCell>
                                         <TableCell className="text-center">
-                                            <Button variant="outline" size="sm" onClick={() => handleOpenTransferDialog(item)} disabled={(item.stockInGodown || 0) <= 0}>
-                                                <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                                Transfer to Shop
-                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="sm" disabled={(item.stockInGodown || 0) <= 0}>
+                                                        <MoreVertical className="h-4 w-4" />
+                                                        <span className="sr-only">Actions</span>
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'shop')}>
+                                                        <Archive className="mr-2 h-4 w-4" />
+                                                        Transfer to Shop
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'onbar')} disabled={!['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine'].includes(item.category)}>
+                                                         <GlassWater className="mr-2 h-4 w-4" />
+                                                        Transfer to On-Bar
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 </React.Fragment>
                             ))
                         ) : (
                              <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
+                                <TableCell colSpan={7} className="h-24 text-center">
                                     No stock found in Godown. Use 'Scan Bill' to add new deliveries.
                                 </TableCell>
                             </TableRow>
@@ -347,5 +400,3 @@ export default function GodownPage() {
     </main>
   );
 }
-
-

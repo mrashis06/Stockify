@@ -45,6 +45,8 @@ export type InventoryItem = {
   sales: number;
   opening?: number;
   closing?: number;
+  dateAddedToGodown?: Timestamp;
+  lastTransferred?: Timestamp;
 };
 
 export type UnprocessedItem = ExtractedItem & { 
@@ -65,6 +67,7 @@ type InventoryState = {
   deleteBrand: (id: string) => Promise<void>;
   deleteUnprocessedItems: (ids: string[]) => Promise<void>;
   transferToShop: (productId: string, quantityToTransfer: number, price?: number) => Promise<void>;
+  transferToOnBar: (productId: string, quantity: number, pegPrices?: { '30ml': number; '60ml': number }) => Promise<void>;
   recordSale: (id: string, quantity: number, salePrice: number, soldBy: string) => Promise<void>;
   updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => Promise<void>;
   forceRefetch: () => Promise<void>;
@@ -80,7 +83,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
   loading: true,
   saving: false,
   setLoading: (isLoading) => set({ loading: isLoading }),
-  setSaving: (isSaving) => set({ saving: isSaving }),
+  setSaving: (isSaving) => set({ isSaving: isSaving }),
   forceRefetch: async () => {
     await get().fetchAllData();
   },
@@ -183,7 +186,10 @@ export const useInventory = create<InventoryState>((set, get) => ({
                 const productSnap = await getDoc(productRef); // Not in transaction, but acceptable for this use case
                 if (productSnap.exists()) {
                     const currentStock = productSnap.data().stockInGodown || 0;
-                    batch.update(productRef, { stockInGodown: currentStock + item.quantity });
+                    batch.update(productRef, { 
+                        stockInGodown: currentStock + item.quantity,
+                        dateAddedToGodown: serverTimestamp(),
+                    });
                 }
             }
         }
@@ -222,7 +228,10 @@ export const useInventory = create<InventoryState>((set, get) => ({
             if (!querySnapshot.empty) {
                 const existingDoc = querySnapshot.docs[0];
                 const newStock = (existingDoc.data().stockInGodown || 0) + Number(details.quantity);
-                transaction.update(existingDoc.ref, { stockInGodown: newStock });
+                transaction.update(existingDoc.ref, { 
+                    stockInGodown: newStock,
+                    dateAddedToGodown: serverTimestamp()
+                });
             } else {
                 const newProductRef = doc(db, 'inventory', barcode);
                 const newProductData = {
@@ -233,6 +242,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
                     stockInGodown: Number(details.quantity),
                     barcodeId: barcode,
                     prevStock: 0,
+                    dateAddedToGodown: serverTimestamp()
                 };
                 transaction.set(newProductRef, newProductData);
             }
@@ -270,26 +280,14 @@ export const useInventory = create<InventoryState>((set, get) => ({
   deleteBrand: async (id) => {
     get().setSaving(true);
     try {
-        const itemToRemove = get().inventory.find(item => item.id === id);
-        if (!itemToRemove) {
-            throw new Error("Product not found");
-        }
-
-        // If it's just godown stock, just clear it. This is the safe delete.
-        if (itemToRemove.stockInGodown > 0 && itemToRemove.prevStock === 0 && itemToRemove.added === 0) {
-             const docRef = doc(db, 'inventory', id);
-             await updateDoc(docRef, { stockInGodown: 0 });
-        } else {
-            // This is a full delete, which should only be triggered from the main inventory page
-            const batch = writeBatch(db);
-            const masterRef = doc(db, 'inventory', id);
-            batch.delete(masterRef);
-            await batch.commit();
-        }
+        // This is a full delete, which should only be triggered from the main inventory page
+        const batch = writeBatch(db);
+        const masterRef = doc(db, 'inventory', id);
+        batch.delete(masterRef);
+        await batch.commit();
         await get().fetchAllData();
-
     } catch (error) {
-        console.error("Error deleting brand:", error);
+        console.error("Error deleting product:", error);
         throw error;
     } finally {
         get().setSaving(false);
@@ -334,7 +332,8 @@ export const useInventory = create<InventoryState>((set, get) => ({
             }
             
             const updateData: any = {
-                 stockInGodown: masterData.stockInGodown - quantityToTransfer
+                 stockInGodown: masterData.stockInGodown - quantityToTransfer,
+                 lastTransferred: serverTimestamp()
             };
             if (price) {
                 updateData.price = Number(price);
@@ -354,6 +353,63 @@ export const useInventory = create<InventoryState>((set, get) => ({
         get().setSaving(false);
     }
  },
+ 
+  transferToOnBar: async (productId, quantity, pegPrices) => {
+    get().setSaving(true);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const masterRef = doc(db, 'inventory', productId);
+        const masterDoc = await transaction.get(masterRef);
+        if (!masterDoc.exists()) throw new Error("Product not found.");
+
+        const masterData = masterDoc.data() as InventoryItem;
+        if ((masterData.stockInGodown || 0) < quantity) {
+          throw new Error(`Not enough stock in godown. Available: ${masterData.stockInGodown || 0}`);
+        }
+
+        // 1. Decrease stock from Godown
+        transaction.update(masterRef, {
+          stockInGodown: masterData.stockInGodown - quantity,
+          lastTransferred: serverTimestamp()
+        });
+
+        // 2. Add item(s) to On-Bar inventory
+        const isBeer = masterData.category === 'Beer';
+        const volumeMatch = masterData.size.match(/(\d+)/);
+        const volume = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
+        
+        const onBarItemPayload: Omit<any, 'id' | 'openedAt'> = {
+            inventoryId: productId,
+            brand: masterData.brand,
+            size: masterData.size,
+            category: masterData.category,
+            totalVolume: volume,
+            remainingVolume: isBeer ? quantity : volume,
+            price: masterData.price,
+            totalQuantity: isBeer ? quantity : 1,
+            salesVolume: 0,
+            salesValue: 0,
+            openedAt: serverTimestamp(),
+        };
+
+        if (!isBeer && pegPrices) {
+            onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
+            onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
+        }
+
+        const onBarDocRef = doc(collection(db, "onBarInventory"));
+        transaction.set(onBarDocRef, onBarItemPayload);
+      });
+
+      await get().fetchAllData();
+
+    } catch (error) {
+      console.error("Error transferring to on-bar:", error);
+      throw error;
+    } finally {
+      get().setSaving(false);
+    }
+  },
 
   recordSale: async (id, quantity, salePrice, soldBy) => {
       get().setSaving(true);
@@ -367,21 +423,25 @@ export const useInventory = create<InventoryState>((set, get) => ({
             const masterDoc = await transaction.get(masterRef);
             if (!masterDoc.exists()) throw new Error("Product not found.");
             
-            const dailyDoc = await transaction.get(dailyDocRef);
-            const masterData = masterDoc.data();
-            let dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            let itemDailyData = dailyData[id];
+            // This is the fix for the POS redirect bug. Re-fetch inventory.
+            await get().fetchAllData();
+            const liveInventory = get().inventory;
+            const liveItem = liveInventory.find(i => i.id === id);
+            if (!liveItem) throw new Error("Live product data not found.");
 
-            if (!itemDailyData) {
-                const yesterdayDoc = await transaction.get(doc(db, 'dailyInventory', yesterday));
-                const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
-                const prevStock = yesterdayData[id]?.closing ?? masterData.prevStock ?? 0;
-                itemDailyData = { ...masterData, prevStock, added: 0, sales: 0 };
+            const openingStock = Number(liveItem.prevStock || 0) + Number(liveItem.added || 0);
+            const currentSales = Number(liveItem.sales || 0);
+
+            if (openingStock < currentSales + quantity) {
+                throw new Error(`Insufficient stock. Available: ${openingStock - currentSales}`);
             }
 
-            const openingStock = (itemDailyData.prevStock ?? (masterData.prevStock ?? 0)) + (itemDailyData.added ?? 0);
-            if (openingStock < (itemDailyData.sales || 0) + quantity) {
-                throw new Error("Insufficient stock to complete sale.");
+            const dailyDoc = await transaction.get(dailyDocRef);
+            let dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+            let itemDailyData = dailyData[id];
+             if (!itemDailyData) {
+                const masterData = masterDoc.data();
+                itemDailyData = { ...masterData, prevStock: openingStock, sales: 0 };
             }
 
             itemDailyData.sales = (itemDailyData.sales || 0) + quantity;

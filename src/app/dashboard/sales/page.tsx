@@ -53,14 +53,14 @@ export default function SalesPage() {
         setIsScannerPaused(true);
         setScannedItem(itemData);
         setEditedPrice(itemData.price);
-        setSaleQuantity(1); // Default to selling 1 item
+        setSaleQuantity(''); // Start with an empty input
     };
     
     const handleSale = async () => {
         if (!scannedItem || editedPrice === null || !user) return;
         
-        const quantityNum = Number(saleQuantity);
-        if (saleQuantity === '' || isNaN(quantityNum) || quantityNum <= 0 || !Number.isInteger(quantityNum)) {
+        const quantityNum = Number(saleQuantity || 1); // Default to 1 if input is empty
+        if (isNaN(quantityNum) || quantityNum <= 0 || !Number.isInteger(quantityNum)) {
             toast({ title: 'Invalid Quantity', description: 'Please enter a valid whole number greater than zero.', variant: 'destructive' });
             return;
         }
@@ -183,10 +183,10 @@ export default function SalesPage() {
                                             type="number"
                                             value={saleQuantity}
                                             onChange={(e) => setSaleQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                                            placeholder="Enter quantity"
+                                            placeholder="Enter quantity (default: 1)"
                                             min="1"
                                             max={availableStock}
-                                            className="max-w-[120px]"
+                                            className="max-w-[180px]"
                                             autoFocus
                                         />
                                     </div>

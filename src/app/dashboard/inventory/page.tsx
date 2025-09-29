@@ -55,7 +55,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         inventory,
         loading,
         addBrand,
-        deleteBrand,
+        deleteBrand: deleteProduct,
         updateBrand,
         updateItemField,
     } = useInventory();
@@ -128,7 +128,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const handleDeleteSelected = async () => {
         try {
-            await Promise.all(Array.from(selectedRows).map(id => deleteBrand(id)));
+            await Promise.all(Array.from(selectedRows).map(id => deleteProduct(id)));
             toast({ title: 'Success', description: 'Selected brands removed.' });
             setSelectedRows(new Set());
         } catch (error) {
