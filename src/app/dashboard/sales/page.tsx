@@ -94,8 +94,8 @@ export default function SalesPage() {
         if (!scannedItem) return 0;
         const liveItem = inventory.find(i => i.id === scannedItem.id);
         if (!liveItem) return 0;
-        const opening = (liveItem.prevStock || 0) + (liveItem.added || 0);
-        return opening - (liveItem.sales || 0);
+        const opening = Number(liveItem.prevStock || 0) + Number(liveItem.added || 0);
+        return opening - Number(liveItem.sales || 0);
     }, [scannedItem, inventory]);
 
     return (
