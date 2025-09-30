@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -32,23 +31,25 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<{ matchedCount: number; unmatchedCount: number; } | null>(null);
 
-    const resetState = () => {
+    const handleClose = useCallback(() => {
+        onOpenChange(false);
+    }, [onOpenChange]);
+
+    const resetState = useCallback(() => {
         setFile(null);
         setIsLoading(false);
         setError(null);
         setResult(null);
-    };
+    }, []);
 
-    // This effect ensures that whenever the dialog is closed, its internal state is reset.
     useEffect(() => {
         if (!isOpen) {
-            // Add a small delay to allow the closing animation to finish before resetting state.
             const timer = setTimeout(() => {
                 resetState();
             }, 300);
             return () => clearTimeout(timer);
         }
-    }, [isOpen]);
+    }, [isOpen, resetState]);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
@@ -84,8 +85,8 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                     title: "Bill Processed Successfully",
                     description: `${processResult.matchedCount} items auto-stocked, ${processResult.unmatchedCount} items need review.`,
                 });
-                // Force a refetch of inventory data on the main page
                 forceRefetch();
+                handleClose(); // Automatically close dialog on success
             } catch (err) {
                 console.error("Extraction error:", err);
                 const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -105,10 +106,6 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
         reader.readAsDataURL(file);
     };
     
-    const handleClose = () => {
-        onOpenChange(false);
-    };
-
     const renderContent = () => {
         if (isLoading) {
             return (
@@ -131,28 +128,6 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                     <Button onClick={() => { setError(null); setFile(null); }} className="w-full">Try Again</Button>
                 </div>
             );
-        }
-
-        if (result) {
-            return (
-                <div className="space-y-4 text-center">
-                    <CheckCircle className="h-16 w-16 mx-auto text-green-500" />
-                    <h3 className="text-xl font-semibold">Processing Complete</h3>
-                    <div className="flex justify-center gap-6">
-                        <div className="p-4 rounded-lg bg-muted">
-                            <p className="text-2xl font-bold">{result.matchedCount}</p>
-                            <p className="text-sm text-muted-foreground">Items Auto-Stocked</p>
-                        </div>
-                        <div className="p-4 rounded-lg bg-muted">
-                             <p className="text-2xl font-bold">{result.unmatchedCount}</p>
-                            <p className="text-sm text-muted-foreground">Need Review</p>
-                        </div>
-                    </div>
-                    <p className="text-muted-foreground">
-                        Auto-stocked items have been added to your Godown. Items needing review are in the 'Unprocessed Deliveries' section.
-                    </p>
-                </div>
-            )
         }
 
         if (file) {
@@ -208,7 +183,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
 
                 <DialogFooter>
                     <Button variant="secondary" onClick={handleClose}>
-                        {result ? 'Done' : 'Cancel'}
+                        Cancel
                     </Button>
                 </DialogFooter>
             </DialogContent>
