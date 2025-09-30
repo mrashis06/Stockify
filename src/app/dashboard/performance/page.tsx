@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -93,9 +94,8 @@ export default function PerformancePage() {
         }
     };
 
-
     const handleDateSelect = (range: DateRange | undefined) => {
-        setDateRangeOption('custom'); // Switch to custom mode when user interacts with calendar
+        setDateRangeOption('custom');
         setDate(range);
     };
     
@@ -372,4 +372,5 @@ export default function PerformancePage() {
         </div>
     );
 }
+
 
