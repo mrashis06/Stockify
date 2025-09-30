@@ -3,10 +3,10 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut } from 'lucide-react';
+import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut, GlassWater } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
+import { useOnBarInventory } from '@/hooks/use-onbar-inventory';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
 import {
   AlertDialog,
@@ -48,19 +49,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { usePageLoading } from '@/hooks/use-loading';
+import { Separator } from '@/components/ui/separator';
 
 
 export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
         inventory,
-        loading,
+        loading: inventoryLoading,
         addBrand,
         deleteBrand: deleteProduct,
         updateBrand,
         updateItemField,
     } = useInventory();
+    const { onBarInventory, loading: onBarLoading } = useOnBarInventory();
     
-    usePageLoading(loading);
+    usePageLoading(inventoryLoading || onBarLoading);
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -210,12 +213,22 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         }, { totalOpening: 0, totalAdded: 0, totalSalesUnits: 0, totalClosing: 0 });
     }, [filteredInventory]);
 
-    const totalAmount = useMemo(() => {
+    const totalOffCounterAmount = useMemo(() => {
         return filteredInventory.reduce((total, item) => total + (Number(item.sales) || 0) * (Number(item.price) || 0), 0);
     }, [filteredInventory]);
+    
+    const onBarSales = useMemo(() => {
+        return onBarInventory.filter(item => item.salesValue && item.salesValue > 0);
+    }, [onBarInventory]);
+
+    const totalOnBarAmount = useMemo(() => {
+        return onBarSales.reduce((total, item) => total + item.salesValue, 0);
+    }, [onBarSales]);
+    
+    const grandTotalSales = totalOffCounterAmount + totalOnBarAmount;
 
 
-  if (loading) {
+  if (inventoryLoading || onBarLoading) {
     return null;
   }
 
@@ -430,7 +443,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                         </TableBody>
                          <TableFooter>
                              <TableRow className="bg-muted/50 font-medium">
-                                <TableCell colSpan={4} className="text-right">Totals</TableCell>
+                                <TableCell colSpan={4} className="text-right">Off-Counter Totals</TableCell>
                                 <TableCell className="font-bold">{filteredInventory.reduce((sum, item) => sum + Number(item.prevStock || 0), 0)}</TableCell>
                                 <TableCell className="font-bold">{totalAdded}</TableCell>
                                 {showOpening && <TableCell className="font-bold">{totalOpening}</TableCell>}
@@ -439,16 +452,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                 <TableCell className="font-bold">
                                     <div className="flex items-center">
                                         <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                        {totalAmount.toLocaleString('en-IN')}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="border-t-2 border-primary/50">
-                                <TableCell colSpan={showOpening && showClosing ? 9 : (showOpening || showClosing ? 8 : 7)} className="text-right font-extrabold text-xl text-primary">Total Sales Value</TableCell>
-                                <TableCell colSpan={1} className="font-extrabold text-xl text-primary">
-                                    <div className="flex items-center">
-                                        <IndianRupee className="h-6 w-6 mr-1 shrink-0" />
-                                        {(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {totalOffCounterAmount.toLocaleString('en-IN')}
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -456,8 +460,88 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                     </Table>
                     
                 </div>
+
+                {onBarSales.length > 0 && (
+                    <div className="mt-8">
+                        <Separator />
+                        <Card className="mt-8 border-dashed bg-muted/30">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-lg">
+                                    <GlassWater className="h-5 w-5 text-primary" /> Today's On-Bar Sales
+                                </CardTitle>
+                                <CardDescription>Summary of all items sold from the On-Bar inventory today.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Brand</TableHead>
+                                            <TableHead>Units / Volume Sold</TableHead>
+                                            <TableHead className="text-right">Sales Value</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {onBarSales.map(item => (
+                                            <TableRow key={item.id}>
+                                                <TableCell className="font-medium">{item.brand} ({item.size})</TableCell>
+                                                <TableCell>{item.salesVolume} {item.category === 'Beer' ? 'units' : 'ml'}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end">
+                                                        <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                                        {item.salesValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow className="bg-muted/50 font-medium">
+                                            <TableCell colSpan={2} className="text-right font-bold">Total On-Bar Sales</TableCell>
+                                            <TableCell className="text-right font-bold">
+                                                <div className="flex items-center justify-end">
+                                                    <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                                    {totalOnBarAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                        <Separator className="my-8" />
+                    </div>
+                )}
+                
+                <div className="mt-6 flex justify-end">
+                    <div className="min-w-[300px] text-right">
+                        <div className="flex justify-between items-center py-2">
+                            <p className="font-medium">Total Off-Counter Sales:</p>
+                             <p className="font-semibold flex items-center">
+                                <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                {totalOffCounterAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b">
+                            <p className="font-medium">Total On-Bar Sales:</p>
+                             <p className="font-semibold flex items-center">
+                                <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                {totalOnBarAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                         <div className="flex justify-between items-center pt-4">
+                            <p className="text-xl font-extrabold text-primary">Grand Total Sales:</p>
+                             <p className="text-xl font-extrabold text-primary flex items-center">
+                                <IndianRupee className="h-6 w-6 mr-1 shrink-0" />
+                                {grandTotalSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
             </CardContent>
         </Card>
     </main>
   );
 }
+
+      
