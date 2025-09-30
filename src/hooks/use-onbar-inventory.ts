@@ -59,7 +59,7 @@ export function useOnBarInventory() {
     return () => unsubscribe();
   }, []);
 
-  const addOnBarItem = async (inventoryItemId: string, volume: number, quantity: number = 1, pegPrices?: { '30ml': number; '60ml': number }) => {
+  const addOnBarItem = async (inventoryItemId: string, volume: number, quantity: number = 1, price: number, pegPrices?: { '30ml': number; '60ml': number }) => {
       if (saving) return;
       setSaving(true);
       try {
@@ -77,7 +77,7 @@ export function useOnBarInventory() {
             category: itemInShop.category,
             totalVolume: volume,
             remainingVolume: isBeer ? quantity : volume,
-            price: itemInShop.price,
+            price: price, // Use the provided price
             totalQuantity: isBeer ? quantity : 1,
             salesVolume: 0,
             salesValue: 0,
@@ -256,3 +256,5 @@ export function useOnBarInventory() {
 
   return { onBarInventory, loading, saving, addOnBarItem, sellPeg, refillPeg, removeOnBarItem };
 }
+
+    

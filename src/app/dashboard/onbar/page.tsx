@@ -84,7 +84,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const handleRemove = async (id: string) => {
          try {
             await removeOnBarItem(id);
-            toast({ title: 'Success', description: 'Bottle removed and stock returned.' });
+            toast({ title: 'Success', description: 'Bottle removed from bar.' });
         } catch (error) {
             console.error('Error removing item:', error);
             const errorMessage = (error as Error).message || 'Failed to remove item.';
@@ -184,7 +184,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     <Wine className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-medium">No Open Bottles</h3>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        Click "Open a Bottle" to add an item from your inventory or manually to start tracking sales.
+                        Click "Open a Bottle" to add an item from your inventory to start tracking sales.
                     </p>
                 </div>
             ) : (
@@ -272,3 +272,5 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
+
+    

@@ -33,17 +33,26 @@ import type { InventoryItem } from '@/hooks/use-inventory';
 const generateFormSchema = (shopInventory: InventoryItem[]) => z.object({
   inventoryId: z.string().min(1, 'Please select a product.'),
   quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1.'),
+  price: z.coerce.number().optional(), // Price per unit for beer
   pegPrice30ml: z.coerce.number().optional(),
   pegPrice60ml: z.coerce.number().optional(),
 }).refine(data => {
     const selectedItem = shopInventory.find(item => item.id === data.inventoryId);
-    // Validation runs if a product is selected and it is NOT a beer.
-    if (selectedItem && selectedItem.category !== 'Beer') {
+    if (selectedItem?.category === 'Beer') {
+        return data.price !== undefined && data.price > 0;
+    }
+    return true;
+}, {
+    message: "Price per unit is required for beer.",
+    path: ["price"],
+}).refine(data => {
+    const selectedItem = shopInventory.find(item => item.id === data.inventoryId);
+    if (selectedItem && selectedItem.category !== 'Beer' && !['Wine'].includes(selectedItem.category)) {
         return data.pegPrice30ml !== undefined && data.pegPrice30ml > 0;
     }
     return true;
 }, {
-    message: "Price for 30ml peg is required for non-beer items.",
+    message: "Price for 30ml peg is required for this item.",
     path: ["pegPrice30ml"],
 });
 
@@ -51,7 +60,7 @@ const generateFormSchema = (shopInventory: InventoryItem[]) => z.object({
 type AddOnBarItemDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onAddItem: (inventoryId: string, volume: number, quantity: number, pegPrices?: { '30ml': number, '60ml': number }) => Promise<void>;
+  onAddItem: (inventoryId: string, volume: number, quantity: number, price: number, pegPrices?: { '30ml': number, '60ml': number }) => Promise<void>;
   shopInventory: InventoryItem[];
 };
 
@@ -68,6 +77,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
     defaultValues: {
       inventoryId: '',
       quantity: 1,
+      price: '' as any,
       pegPrice30ml: '' as any,
       pegPrice60ml: '' as any,
     },
@@ -87,6 +97,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
   const selectedProductId = form.watch('inventoryId');
   const selectedProduct = useMemo(() => shopInventory.find(item => item.id === selectedProductId), [shopInventory, selectedProductId]);
   const isBeer = selectedProduct?.category === 'Beer';
+  const isWine = selectedProduct?.category === 'Wine';
 
   const onSubmit = async (data: AddOnBarItemFormValues) => {
     try {
@@ -96,12 +107,14 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
         const volumeMatch = item.size.match(/(\d+)/);
         const volume = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
         
+        const salePrice = data.price || item.price; // Use form price for beer, or fallback to inventory price
+
         const pegPrices = data.pegPrice30ml ? {
             '30ml': data.pegPrice30ml,
-            '60ml': data.pegPrice60ml || data.pegPrice30ml * 2, // Default 60ml if not provided
+            '60ml': data.pegPrice60ml || data.pegPrice30ml * 2,
         } : undefined;
 
-        await onAddItem(data.inventoryId, volume, data.quantity, pegPrices);
+        await onAddItem(data.inventoryId, volume, data.quantity, salePrice, pegPrices);
         onOpenChange(false);
     } catch(error) {
         console.error("Failed to add item to On-Bar", error);
@@ -111,11 +124,28 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
   };
   
   useEffect(() => {
-    if (!isOpen) {
-      form.reset();
-      setSearchTerm('');
+    if (isOpen) {
+        const selectedId = form.getValues('inventoryId');
+        const product = shopInventory.find(item => item.id === selectedId);
+        form.reset({
+          inventoryId: selectedId,
+          quantity: 1,
+          price: product?.price || ('' as any), // Pre-fill price if it exists
+          pegPrice30ml: '' as any,
+          pegPrice60ml: '' as any,
+        });
+    } else {
+        form.reset();
+        setSearchTerm('');
     }
-  }, [isOpen, form]);
+  }, [isOpen, form, shopInventory]);
+
+  useEffect(() => {
+      const product = shopInventory.find(item => item.id === selectedProductId);
+      if (product) {
+          form.setValue('price', product.price);
+      }
+  }, [selectedProductId, shopInventory, form]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -123,7 +153,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
         <DialogHeader>
           <DialogTitle>Open a Bottle</DialogTitle>
           <DialogDescription>
-             Select an item from your shop inventory to add it to the on-bar service area. This will not affect your off-counter stock.
+             Select an item from your shop inventory to add it to the on-bar service area.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -162,7 +192,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
                                   ))
                               ) : (
                                   <div className="text-center p-8 text-muted-foreground">
-                                      No products found with available stock.
+                                      No products with available stock found.
                                   </div>
                               )}
                           </ScrollArea>
@@ -172,21 +202,36 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
               />
               
               {selectedProduct && (
-                isBeer ? (
+                <>
                   <FormField
                       control={form.control}
                       name="quantity"
                       render={({ field }) => (
                           <FormItem>
-                              <FormLabel>Quantity of Units</FormLabel>
+                              <FormLabel>Quantity to Open</FormLabel>
                               <FormControl>
-                                  <Input type="number" min="1" placeholder="Number of beer bottles" {...field} />
+                                  <Input type="number" min="1" placeholder="Number of units/bottles" {...field} />
                               </FormControl>
                               <FormMessage />
                           </FormItem>
                       )}
                   />
-                ) : (
+                  {isBeer ? (
+                     <FormField
+                        control={form.control}
+                        name="price"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>On-Bar Price Per Unit</FormLabel>
+                                <div className="relative">
+                                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <FormControl><Input type="number" placeholder="e.g. 150" {...field} className="pl-8" /></FormControl>
+                                </div>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                      />
+                  ) : !isWine && (
                     <div className="grid grid-cols-2 gap-4">
                         <FormField control={form.control} name="pegPrice30ml" render={({ field }) => (
                              <FormItem>
@@ -209,7 +254,8 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
                              </FormItem>
                         )} />
                     </div>
-                )
+                  )}
+                </>
               )}
 
                <DialogFooter>
@@ -224,3 +270,5 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
     </Dialog>
   );
 }
+
+    
