@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { eachDayOfInterval, startOfDay, subMonths, format, isSameDay } from 'date-fns';
+import { eachDayOfInterval, startOfDay, subMonths, subDays, format, isSameDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Calendar as CalendarIcon, Filter, Loader2, Download, PackagePlus, MinusCircle, TrendingUp } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -55,7 +55,7 @@ export default function PerformancePage() {
     const [loading, setLoading] = useState(true);
 
     const [date, setDate] = useState<DateRange | undefined>({
-        from: subMonths(new Date(), 1),
+        from: subDays(new Date(), 29),
         to: new Date(),
     });
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
@@ -355,3 +355,4 @@ export default function PerformancePage() {
         </div>
     );
 }
+
