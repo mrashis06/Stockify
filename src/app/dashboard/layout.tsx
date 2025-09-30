@@ -3,7 +3,7 @@
 
 import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -126,6 +126,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       { href: "/dashboard/map-barcode", pageName: 'Map Barcodes', icon: Barcode, label: "Map Barcodes" },
       ...(isAdmin ? [{ href: "/dashboard/staff", pageName: 'Staff', icon: Users, label: "Staff" }] : []),
       { href: "/dashboard/reports", pageName: 'Reports', icon: FileText, label: "Reports" },
+      { href: "/dashboard/performance", pageName: 'Performance', icon: TrendingUp, label: "Performance" },
   ];
 
   
