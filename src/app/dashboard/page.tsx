@@ -109,7 +109,13 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   }, [inventory, todaySalesData]);
   
   const currentTotalStock = useMemo(() => {
-    return processedInventory.reduce((sum, item) => sum + item.closing, 0);
+    return processedInventory.reduce((sum, item) => {
+        const opening = item.opening ?? 0;
+        if (opening > 0) {
+            return sum + (item.closing ?? 0);
+        }
+        return sum;
+    }, 0);
   }, [processedInventory]);
 
   const calculateTotalSales = (salesData: any, inventoryMap: InventoryItem[]) => {
@@ -117,10 +123,18 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     for (const key in salesData) {
         if (Object.prototype.hasOwnProperty.call(salesData, key)) {
             const item = salesData[key];
-            const masterItem = inventoryMap.find(inv => inv.id === key);
-            const price = Number(item.price ?? masterItem?.price ?? 0);
-            if (item.sales && price) {
-                 total += Number(item.sales) * price;
+            
+            // Handle On-Bar sales, which have a direct salesValue
+            if (item.salesValue && item.salesValue > 0) {
+                total += Number(item.salesValue);
+            } 
+            // Handle Off-Counter sales
+            else if (item.sales && item.sales > 0) {
+                const masterItem = inventoryMap.find(inv => inv.id === key);
+                const price = Number(item.price ?? masterItem?.price ?? 0);
+                if (price) {
+                     total += Number(item.sales) * price;
+                }
             }
         }
     }
@@ -136,29 +150,26 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   }, [yesterdaySalesData, inventory]);
 
   const { lowStockItems, outOfStockItems } = useMemo(() => {
-    const lowStock: InventoryItem[] = [];
-    const outOfStock: InventoryItem[] = [];
+    const low: InventoryItem[] = [];
+    const out: InventoryItem[] = [];
 
     processedInventory.forEach(item => {
         const closingStock = item.closing ?? 0;
         const openingStock = item.opening ?? 0;
-        const stockAtDayStart = item.prevStock ?? 0;
-        const addedToday = (item.added ?? 0) > 0;
-
-        const wasJustRestocked = stockAtDayStart === 0 && addedToday;
-
-        if (wasJustRestocked || openingStock === 0) {
-            return; 
+        
+        // Skip items that are not in the shop inventory for the day.
+        if (openingStock === 0) {
+            return;
         }
 
         if (closingStock === 0) {
-            outOfStock.push(item);
+            out.push(item);
         } else if (closingStock > 0 && closingStock < 10) {
-            lowStock.push(item);
+            low.push(item);
         }
     });
     
-    return { lowStockItems: lowStock, outOfStockItems: outOfStock };
+    return { lowStockItems: low, outOfStockItems: out };
   }, [processedInventory]);
 
   const totalAlerts = lowStockItems.length + outOfStockItems.length;
@@ -189,7 +200,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
               <CardContent>
                 <div className="text-2xl font-bold">{currentTotalStock} Units</div>
                 <p className="text-xs text-muted-foreground">
-                  Current closing stock including today's sales and additions.
+                  Current closing stock in the shop.
                 </p>
               </CardContent>
             </Card>
@@ -291,3 +302,4 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   );
 
     
+
