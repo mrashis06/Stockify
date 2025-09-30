@@ -68,6 +68,7 @@ type InventoryState = {
   processScannedBill: (billDataUri: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
   updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
+  linkBarcodeToProduct: (sourceProductId: string, destinationProductId: string) => Promise<void>;
   updateGodownStock: (productId: string, newStock: number) => Promise<void>;
   deleteBrand: (id: string) => Promise<void>;
   deleteUnprocessedItems: (ids: string[]) => Promise<void>;
@@ -299,6 +300,49 @@ export const useInventory = create<InventoryState>((set, get) => ({
     } catch (error) {
       console.error("Error updating brand: ", error);
       throw error;
+    } finally {
+        get().setSaving(false);
+    }
+  },
+  
+  linkBarcodeToProduct: async (sourceProductId, destinationProductId) => {
+    get().setSaving(true);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const sourceRef = doc(db, 'inventory', sourceProductId);
+            const destRef = doc(db, 'inventory', destinationProductId);
+            
+            const sourceDoc = await transaction.get(sourceRef);
+            const destDoc = await transaction.get(destRef);
+
+            if (!sourceDoc.exists() || !destDoc.exists()) {
+                throw new Error("One or both products not found.");
+            }
+
+            const sourceData = sourceDoc.data() as InventoryItem;
+            const destData = destDoc.data() as InventoryItem;
+            
+            if (!sourceData.barcodeId) {
+                throw new Error("Source product does not have a barcode to link.");
+            }
+            if (destData.barcodeId) {
+                throw new Error("Destination product already has a barcode mapped.");
+            }
+            
+            // 1. Move barcode and stock
+            transaction.update(destRef, {
+                barcodeId: sourceData.barcodeId,
+                stockInGodown: (destData.stockInGodown || 0) + (sourceData.stockInGodown || 0),
+            });
+
+            // 2. Delete the old "messy" product
+            transaction.delete(sourceRef);
+        });
+        await get().fetchAllData();
+
+    } catch (error) {
+        console.error("Error linking barcode: ", error);
+        throw error;
     } finally {
         get().setSaving(false);
     }
