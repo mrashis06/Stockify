@@ -3,7 +3,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater } from 'lucide-react';
+import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -78,6 +78,7 @@ export default function GodownPage() {
     const [selectedUnprocessedRows, setSelectedUnprocessedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleteUnprocessedOpen, setIsDeleteUnprocessedOpen] = useState(false);
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const { toast } = useToast();
     
     const handleOpenTransferDialog = (item: InventoryItem, destination: 'shop' | 'onbar') => {
@@ -165,6 +166,16 @@ export default function GodownPage() {
             newSelection.add(itemId);
         }
         setSelectedUnprocessedRows(newSelection);
+    };
+
+    const toggleRowExpansion = (itemId: string) => {
+        const newSet = new Set(expandedRows);
+        if (newSet.has(itemId)) {
+            newSet.delete(itemId);
+        } else {
+            newSet.add(itemId);
+        }
+        setExpandedRows(newSet);
     };
 
     const filteredInventory = useMemo(() => {
@@ -339,9 +350,7 @@ export default function GodownPage() {
                             <TableHead className="font-bold text-foreground">Brand</TableHead>
                             <TableHead className="font-bold text-foreground">Size</TableHead>
                             <TableHead className="font-bold text-foreground">Godown Stock</TableHead>
-                            <TableHead className="font-bold text-foreground">Date Added</TableHead>
-                            <TableHead className="font-bold text-foreground">Last Transferred</TableHead>
-                            <TableHead className="font-bold text-foreground text-center w-32">Actions</TableHead>
+                            <TableHead className="text-right font-bold text-foreground w-32">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -350,24 +359,32 @@ export default function GodownPage() {
                                 <React.Fragment key={item.id}>
                                     <TableRow data-state={selectedRows.has(item.id) ? "selected" : ""}>
                                          <TableCell className="text-center">
-                                            <input
-                                                type="checkbox"
-                                                className="h-4 w-4"
-                                                checked={selectedRows.has(item.id)}
-                                                onChange={() => handleRowSelect(item.id)}
-                                            />
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => toggleRowExpansion(item.id)}
+                                                    className="h-8 w-8"
+                                                >
+                                                    {expandedRows.has(item.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                </Button>
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4"
+                                                    checked={selectedRows.has(item.id)}
+                                                    onChange={() => handleRowSelect(item.id)}
+                                                />
+                                            </div>
                                         </TableCell>
                                         <TableCell className="font-medium">{item.brand}</TableCell>
                                         <TableCell>{item.size}</TableCell>
                                         <TableCell>{item.stockInGodown || 0}</TableCell>
-                                        <TableCell>{item.dateAddedToGodown ? formatDate(item.dateAddedToGodown.toDate()) : 'N/A'}</TableCell>
-                                        <TableCell>{item.lastTransferred ? formatDate(item.lastTransferred.toDate()) : 'N/A'}</TableCell>
-                                        <TableCell className="text-center">
+                                        <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="sm" disabled={(item.stockInGodown || 0) <= 0}>
-                                                        <MoreVertical className="h-4 w-4" />
-                                                        <span className="sr-only">Actions</span>
+                                                    <Button variant="outline" size="sm" disabled={(item.stockInGodown || 0) <= 0}>
+                                                        Actions
+                                                        <ChevronDown className="h-4 w-4 ml-2" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent>
@@ -383,11 +400,27 @@ export default function GodownPage() {
                                             </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
+                                    {expandedRows.has(item.id) && (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="p-0">
+                                                <div className="bg-muted/50 p-4 grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <p className="font-semibold text-sm">Date Added</p>
+                                                        <p className="text-sm text-muted-foreground">{item.dateAddedToGodown ? formatDate(item.dateAddedToGodown.toDate()) : 'N/A'}</p>
+                                                    </div>
+                                                     <div>
+                                                        <p className="font-semibold text-sm">Last Transferred</p>
+                                                        <p className="text-sm text-muted-foreground">{item.lastTransferred ? formatDate(item.lastTransferred.toDate()) : 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
                                 </React.Fragment>
                             ))
                         ) : (
                              <TableRow>
-                                <TableCell colSpan={7} className="h-24 text-center">
+                                <TableCell colSpan={5} className="h-24 text-center">
                                     No stock found in Godown. Use 'Scan Bill' to add new deliveries.
                                 </TableCell>
                             </TableRow>
