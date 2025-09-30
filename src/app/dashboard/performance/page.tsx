@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { eachDayOfInterval, startOfDay, subMonths, format } from 'date-fns';
+import { eachDayOfInterval, startOfDay, subMonths, format, isSameDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Calendar as CalendarIcon, Filter, Loader2, Download, PackagePlus, MinusCircle, TrendingUp } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -63,16 +63,22 @@ export default function PerformancePage() {
         return ['All Categories', ...Array.from(cats).sort()];
     }, [masterInventory]);
 
-    const handleDateRangeOptionChange = (value: string) => {
-        setDateRangeOption(value);
-        let fromDate;
-        if (value === '30d') fromDate = subMonths(new Date(), 1);
-        else if (value === '3m') fromDate = subMonths(new Date(), 3);
-        else if (value === '6m') fromDate = subMonths(new Date(), 6);
-
-        if (fromDate) {
-            setDate({ from: fromDate, to: new Date() });
+    const handleDateRangeSelect = (range: DateRange | undefined) => {
+        if (range) {
+            if (range.from && !range.to) {
+                // If user clicks one date, set both from and to
+                setDate({ from: range.from, to: range.from });
+            } else if (range.from && range.to && isSameDay(range.from, range.to)) {
+                 // Allow selecting a single day
+                 setDate(range);
+            }
+            else {
+                setDate(range);
+            }
+        } else {
+            setDate(range);
         }
+        setDateRangeOption('custom');
     };
     
     const fetchPerformanceData = useCallback(async (range: DateRange | undefined, category: string) => {
@@ -92,7 +98,9 @@ export default function PerformancePage() {
                     const dailyLog = docSnap.data();
                     for (const productId in dailyLog) {
                         const itemLog = dailyLog[productId];
-                        if (category !== 'All Categories' && itemLog.category !== category) continue;
+                        const masterItemRef = masterInventory.find(i => i.id === productId);
+
+                        if (category !== 'All Categories' && masterItemRef?.category !== category) continue;
                         
                         const current = salesMap.get(productId) || { sold: 0, added: 0 };
                         if (itemLog.sales) current.sold += itemLog.sales;
@@ -132,6 +140,19 @@ export default function PerformancePage() {
         }
     }, [masterInventory, date, categoryFilter, fetchPerformanceData]);
 
+    const handleDateRangeOptionChange = (value: string) => {
+        setDateRangeOption(value);
+        if (value === 'custom') return;
+
+        let fromDate;
+        if (value === '30d') fromDate = subMonths(new Date(), 1);
+        else if (value === '3m') fromDate = subMonths(new Date(), 3);
+        else if (value === '6m') fromDate = subMonths(new Date(), 6);
+        
+        if (fromDate) {
+            setDate({ from: fromDate, to: new Date() });
+        }
+    };
 
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
@@ -183,19 +204,19 @@ export default function PerformancePage() {
                             {dateRangeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                         </SelectContent>
                     </Select>
-                    {dateRangeOption === 'custom' && (
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant={"outline"} className={cn("w-full md:w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {date?.from ? (date.to ? (<>{formatDate(date.from)} - {formatDate(date.to)}</>) : formatDate(date.from)) : <span>Pick a date range</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={1} disabled={{ after: new Date() }} />
-                            </PopoverContent>
-                        </Popover>
-                    )}
+                    
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant={"outline"} className={cn("w-full md:w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {date?.from ? (date.to ? (<>{formatDate(date.from)} - {formatDate(date.to)}</>) : formatDate(date.from)) : <span>Pick a date range</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={handleDateRangeSelect} numberOfMonths={1} disabled={{ after: new Date() }} />
+                        </PopoverContent>
+                    </Popover>
+                    
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                         <SelectTrigger className="w-full md:w-[220px]">
                             <SelectValue placeholder="Select Category" />
@@ -282,5 +303,3 @@ export default function PerformancePage() {
         </div>
     );
 }
-
-    
