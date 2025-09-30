@@ -83,9 +83,7 @@ export default function RootLayout({
             <LoadingProvider>
                 <DateFormatProvider>
                     <NotificationSettingsProvider>
-                        <ClientOnly>
-                          {children}
-                        </ClientOnly>
+                        {children}
                         <Loader />
                         <Toaster />
                     </NotificationSettingsProvider>
