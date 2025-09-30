@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -70,16 +69,29 @@ export default function SalesPage() {
             return;
         }
         
-        try {
-            await recordSale(scannedItem.id, quantityNum, editedPrice, user.uid);
-            toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
-            setSaleCompleted(true);
-            await forceRefetch();
-        } catch (error) {
-            console.error("Error processing sale:", error);
-            const errorMessage = (error as Error).message || 'Failed to process sale.';
-            toast({ title: 'Sync Error', description: `Sale failed to record. ${errorMessage}`, variant: 'destructive' });
-        }
+        // Optimistic UI Update: Show success immediately
+        setSaleCompleted(true);
+        toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
+
+        // Perform database operations in the background
+        recordSale(scannedItem.id, quantityNum, editedPrice, user.uid)
+            .then(() => {
+                // The sale was successful in the backend. We can optionally
+                // re-fetch data in the background if needed, but the UI is already updated.
+                forceRefetch(); // This now happens silently.
+            })
+            .catch((error) => {
+                // Revert UI on failure
+                setSaleCompleted(false); 
+                console.error("Error processing sale:", error);
+                const errorMessage = (error as Error).message || 'Failed to process sale.';
+                toast({ 
+                    title: 'Sync Error', 
+                    description: `Sale failed to record. Please try again. ${errorMessage}`, 
+                    variant: 'destructive',
+                    duration: 5000,
+                });
+            });
     };
 
     const resetScanState = () => {
