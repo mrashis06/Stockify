@@ -84,7 +84,8 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             masterInventory.forEach((masterItem) => {
                 const id = masterItem.id;
                 const dailyItem = todayData[id];
-                const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
+                // Use the master item's prevStock as the source of truth for opening stock
+                const prevStock = masterItem.prevStock ?? 0;
 
                 items.push({
                     ...masterItem,
@@ -152,8 +153,8 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   }, [yesterdaySalesData, inventory]);
 
   const totalOpeningStock = useMemo(() => {
-    return inventory.reduce((sum, item) => sum + Number(item.prevStock || 0), 0);
-  }, [inventory]);
+    return processedInventory.reduce((sum, item) => sum + Number(item.opening || 0), 0);
+  }, [processedInventory]);
   
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const lowStock: InventoryItem[] = [];
@@ -170,7 +171,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             return; 
         }
 
-        if (closingStock === 0) {
+        if (closingStock === 0 && stockAtDayStart > 0) { // Only alert if it was in stock at start of day
             outOfStock.push(item);
         } else if (closingStock > 0 && closingStock < 10) {
             lowStock.push(item);
@@ -208,7 +209,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
               <CardContent>
                 <div className="text-2xl font-bold">{totalOpeningStock} Units</div>
                 <p className="text-xs text-muted-foreground">
-                  Yesterday's closing stock across all items
+                  Today's opening stock across all items
                 </p>
               </CardContent>
             </Card>
@@ -309,3 +310,5 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    

@@ -65,7 +65,7 @@ export function useEndOfDay() {
       for (const [itemId, masterItem] of masterInventory.entries()) {
           const todayItem = todaysData[itemId];
           
-          // CRITICAL FIX: Ensure all values are treated as numbers
+          // CRITICAL FIX: Ensure all values are treated as numbers before calculations
           const prevStock = Number(masterItem.prevStock ?? 0);
           const added = Number(todayItem?.added ?? 0);
           const sales = Number(todayItem?.sales ?? 0);
@@ -90,3 +90,5 @@ export function useEndOfDay() {
 
   return { isEndingDay, endOfDayProcess };
 }
+
+    

@@ -171,7 +171,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const processedInventory = useMemo(() => {
         return inventory.map(item => {
-            // CRITICAL FIX: Ensure all values are treated as numbers
+            // CRITICAL FIX: Ensure all values are treated as numbers before calculations
             const prevStock = Number(item.prevStock || 0);
             const added = Number(item.added || 0);
             const sales = Number(item.sales || 0);
@@ -546,3 +546,5 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 }
 
       
+
+    
