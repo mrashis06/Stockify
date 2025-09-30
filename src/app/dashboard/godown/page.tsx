@@ -410,7 +410,7 @@ export default function GodownPage() {
                                                     </div>
                                                      <div>
                                                         <p className="font-semibold text-sm">Last Transferred</p>
-                                                        {item.lastTransferred ? (
+                                                        {item.lastTransferred && item.lastTransferred.date ? (
                                                             <p className="text-sm text-muted-foreground">
                                                                 {item.lastTransferred.quantity} units to {item.lastTransferred.destination} on {formatDate(item.lastTransferred.date.toDate())}
                                                             </p>
