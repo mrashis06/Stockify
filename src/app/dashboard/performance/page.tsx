@@ -54,6 +54,7 @@ export default function PerformancePage() {
     const { formatDate } = useDateFormat();
     const [loading, setLoading] = useState(true);
 
+    const [dateRangeOption, setDateRangeOption] = useState('30d');
     const [date, setDate] = useState<DateRange | undefined>({
         from: subDays(new Date(), 29),
         to: new Date(),
@@ -78,17 +79,24 @@ export default function PerformancePage() {
         setProductFilter('All Products');
     }, [categoryFilter]);
 
+    const handleDateRangeOptionChange = (value: string) => {
+        setDateRangeOption(value);
+        const now = new Date();
+        if (value === '30d') {
+            setDate({ from: subDays(now, 29), to: now });
+        } else if (value === '3m') {
+            setDate({ from: subMonths(now, 3), to: now });
+        } else if (value === '6m') {
+            setDate({ from: subMonths(now, 6), to: now });
+        } else {
+            // For 'custom', we let the user pick, don't change the date here
+        }
+    };
+
 
     const handleDateSelect = (range: DateRange | undefined) => {
-        if (range) {
-            if (range.from && !range.to) {
-                setDate({ from: range.from, to: range.from });
-            } else {
-                setDate(range);
-            }
-        } else {
-            setDate(range);
-        }
+        setDateRangeOption('custom'); // Switch to custom mode when user interacts with calendar
+        setDate(range);
     };
     
     const fetchPerformanceData = useCallback(async (range: DateRange | undefined, category: string, product: string) => {
@@ -247,6 +255,15 @@ export default function PerformancePage() {
                     <CardTitle>Filters</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full flex-wrap">
+                    <Select value={dateRangeOption} onValueChange={handleDateRangeOptionChange}>
+                         <SelectTrigger className="w-full md:w-[180px]">
+                            <SelectValue placeholder="Select Date Range" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {dateRangeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant={"outline"} className={cn("w-full md:w-auto justify-start text-left font-normal", !date && "text-muted-foreground")}>
