@@ -85,14 +85,13 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             masterInventory.forEach((masterItem) => {
                 const id = masterItem.id;
                 const dailyItem = todayData[id];
-                const prevDailyItem = yesterdayData[id];
-
-                // Calculate opening stock based on yesterday's closing stock if available.
-                const prevClosing = prevDailyItem ? (Number(masterItem.prevStock || 0) + Number(prevDailyItem.added || 0)) - Number(prevDailyItem.sales || 0) : Number(masterItem.prevStock || 0);
+                
+                // Use master prevStock as the reliable source for today's opening stock calculation
+                const prevStock = Number(masterItem.prevStock || 0);
 
                 items.push({
                     ...masterItem,
-                    prevStock: prevClosing,
+                    prevStock: prevStock,
                     added: Number(dailyItem?.added ?? 0),
                     sales: Number(dailyItem?.sales ?? 0),
                 });

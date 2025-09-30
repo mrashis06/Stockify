@@ -159,7 +159,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
             await endOfDayProcess();
             toast({
                 title: 'End of Day Processed',
-                description: 'The system has been signaled for end of day. Your inventory will roll over automatically after midnight.'
+                description: "Today's closing stock has been set as tomorrow's opening stock."
             });
         } catch (error) {
             console.error("End of day process failed:", error);
@@ -269,7 +269,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                 <AlertDialogHeader>
                     <AlertDialogTitle>End of Day Process</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This signals the end of the business day. This action does not prevent further edits today but prepares the system for the next day's rollover.
+                        This will finalize today's numbers and set the opening stock for tomorrow. You should run this as the last action of your business day. Are you sure you want to continue?
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

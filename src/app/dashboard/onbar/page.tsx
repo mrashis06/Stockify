@@ -99,7 +99,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             await endOfDayProcess();
             toast({
                 title: 'End of Day Processed',
-                description: 'The system has been signaled for end of day. Your inventory will roll over automatically after midnight.'
+                description: "Today's closing stock has been set as tomorrow's opening stock."
             });
         } catch (error) {
             console.error("End of day process failed:", error);
@@ -142,7 +142,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     <AlertDialogHeader>
                         <AlertDialogTitle>End of Day Process</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to run the end-of-day process? This will close out today's bar sales and prepare the system for the next day. You can still edit today's off-counter sales until midnight.
+                            This will finalize today's numbers and set the opening stock for tomorrow. You should run this as the last action of your business day. Are you sure you want to continue?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -275,4 +275,3 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
 }
 
     
-
