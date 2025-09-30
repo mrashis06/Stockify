@@ -49,8 +49,8 @@ export type BillExtractionOutput = z.infer<typeof BillExtractionOutputSchema>;
 
 /**
  * A wrapper function that executes the Genkit flow to extract items from a bill.
- * @param input The bill data URI.
- * @returns A promise that resolves to the extracted items.
+ * @param input The bill data URI and existing inventory.
+ * @returns A promise that resolves to the extracted and categorized items.
  */
 export async function extractItemsFromBill(input: BillExtractionInput): Promise<BillExtractionOutput> {
   return extractBillFlow(input);
@@ -92,10 +92,13 @@ INSTRUCTIONS:
 1.  "McDowell's No.1 750ml - 10 units"
 2.  "Tuborg Beer 650ml - 5 units"
 3.  "Seagrams Royal Stag 750ml - 8 units"
+4.  "I Blue 750ml - 3 units"
 
 *existingInventory contains:*
 1.  { id: 'mcdowells_750', brand: 'McDowells', size: '750' }
 2.  { id: 'royalstag_barrel_750', brand: 'Royal Stag Barrel', size: '750' }
+3.  { id: 'imperial_blue_750', brand: 'I Blue', size: '750' }
+
 
 *Expected JSON Output:*
 \`\`\`json
@@ -104,6 +107,10 @@ INSTRUCTIONS:
     {
       "productId": "mcdowells_750",
       "quantity": 10
+    },
+    {
+      "productId": "imperial_blue_750",
+      "quantity": 3
     }
   ],
   "unmatchedItems": [
@@ -122,7 +129,7 @@ INSTRUCTIONS:
   ]
 }
 \`\`\`
-*Explanation for the example: "Seagrams Royal Stag" from the bill did NOT match "Royal Stag Barrel" from inventory because the word "Barrel" was missing. It was correctly placed in \`unmatchedItems\`.*
+*Explanation for the example: "Seagrams Royal Stag" from the bill did NOT match "Royal Stag Barrel" from inventory because the word "Barrel" was missing. It was correctly placed in \`unmatchedItems\`. "I Blue" from the bill correctly matched "I Blue" from inventory as a common abbreviation.*
 
 
 Bill document to process: {{media url=billDataUri}}
