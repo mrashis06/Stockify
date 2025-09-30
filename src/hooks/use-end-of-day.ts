@@ -50,7 +50,7 @@ export function useEndOfDay() {
                 brand: item.brand,
                 size: item.size,
                 category: item.category,
-                price: item.price,
+                // price is not logged here as it's variable (pegs)
                 salesVolume: item.salesVolume,
                 salesValue: item.salesValue,
             };

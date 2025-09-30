@@ -35,7 +35,7 @@ interface jsPDFWithAutoTable extends jsPDF {
 }
 
 type OffCounterLog = { brand: string; size: string; sales: number; price: number; category: string };
-type OnBarLog = { brand: string; size: string; category: string; salesVolume: number; salesValue: number; price: number };
+type OnBarLog = { brand: string; size: string; category: string; salesVolume: number; salesValue: number; price?: number };
 
 type DailyLog = { [itemId: string]: OffCounterLog | OnBarLog };
 
@@ -180,6 +180,38 @@ export default function ReportsPage() {
     }, [reportType, offCounterSalesData, onBarSalesData]);
 
 
+    const generateRowsForExport = (data: ReportDataEntry[]) => {
+        const rows: any[] = [];
+        const isOffCounter = reportType === 'offcounter';
+
+        data.forEach(entry => {
+            const dailyRows = [];
+            for (const productId in entry.log) {
+                const item = entry.log[productId] as any;
+                const matchesReportType = isOffCounter 
+                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
+                    : (item.salesValue > 0 && productId.startsWith('on-bar-'));
+
+                if (matchesReportType) {
+                    if (isOffCounter) {
+                         dailyRows.push([
+                            entry.date, item.brand, item.size, item.category, 
+                            item.price.toFixed(2), item.sales, (item.sales * item.price).toFixed(2)
+                        ]);
+                    } else {
+                        const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
+                        dailyRows.push([
+                           entry.date, item.brand, item.size, item.category, 
+                           `${item.salesVolume} ${unitLabel}`, item.salesValue.toFixed(2)
+                       ]);
+                    }
+                }
+            }
+            rows.push(...dailyRows.sort((a, b) => a[1].localeCompare(b[1]))); // Sort by brand
+        });
+        return rows;
+    };
+
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
         const isOffCounter = reportType === 'offcounter';
@@ -187,20 +219,7 @@ export default function ReportsPage() {
         const tableColumn = isOffCounter 
             ? ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]
             : ["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"];
-            
-        const dataToExport = isOffCounter ? offCounterSalesData : onBarSalesData;
-
-        const tableRows = dataToExport.map(item => {
-            if (isOffCounter) {
-                const offItem = item as SoldItem;
-                return [offItem.brand, offItem.size, offItem.category, offItem.price.toFixed(2), offItem.unitsSold, offItem.totalAmount.toFixed(2)];
-            } else {
-                const onBarItem = item as OnBarSoldItem;
-                const unitLabel = onBarItem.category === 'Beer' ? 'units' : 'ml';
-                return [onBarItem.brand, onBarItem.size, onBarItem.category, `${onBarItem.unitsSold} ${unitLabel}`, onBarItem.totalAmount.toFixed(2)];
-            }
-        });
-
+        
         const startDate = date?.from ? formatDate(date.from) : '';
         const endDate = date?.to ? formatDate(date.to) : startDate;
         const isSingleDay = !date?.to || isSameDay(date?.from || new Date(), date.to);
@@ -209,64 +228,144 @@ export default function ReportsPage() {
 
         doc.setFontSize(16);
         doc.text(reportTitle, 14, 15);
+        let startY = 25;
+        let grandTotalUnits = 0;
+        let grandTotalAmount = 0;
         
-        const foot = isOffCounter
-            ? [['Grand Total', '', '', '', reportTotals.totalUnits, reportTotals.totalAmount.toFixed(2)]]
-            : [['Grand Total', '', '', '', reportTotals.totalAmount.toFixed(2)]];
+        const sortedReportData = [...reportData].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        doc.autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            foot,
-            startY: 25,
-            headStyles: { fillColor: [40, 40, 40] },
-            footStyles: { fillColor: [22, 163, 74], textColor: [255,255,255], fontStyle: 'bold' },
+        sortedReportData.forEach((entry, index) => {
+            let dailyTotalUnits = 0;
+            let dailyTotalAmount = 0;
+            const tableRows: (string | number)[][] = [];
+
+            for (const productId in entry.log) {
+                const item = entry.log[productId] as any;
+                 const matchesReportType = isOffCounter 
+                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
+                    : (item.salesValue > 0 && productId.startsWith('on-bar-'));
+                
+                if (matchesReportType) {
+                    if (isOffCounter) {
+                        tableRows.push([item.brand, item.size, item.category, item.price.toFixed(2), item.sales, (item.sales * item.price).toFixed(2)]);
+                        dailyTotalUnits += item.sales;
+                        dailyTotalAmount += item.sales * item.price;
+                    } else {
+                        const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
+                        tableRows.push([item.brand, item.size, item.category, `${item.salesVolume} ${unitLabel}`, item.salesValue.toFixed(2)]);
+                        dailyTotalAmount += item.salesValue;
+                    }
+                }
+            }
+
+            if (tableRows.length > 0) {
+                tableRows.sort((a,b) => (a[0] as string).localeCompare(b[0] as string)); // Sort by brand
+
+                const foot = isOffCounter
+                    ? [['Daily Total', '', '', '', dailyTotalUnits, dailyTotalAmount.toFixed(2)]]
+                    : [['Daily Total', '', '', '', dailyTotalAmount.toFixed(2)]];
+
+                const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY : startY;
+
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Sales for ${formatDate(parse(entry.date, 'yyyy-MM-dd', new Date()))}`, 14, finalY + (index === 0 ? 0 : 15));
+
+                doc.autoTable({
+                    head: [tableColumn],
+                    body: tableRows,
+                    foot,
+                    startY: finalY + (index === 0 ? 2 : 17),
+                    headStyles: { fillColor: [40, 40, 40] },
+                    footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                });
+
+                grandTotalUnits += dailyTotalUnits;
+                grandTotalAmount += dailyTotalAmount;
+            }
         });
         
+        if (reportData.length > 1 && grandTotalAmount > 0) {
+             const finalY = (doc as any).lastAutoTable.finalY;
+             doc.autoTable({
+                startY: finalY + 10,
+                body: [],
+                foot: isOffCounter 
+                    ? [['Grand Total', '', '', '', grandTotalUnits, grandTotalAmount.toFixed(2)]]
+                    : [['Grand Total', '', '', '', grandTotalAmount.toFixed(2)]],
+                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
+                 columnStyles: { 0: { halign: 'left' } },
+            });
+        }
+        
         const fileDate = date?.from ? formatDate(date.from, 'yyyy-MM-dd') : 'report';
-        doc.save(`${reportType}_sales_${fileDate}.pdf`);
+        doc.save(`${reportType}_sales_report_${fileDate}.pdf`);
     };
 
     const handleExportCSV = () => {
         const isOffCounter = reportType === 'offcounter';
         const headers = isOffCounter 
-            ? ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]
-            : ["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"];
+            ? ["Date", "Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]
+            : ["Date", "Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"];
         
         let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
         
-        const dataToExport = isOffCounter ? offCounterSalesData : onBarSalesData;
-        
-        dataToExport.forEach(item => {
-            let row;
-            if (isOffCounter) {
-                const offItem = item as SoldItem;
-                 row = [
-                    `"${offItem.brand.replace(/"/g, '""')}"`, `"${offItem.size}"`, offItem.category, 
-                    offItem.price.toFixed(2), offItem.unitsSold, offItem.totalAmount.toFixed(2)
-                ].join(",");
-            } else {
-                 const onBarItem = item as OnBarSoldItem;
-                 const unitLabel = onBarItem.category === 'Beer' ? 'units' : 'ml';
-                 row = [
-                    `"${onBarItem.brand.replace(/"/g, '""')}"`, `"${onBarItem.size}"`, onBarItem.category, 
-                    `"${onBarItem.unitsSold} ${unitLabel}"`, onBarItem.totalAmount.toFixed(2)
-                 ].join(",");
+        const sortedReportData = [...reportData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        let grandTotalUnits = 0;
+        let grandTotalAmount = 0;
+
+        sortedReportData.forEach(entry => {
+            const dailyRows: any[] = [];
+            let dailyTotalUnits = 0;
+            let dailyTotalAmount = 0;
+
+            for (const productId in entry.log) {
+                const item = entry.log[productId] as any;
+                const matchesReportType = isOffCounter 
+                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
+                    : (item.salesValue > 0 && productId.startsWith('on-bar-'));
+
+                if (matchesReportType) {
+                    let row;
+                    if (isOffCounter) {
+                        row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, item.price.toFixed(2), item.sales, (item.sales * item.price).toFixed(2)];
+                        dailyTotalUnits += item.sales;
+                        dailyTotalAmount += item.sales * item.price;
+                    } else {
+                        const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
+                        row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, `"${item.salesVolume} ${unitLabel}"`, item.salesValue.toFixed(2)];
+                        dailyTotalAmount += item.salesValue;
+                    }
+                    dailyRows.push(row);
+                }
             }
-            csvContent += row + "\n";
+            
+            if(dailyRows.length > 0) {
+                 dailyRows.sort((a, b) => a[1].localeCompare(b[1])).forEach(row => {
+                    csvContent += row.join(",") + "\n";
+                 });
+                 const totalRow = isOffCounter
+                    ? [`Daily Total for ${entry.date}`, "", "", "", "", dailyTotalUnits, dailyTotalAmount.toFixed(2)].join(",")
+                    : [`Daily Total for ${entry.date}`, "", "", "", "", dailyTotalAmount.toFixed(2)].join(",");
+                 csvContent += totalRow + "\n\n";
+
+                 grandTotalUnits += dailyTotalUnits;
+                 grandTotalAmount += dailyTotalAmount;
+            }
         });
         
-        const totalRow = isOffCounter
-            ? ["Grand Total", "", "", "", reportTotals.totalUnits, reportTotals.totalAmount.toFixed(2)].join(",")
-            : ["Grand Total", "", "", "", reportTotals.totalAmount.toFixed(2)].join(",");
-        csvContent += "\n" + totalRow + "\n";
-        
+        if (reportData.length > 1 && grandTotalAmount > 0) {
+            const grandTotalRow = isOffCounter
+                ? ["Grand Total", "", "", "", "", grandTotalUnits, grandTotalAmount.toFixed(2)].join(",")
+                : ["Grand Total", "", "", "", "", grandTotalAmount.toFixed(2)].join(",");
+            csvContent += grandTotalRow + "\n";
+        }
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         const fileDate = date?.from ? formatDate(date.from, 'yyyy-MM-dd') : 'report';
-        link.setAttribute("download", `${reportType}_sales_${fileDate}.csv`);
+        link.setAttribute("download", `${reportType}_sales_report_${fileDate}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -356,7 +455,7 @@ export default function ReportsPage() {
             <CardTitle>
                 {reportType === 'offcounter' ? 'Off-Counter Sales Details' : 'On-Bar Sales Details'}
             </CardTitle>
-            <CardDescription>An aggregated summary of sales for the selected period.</CardDescription>
+            <CardDescription>An aggregated summary of sales for the selected period. Day-wise breakdown is available in the exports.</CardDescription>
         </CardHeader>
         <CardContent>
                 <div className="overflow-x-auto">
@@ -419,7 +518,7 @@ export default function ReportsPage() {
                             {reportType === 'offcounter' && (
                                 <TableCell className="font-bold text-right text-base">{reportTotals.totalUnits}</TableCell>
                             )}
-                            <TableCell colSpan={reportType === 'offcounter' ? 1 : 2} className="font-bold text-right text-base flex items-center justify-end gap-1">
+                             <TableCell colSpan={reportType === 'offcounter' ? 1 : 2} className="font-bold text-right text-base flex items-center justify-end gap-1">
                                 <IndianRupee className="h-4 w-4" />
                                 {reportTotals.totalAmount.toFixed(2)}
                             </TableCell>
