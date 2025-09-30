@@ -133,7 +133,7 @@ Return the final result as valid JSON.
 `,
   model: 'googleai/gemini-2.5-flash',
   requestOptions: {
-    timeout: 60000, // Increased timeout for a more complex task
+    timeout: 120000, // 120 seconds to prevent cold start and complex bill timeouts
   },
 });
 
