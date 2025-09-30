@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { useEffect, useState, useMemo } from "react";
 import { doc, onSnapshot, collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { subDays } from 'date-fns';
+import { subDays, format } from 'date-fns';
 import { useDateFormat } from "@/hooks/use-date-format";
 
 import {
@@ -85,10 +85,14 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             masterInventory.forEach((masterItem) => {
                 const id = masterItem.id;
                 const dailyItem = todayData[id];
-                
-                // Use master prevStock as the reliable source for today's opening stock calculation
-                const prevStock = Number(masterItem.prevStock || 0);
+                const yesterdayItem = yesterdayData[id];
 
+                // Calculate prevStock based on yesterday's closing
+                const yesterdaysOpening = Number(masterItem.prevStock || 0);
+                const yesterdaysAdded = Number(yesterdayItem?.added ?? 0);
+                const yesterdaysSales = Number(yesterdayItem?.sales ?? 0);
+                const prevStock = (yesterdaysOpening + yesterdaysAdded) - yesterdaysSales;
+                
                 items.push({
                     ...masterItem,
                     prevStock: prevStock,

@@ -97,7 +97,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
   
   fetchAllData: async () => {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
       set({ loading: true });
       try {
         const inventorySnapshot = await getDocs(collection(db, 'inventory'));
@@ -110,23 +109,17 @@ export const useInventory = create<InventoryState>((set, get) => ({
         const dailySnap = await getDoc(dailyDocRef);
         const dailyData = dailySnap.exists() ? dailySnap.data() : {};
 
-        const yesterdayDocRef = doc(db, 'dailyInventory', yesterday);
-        const yesterdayDocSnap = await getDoc(yesterdayDocRef);
-        const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
-        
         const items: InventoryItem[] = [];
         masterInventory.forEach((masterItem) => {
             const id = masterItem.id;
             const dailyItem = dailyData[id];
-            const yesterdayItem = yesterdayData[id];
-
-            const prevStock = yesterdayItem 
-                ? (Number(masterItem.prevStock || 0) + Number(yesterdayItem.added || 0)) - Number(yesterdayItem.sales || 0)
-                : Number(masterItem.prevStock || 0);
             
-            const added = Number(dailyItem?.added ?? 0);
-            const sales = Number(dailyItem?.sales ?? 0);
-            items.push({ ...masterItem, prevStock, added, sales });
+            items.push({
+                ...masterItem,
+                prevStock: Number(masterItem.prevStock || 0),
+                added: Number(dailyItem?.added ?? 0),
+                sales: Number(dailyItem?.sales ?? 0),
+            });
         });
 
         const unprocessedSnapshot = await getDocs(query(collection(db, 'unprocessed_deliveries'), orderBy('createdAt', 'desc')));
