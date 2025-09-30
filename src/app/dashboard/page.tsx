@@ -159,7 +159,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   }, [yesterdaySalesData, inventory]);
 
   const totalOpeningStock = useMemo(() => {
-    return processedInventory.reduce((sum, item) => sum + Number(item.opening || 0), 0);
+    return processedInventory.reduce((sum, item) => sum + Number(item.prevStock || 0), 0);
   }, [processedInventory]);
   
   const { lowStockItems, outOfStockItems } = useMemo(() => {
@@ -215,7 +215,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
               <CardContent>
                 <div className="text-2xl font-bold">{totalOpeningStock} Units</div>
                 <p className="text-xs text-muted-foreground">
-                  Today's opening stock across all items
+                  Today's opening stock before any additions
                 </p>
               </CardContent>
             </Card>
@@ -316,5 +316,3 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
