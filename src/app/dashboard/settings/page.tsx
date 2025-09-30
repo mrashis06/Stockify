@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { parseISO } from 'date-fns';
-import { CalendarIcon, ChevronRight, LogOut, Camera, Loader2 } from 'lucide-react';
+import { CalendarIcon, ChevronRight, LogOut, Camera, Loader2, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { useDropzone } from 'react-dropzone';
@@ -127,7 +127,6 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx?.drawImage(img, 0, 0, width, height);
-      // For JPEG, you can specify quality. Use a higher quality for the large image.
       const quality = maxWidth > 256 ? 0.9 : 0.8;
       return canvas.toDataURL(fileType, quality);
   }
@@ -166,12 +165,12 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
     [user, updateUser, toast]
   );
   
-  const { getRootProps, getInputProps } = useDropzone({
+  const { getRootProps, getInputProps, open } = useDropzone({
     onDrop,
     accept: { 'image/jpeg': [], 'image/png': [] },
     multiple: false,
-    noClick: isUploading,
-    noKeyboard: isUploading,
+    noClick: true, // We will trigger the open manually
+    noKeyboard: true,
   });
 
 
@@ -202,6 +201,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                 onOpenChange={setIsProfilePicOpen}
                 imageUrl={user.photoURL_large}
                 userName={user.name || ''}
+                onEditClick={open}
             />
         )}
       <header className="mb-8">
@@ -214,23 +214,24 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
         </CardHeader>
         <CardContent>
             <div className="flex flex-col sm:flex-row gap-8">
-                <div className="relative shrink-0 group w-24 h-24 sm:w-32 sm:h-32 cursor-pointer">
-                    <div {...getRootProps()} className="w-full h-full">
-                        <input {...getInputProps()} />
-                        <Avatar className="w-full h-full text-4xl" onClick={() => user?.photoURL_large && setIsProfilePicOpen(true)}>
-                            <AvatarImage src={user?.photoURL || undefined} alt={user?.name || 'User'} />
-                            <AvatarFallback>
-                                {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
-                            </AvatarFallback>
-                        </Avatar>
-                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                            {isUploading ? (
-                            <Loader2 className="h-8 w-8 text-white animate-spin" />
-                            ) : (
-                            <Camera className="h-8 w-8 text-white" />
-                            )}
-                        </div>
-                    </div>
+                 <div {...getRootProps()} className="relative shrink-0 group w-24 h-24 sm:w-32 sm:h-32">
+                    <input {...getInputProps()} />
+                     <Avatar className="w-full h-full text-4xl cursor-pointer" onClick={() => user?.photoURL_large && setIsProfilePicOpen(true)}>
+                        <AvatarImage src={user?.photoURL || undefined} alt={user?.name || 'User'} />
+                        <AvatarFallback>
+                            {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                        </AvatarFallback>
+                    </Avatar>
+                     <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={open}
+                        className="absolute bottom-0 right-0 rounded-full h-8 w-8"
+                        aria-label="Change profile picture"
+                        disabled={isUploading}
+                    >
+                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                    </Button>
                 </div>
 
                 <Form {...form}>
