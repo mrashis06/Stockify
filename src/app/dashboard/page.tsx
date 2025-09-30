@@ -141,12 +141,13 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
     processedInventory.forEach(item => {
         const closingStock = item.closing ?? 0;
+        const openingStock = item.opening ?? 0;
         const stockAtDayStart = item.prevStock ?? 0;
         const addedToday = (item.added ?? 0) > 0;
 
         const wasJustRestocked = stockAtDayStart === 0 && addedToday;
 
-        if (wasJustRestocked) {
+        if (wasJustRestocked || openingStock === 0) {
             return; 
         }
 
