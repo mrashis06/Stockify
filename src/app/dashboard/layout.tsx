@@ -42,6 +42,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDateFormat } from '@/hooks/use-date-format';
 import NotificationDialog from '@/components/dashboard/notification-dialog';
 import { Separator } from '@/components/ui/separator';
+import ProfilePictureDialog from '@/components/dashboard/profile-picture-dialog';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
@@ -54,6 +55,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [isSupportDialogOpen, setIsSupportDialogOpen] = useState(false);
   const [isNotificationDialogOpen, setNotificationDialogOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [isProfilePicOpen, setIsProfilePicOpen] = useState(false);
 
   const displayedNotifications = user?.role === 'staff' && !settings.staffBroadcasts 
     ? [] 
@@ -139,6 +141,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 onOpenChange={setNotificationDialogOpen}
                 notification={selectedNotification}
              />
+        )}
+        {user?.photoURL_large && (
+            <ProfilePictureDialog
+                isOpen={isProfilePicOpen}
+                onOpenChange={setIsProfilePicOpen}
+                imageUrl={user.photoURL_large}
+                userName={user.name || ''}
+            />
         )}
        <AlertDialog open={isSupportDialogOpen} onOpenChange={setIsSupportDialogOpen}>
             <AlertDialogContent>
@@ -284,7 +294,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel className="flex items-center gap-2">
-                {user.displayName || 'My Account'}
+                <div onClick={() => user?.photoURL_large && setIsProfilePicOpen(true)} className="cursor-pointer">
+                    {user.displayName || 'My Account'}
+                </div>
                 {user.role === 'admin' && <Badge variant="destructive">Admin</Badge>}
                 {user.role === 'staff' && <Badge variant="secondary">Staff</Badge>}
               </DropdownMenuLabel>

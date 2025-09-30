@@ -16,6 +16,7 @@ export type AppUser = User & {
     aadhaar?: string;
     pan?: string;
     photoURL?: string | null;
+    photoURL_large?: string | null;
 };
 
 type AuthContextType = {
@@ -72,6 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         ...authUser,
                         displayName: userData.name || authUser.displayName,
                         photoURL: userData.photoURL || authUser.photoURL,
+                        photoURL_large: userData.photoURL_large || null,
                         role: effectiveRole,
                         name: userData.name || authUser.displayName,
                         dob: userData.dob,

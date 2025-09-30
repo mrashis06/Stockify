@@ -40,6 +40,7 @@ import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfilePictureDialog from '@/components/dashboard/profile-picture-dialog';
 
 
 const formSchema = z.object({
@@ -87,6 +88,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
   const { dateFormat, setDateFormat, formatDate } = useDateFormat();
   const { settings, setSetting } = useNotificationSettings();
   const [isUploading, setIsUploading] = useState(false);
+  const [isProfilePicOpen, setIsProfilePicOpen] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(formSchema),
@@ -105,6 +107,31 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
     }
   }, [user, form]);
   
+  const processImage = (img: HTMLImageElement, fileType: string, maxWidth: number, maxHeight: number): string => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width *= maxHeight / height;
+          height = maxHeight;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      // For JPEG, you can specify quality. Use a higher quality for the large image.
+      const quality = maxWidth > 256 ? 0.9 : 0.8;
+      return canvas.toDataURL(fileType, quality);
+  }
+
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (!user) return;
@@ -117,30 +144,11 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
       reader.onload = (readEvent) => {
         const img = document.createElement('img');
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 128;
-          const MAX_HEIGHT = 128;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL(file.type);
           
-          updateUser(user.uid, { photoURL: dataUrl })
+          const thumbnailDataUrl = processImage(img, file.type, 128, 128);
+          const largeDataUrl = processImage(img, file.type, 512, 512);
+
+          updateUser(user.uid, { photoURL: thumbnailDataUrl, photoURL_large: largeDataUrl })
             .then(() => {
                 toast({ title: 'Success', description: 'Profile picture updated.' });
             })
@@ -188,6 +196,14 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-0">
+        {user?.photoURL_large && (
+            <ProfilePictureDialog
+                isOpen={isProfilePicOpen}
+                onOpenChange={setIsProfilePicOpen}
+                imageUrl={user.photoURL_large}
+                userName={user.name || ''}
+            />
+        )}
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
       </header>
@@ -198,20 +214,22 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
         </CardHeader>
         <CardContent>
             <div className="flex flex-col sm:flex-row gap-8">
-                <div {...getRootProps()} className="relative shrink-0 group w-24 h-24 sm:w-32 sm:h-32 cursor-pointer">
-                    <input {...getInputProps()} />
-                    <Avatar className="w-full h-full text-4xl">
-                        <AvatarImage src={user?.photoURL || undefined} alt={user?.name || 'User'} />
-                        <AvatarFallback>
-                            {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                       {isUploading ? (
-                           <Loader2 className="h-8 w-8 text-white animate-spin" />
-                       ) : (
-                           <Camera className="h-8 w-8 text-white" />
-                       )}
+                <div className="relative shrink-0 group w-24 h-24 sm:w-32 sm:h-32 cursor-pointer">
+                    <div {...getRootProps()} className="w-full h-full">
+                        <input {...getInputProps()} />
+                        <Avatar className="w-full h-full text-4xl" onClick={() => user?.photoURL_large && setIsProfilePicOpen(true)}>
+                            <AvatarImage src={user?.photoURL || undefined} alt={user?.name || 'User'} />
+                            <AvatarFallback>
+                                {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                            </AvatarFallback>
+                        </Avatar>
+                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            {isUploading ? (
+                            <Loader2 className="h-8 w-8 text-white animate-spin" />
+                            ) : (
+                            <Camera className="h-8 w-8 text-white" />
+                            )}
+                        </div>
                     </div>
                 </div>
 
