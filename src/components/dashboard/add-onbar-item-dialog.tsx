@@ -30,24 +30,23 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { InventoryItem } from '@/hooks/use-inventory';
 
 
-const formSchema = z.object({
+const generateFormSchema = (shopInventory: InventoryItem[]) => z.object({
   inventoryId: z.string().min(1, 'Please select a product.'),
   quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1.'),
   pegPrice30ml: z.coerce.number().optional(),
   pegPrice60ml: z.coerce.number().optional(),
 }).refine(data => {
-    // This validation runs if a product is selected and it is NOT a beer.
-    const productIsLiquor = data.inventoryId && !data.inventoryId.toLowerCase().includes('beer');
-    if (productIsLiquor) {
+    const selectedItem = shopInventory.find(item => item.id === data.inventoryId);
+    // Validation runs if a product is selected and it is NOT a beer.
+    if (selectedItem && selectedItem.category !== 'Beer') {
         return data.pegPrice30ml !== undefined && data.pegPrice30ml > 0;
     }
     return true;
 }, {
-    message: "Price for 30ml peg is required.",
+    message: "Price for 30ml peg is required for non-beer items.",
     path: ["pegPrice30ml"],
 });
 
-type AddOnBarItemFormValues = z.infer<typeof formSchema>;
 
 type AddOnBarItemDialogProps = {
   isOpen: boolean;
@@ -60,6 +59,9 @@ const allowedCategories = ['Whiskey', 'Rum', 'Vodka', 'Beer', 'Wine'];
 
 export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, shopInventory }: AddOnBarItemDialogProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const formSchema = useMemo(() => generateFormSchema(shopInventory), [shopInventory]);
+  type AddOnBarItemFormValues = z.infer<typeof formSchema>;
 
   const form = useForm<AddOnBarItemFormValues>({
     resolver: zodResolver(formSchema),
@@ -72,7 +74,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
   });
   
   const baseFilteredInventory = useMemo(() => {
-    return shopInventory.filter(item => item.category && allowedCategories.includes(item.category));
+    return shopInventory.filter(item => item.category && allowedCategories.includes(item.category) && (Number(item.prevStock || 0) + Number(item.added || 0) - Number(item.sales || 0) > 0));
   }, [shopInventory]);
 
   const filteredInventory = useMemo(() => {
@@ -160,7 +162,7 @@ export default function AddOnBarItemDialog({ isOpen, onOpenChange, onAddItem, sh
                                   ))
                               ) : (
                                   <div className="text-center p-8 text-muted-foreground">
-                                      No products found.
+                                      No products found with available stock.
                                   </div>
                               )}
                           </ScrollArea>
