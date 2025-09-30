@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
@@ -65,43 +64,18 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         try {
             // Fetch all master inventory items once
             const inventorySnapshot = await getDocs(collection(db, 'inventory'));
-            const masterInventory = new Map<string, any>();
+            const masterInventory: InventoryItem[] = [];
             inventorySnapshot.forEach(doc => {
-                masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
+                masterInventory.push({ id: doc.id, ...doc.data() } as InventoryItem);
             });
+            
+            setInventory(masterInventory);
 
-            // Fetch yesterday's data for both stock and sales
+            // Fetch yesterday's data for sales comparison
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterdayDateStr);
             const yesterdayDocSnap = await getDoc(yesterdayDocRef);
             const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
-            setYesterdaySalesData(yesterdayData); // Set yesterday's sales data
-
-            // Fetch today's data once for initial state
-            const todayDocSnap = await getDoc(dailyDocRef);
-            const todayData = todayDocSnap.exists() ? todayDocSnap.data() : {};
-
-            const items: InventoryItem[] = [];
-
-            masterInventory.forEach((masterItem) => {
-                const id = masterItem.id;
-                const dailyItem = todayData[id];
-                const yesterdayItem = yesterdayData[id];
-
-                // Calculate prevStock based on yesterday's closing
-                const yesterdaysOpening = Number(masterItem.prevStock || 0);
-                const yesterdaysAdded = Number(yesterdayItem?.added ?? 0);
-                const yesterdaysSales = Number(yesterdayItem?.sales ?? 0);
-                const prevStock = (yesterdaysOpening + yesterdaysAdded) - yesterdaysSales;
-                
-                items.push({
-                    ...masterItem,
-                    prevStock: prevStock,
-                    added: Number(dailyItem?.added ?? 0),
-                    sales: Number(dailyItem?.sales ?? 0),
-                });
-            });
-            
-            setInventory(items);
+            setYesterdaySalesData(yesterdayData);
 
         } catch (error) {
             console.error("Error fetching dashboard data:", error);
@@ -118,10 +92,9 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
   const processedInventory = useMemo(() => {
     return inventory.map(item => {
-      // Recalculate opening and closing based on potentially updated daily sales data
       const dailyItem = todaySalesData[item.id];
-      const added = Number(dailyItem?.added ?? item.added ?? 0);
-      const sales = Number(dailyItem?.sales ?? item.sales ?? 0);
+      const added = Number(dailyItem?.added ?? 0);
+      const sales = Number(dailyItem?.sales ?? 0);
       
       const opening = Number(item.prevStock ?? 0) + added;
       const closing = opening - sales;
@@ -134,6 +107,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       };
     });
   }, [inventory, todaySalesData]);
+  
+  const currentTotalStock = useMemo(() => {
+    return processedInventory.reduce((sum, item) => sum + item.closing, 0);
+  }, [processedInventory]);
 
   const calculateTotalSales = (salesData: any, inventoryMap: InventoryItem[]) => {
     let total = 0;
@@ -158,10 +135,6 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     return calculateTotalSales(yesterdaySalesData, inventory)
   }, [yesterdaySalesData, inventory]);
 
-  const totalOpeningStock = useMemo(() => {
-    return processedInventory.reduce((sum, item) => sum + Number(item.prevStock || 0), 0);
-  }, [processedInventory]);
-  
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const lowStock: InventoryItem[] = [];
     const outOfStock: InventoryItem[] = [];
@@ -209,13 +182,13 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         <Link href="/dashboard/inventory" className="block hover:shadow-lg transition-shadow rounded-lg">
             <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Today's Stock</CardTitle>
+                <CardTitle className="text-sm font-medium">Today's Live Stock</CardTitle>
                 <PackageCheck className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{totalOpeningStock} Units</div>
+                <div className="text-2xl font-bold">{currentTotalStock} Units</div>
                 <p className="text-xs text-muted-foreground">
-                  Today's opening stock before any additions
+                  Current closing stock including today's sales and additions.
                 </p>
               </CardContent>
             </Card>
