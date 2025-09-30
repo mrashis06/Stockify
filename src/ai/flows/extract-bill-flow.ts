@@ -66,30 +66,36 @@ const billExtractionPrompt = ai.definePrompt({
     format: 'json'
   },
   prompt: `
-You are an expert data entry and matching agent for a liquor store. Your task is to extract all line items from the provided bill and match them against the user's existing inventory.
+You are an expert data entry and matching agent for a liquor store. Your task is to extract all line items from the provided bill and match them against the user's existing inventory with very high accuracy.
 
 INSTRUCTIONS:
 
-1.  Extract Details: For each line item on the bill, extract the following details:
-    *   brand: The brand name (e.g., "Old Monk", "Kingfisher Ultra").
-    *   size: Extract ONLY the numeric value of the size. Discard units like "ml", "ML". (e.g., "750ml" -> "750").
-    *   quantity: The number of units.
-    *   category: The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
+1.  **Extract Details:** For each line item on the bill, extract:
+    *   **brand:** The brand name (e.g., "Old Monk", "Kingfisher Ultra").
+    *   **size:** Extract ONLY the numeric value of the size. Discard units like "ml", "ML". (e.g., "750ml" -> "750").
+    *   **quantity:** The number of units.
+    *   **category:** The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
 
-2.  Match Against Inventory: For each extracted item, compare it to the existingInventory list provided. The goal is to find a perfect match based on brand and size. Brand names might be slightly different (e.g., bill says "Kingfisher Beer" and inventory has "Kingfisher"). Use your best judgment to find the correct match.
+2.  **Strictly Match Against Inventory:** For each extracted item, compare it to the \`existingInventory\` list.
+    *   A **MATCH** occurs ONLY IF the brand and size from the bill are a **near-perfect match** to an item in the inventory.
+    *   Common abbreviations ARE acceptable (e.g., bill says "I Blue" and inventory has "Imperial Blue").
+    *   Descriptive words are fine if they don't conflict (e.g., bill says "Seagrams Royal Stag Whiskey" and inventory has "Royal Stag").
+    *   A **MISMATCH** occurs if there are conflicting words. For example, if the inventory has "Royal Stag **Barrel**" but the bill just says "Royal Stag", that is a MISMATCH. The extra word "Barrel" in the inventory item makes it a different product.
 
-3.  Categorize Results:
-    *   If a match is found: Add the item to the matchedItems array. You must provide the productId from the existingInventory and the quantity from the bill.
-    *   If no match is found: This is a new product. Add its full extracted details (brand, size, quantity, category) to the unmatchedItems array.
+3.  **Categorize Results:**
+    *   If a **strict match** is found: Add the item to the \`matchedItems\` array. You must provide the \`productId\` from the \`existingInventory\` and the \`quantity\` from the bill.
+    *   If **no strict match** is found: This is a new or different product. Add its full extracted details (brand, size, quantity, category) to the \`unmatchedItems\` array for manual user review.
 
-EXAMPLE:
+**EXAMPLES:**
 
 *Bill shows:*
-*   "McDowell's No.1 750ml - 10 units"
-*   "Tuborg Beer 650ml - 5 units"
+1.  "McDowell's No.1 750ml - 10 units"
+2.  "Tuborg Beer 650ml - 5 units"
+3.  "Seagrams Royal Stag 750ml - 8 units"
 
 *existingInventory contains:*
-*   { id: 'mcdowells_750', brand: 'McDowells', size: '750' }
+1.  { id: 'mcdowells_750', brand: 'McDowells', size: '750' }
+2.  { id: 'royalstag_barrel_750', brand: 'Royal Stag Barrel', size: '750' }
 
 *Expected JSON Output:*
 \`\`\`json
@@ -106,10 +112,18 @@ EXAMPLE:
       "size": "650",
       "quantity": 5,
       "category": "Beer"
+    },
+    {
+      "brand": "Seagrams Royal Stag",
+      "size": "750",
+      "quantity": 8,
+      "category": "Whiskey"
     }
   ]
 }
 \`\`\`
+*Explanation for the example: "Seagrams Royal Stag" from the bill did NOT match "Royal Stag Barrel" from inventory because the word "Barrel" was missing. It was correctly placed in \`unmatchedItems\`.*
+
 
 Bill document to process: {{media url=billDataUri}}
 Existing Inventory to match against:

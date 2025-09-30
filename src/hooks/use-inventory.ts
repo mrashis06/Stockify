@@ -82,6 +82,17 @@ type InventoryState = {
 
 const LOW_STOCK_THRESHOLD = 10;
 
+// Simple non-crypto hash function for client-side duplicate detection
+const simpleHash = (str: string): string => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = (hash << 5) - hash + char;
+        hash |= 0; // Convert to 32bit integer
+    }
+    return hash.toString();
+};
+
 export const useInventory = create<InventoryState>((set, get) => ({
   inventory: [],
   unprocessedItems: [],
@@ -171,6 +182,14 @@ export const useInventory = create<InventoryState>((set, get) => ({
   processScannedBill: async (billDataUri: string) => {
     get().setSaving(true);
     try {
+        const billHash = simpleHash(billDataUri);
+        const processedBillRef = doc(db, 'processed_bills', billHash);
+        const processedBillSnap = await getDoc(processedBillRef);
+        
+        if (processedBillSnap.exists()) {
+            throw new Error("This bill has already been processed and will not be scanned again.");
+        }
+        
         const currentInventory = get().inventory.map(item => ({
             id: item.id,
             brand: item.brand,
@@ -188,7 +207,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
         if (result.matchedItems && result.matchedItems.length > 0) {
             for (const item of result.matchedItems) {
                 const productRef = doc(db, 'inventory', item.productId);
-                const productSnap = await getDoc(productRef); // Not in transaction, but acceptable for this use case
+                 const productSnap = await getDoc(productRef); // Not in transaction, but acceptable for this use case
                 if (productSnap.exists()) {
                     const currentStock = productSnap.data().stockInGodown || 0;
                     batch.update(productRef, { 
@@ -207,6 +226,9 @@ export const useInventory = create<InventoryState>((set, get) => ({
             });
         }
         
+        // Mark the bill as processed
+        batch.set(processedBillRef, { processedAt: serverTimestamp() });
+
         await batch.commit();
         await get().fetchAllData();
         
@@ -560,5 +582,3 @@ function initializeListeners() {
 if (typeof window !== 'undefined') {
     initializeListeners();
 }
-
-    
