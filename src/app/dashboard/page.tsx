@@ -150,7 +150,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             return; 
         }
 
-        if (closingStock === 0 && stockAtDayStart > 0) { // Only alert if it was in stock at start of day
+        if (closingStock === 0) {
             outOfStock.push(item);
         } else if (closingStock > 0 && closingStock < 10) {
             lowStock.push(item);
@@ -288,4 +288,5 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       </div>
     </main>
   );
-}
+
+    
