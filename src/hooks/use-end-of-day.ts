@@ -68,8 +68,11 @@ export function useEndOfDay() {
       for (const [itemId, masterItem] of masterInventory.entries()) {
           const todayItem = todaysData[itemId];
           
-          const opening = (masterItem.prevStock ?? 0) + (todayItem?.added ?? 0);
-          const closingStock = opening - (todayItem?.sales ?? 0);
+          const prevStock = Number(masterItem.prevStock ?? 0);
+          const added = Number(todayItem?.added ?? 0);
+          const sales = Number(todayItem?.sales ?? 0);
+          const opening = prevStock + added;
+          const closingStock = opening - sales;
 
           newDailyData[itemId] = {
             brand: masterItem.brand,
