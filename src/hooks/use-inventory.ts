@@ -118,10 +118,11 @@ export const useInventory = create<InventoryState>((set, get) => ({
         masterInventory.forEach((masterItem) => {
             const id = masterItem.id;
             const dailyItem = dailyData[id];
-            const prevStock = (yesterdayData[id]?.closing ?? masterItem.prevStock) ?? 0;
+            // Get opening stock from yesterday's closing, fallback to master `prevStock`
+            const prevStock = yesterdayData[id]?.closing ?? masterItem.prevStock ?? 0;
             const added = dailyItem?.added ?? 0;
             const sales = dailyItem?.sales ?? 0;
-            items.push({ ...masterItem, prevStock, added, sales });
+            items.push({ ...masterItem, prevStock: Number(prevStock), added: Number(added), sales: Number(sales) });
         });
 
         const unprocessedSnapshot = await getDocs(query(collection(db, 'unprocessed_deliveries'), orderBy('createdAt', 'desc')));

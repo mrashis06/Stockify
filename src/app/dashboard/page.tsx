@@ -88,9 +88,9 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
                 items.push({
                     ...masterItem,
-                    prevStock: prevStock,
-                    added: dailyItem?.added ?? 0,
-                    sales: dailyItem?.sales ?? 0,
+                    prevStock: Number(prevStock),
+                    added: Number(dailyItem?.added ?? 0),
+                    sales: Number(dailyItem?.sales ?? 0),
                 });
             });
             
@@ -113,10 +113,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     return inventory.map(item => {
       // Recalculate opening and closing based on potentially updated daily sales data
       const dailyItem = todaySalesData[item.id];
-      const added = dailyItem?.added ?? item.added ?? 0;
-      const sales = dailyItem?.sales ?? item.sales ?? 0;
+      const added = Number(dailyItem?.added ?? item.added ?? 0);
+      const sales = Number(dailyItem?.sales ?? item.sales ?? 0);
       
-      const opening = (item.prevStock ?? 0) + added;
+      const opening = Number(item.prevStock ?? 0) + added;
       const closing = opening - sales;
       return {
         ...item,
@@ -134,9 +134,9 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         if (Object.prototype.hasOwnProperty.call(salesData, key)) {
             const item = salesData[key];
             const masterItem = inventoryMap.find(inv => inv.id === key);
-            const price = item.price ?? masterItem?.price ?? 0;
+            const price = Number(item.price ?? masterItem?.price ?? 0);
             if (item.sales && price) {
-                 total += item.sales * price;
+                 total += Number(item.sales) * price;
             }
         }
     }

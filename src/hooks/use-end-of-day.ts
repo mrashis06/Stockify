@@ -20,7 +20,6 @@ export function useEndOfDay() {
   const endOfDayProcess = async () => {
     setIsEndingDay(true);
     const today = format(new Date(), 'yyyy-MM-dd');
-    const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
     
     try {
       const dailyDocRef = doc(db, 'dailyInventory', today);
@@ -35,8 +34,6 @@ export function useEndOfDay() {
       const todaysData = dailyDocSnap.exists() ? dailyDocSnap.data() : {};
       const batch = writeBatch(db);
       
-      const tomorrowDocRef = doc(db, 'dailyInventory', tomorrow);
-      const newDailyData: { [key: string]: any } = {};
 
       // Handle On-Bar Sales
       const onBarSnap = await getDocs(collection(db, 'onBarInventory'));
@@ -64,33 +61,23 @@ export function useEndOfDay() {
           batch.set(dailyDocRef, onBarSalesLog, { merge: true });
       }
 
-      // Iterate over the master inventory to carry over bottle stock
+      // Iterate over the master inventory to update the final closing stock as the new prevStock for tomorrow
       for (const [itemId, masterItem] of masterInventory.entries()) {
           const todayItem = todaysData[itemId];
           
+          // CRITICAL FIX: Ensure all values are treated as numbers
           const prevStock = Number(masterItem.prevStock ?? 0);
           const added = Number(todayItem?.added ?? 0);
           const sales = Number(todayItem?.sales ?? 0);
           const opening = prevStock + added;
           const closingStock = opening - sales;
 
-          newDailyData[itemId] = {
-            brand: masterItem.brand,
-            size: masterItem.size,
-            category: masterItem.category,
-            price: masterItem.price,
-            prevStock: closingStock,
-            added: 0, 
-            sales: 0,
-          };
-          
+          // Update the master inventory's prevStock to be today's closing stock.
+          // This value will be picked up tomorrow as the opening stock.
           const masterInventoryRef = doc(db, 'inventory', itemId);
           batch.update(masterInventoryRef, { prevStock: closingStock });
       }
       
-      // Set the prepared data for tomorrow
-      batch.set(tomorrowDocRef, newDailyData, { merge: true });
-
       await batch.commit();
 
     } catch (error) {
