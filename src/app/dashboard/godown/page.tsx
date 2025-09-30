@@ -410,7 +410,13 @@ export default function GodownPage() {
                                                     </div>
                                                      <div>
                                                         <p className="font-semibold text-sm">Last Transferred</p>
-                                                        <p className="text-sm text-muted-foreground">{item.lastTransferred ? formatDate(item.lastTransferred.toDate()) : 'N/A'}</p>
+                                                        {item.lastTransferred ? (
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {item.lastTransferred.quantity} units to {item.lastTransferred.destination} on {formatDate(item.lastTransferred.date.toDate())}
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-sm text-muted-foreground">N/A</p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </TableCell>

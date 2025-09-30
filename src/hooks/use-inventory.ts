@@ -46,7 +46,11 @@ export type InventoryItem = {
   opening?: number;
   closing?: number;
   dateAddedToGodown?: Timestamp;
-  lastTransferred?: Timestamp;
+  lastTransferred?: {
+    date: Timestamp;
+    quantity: number;
+    destination: 'shop' | 'onbar';
+  };
 };
 
 export type UnprocessedItem = ExtractedItem & { 
@@ -333,7 +337,11 @@ export const useInventory = create<InventoryState>((set, get) => ({
             
             const updateData: any = {
                  stockInGodown: masterData.stockInGodown - quantityToTransfer,
-                 lastTransferred: serverTimestamp()
+                 lastTransferred: {
+                    date: serverTimestamp(),
+                    quantity: quantityToTransfer,
+                    destination: 'shop',
+                 }
             };
             if (price) {
                 updateData.price = Number(price);
@@ -367,10 +375,14 @@ export const useInventory = create<InventoryState>((set, get) => ({
           throw new Error(`Not enough stock in godown. Available: ${masterData.stockInGodown || 0}`);
         }
 
-        // 1. Decrease stock from Godown
+        // 1. Decrease stock from Godown and log transfer
         transaction.update(masterRef, {
           stockInGodown: masterData.stockInGodown - quantity,
-          lastTransferred: serverTimestamp()
+          lastTransferred: {
+             date: serverTimestamp(),
+             quantity: quantity,
+             destination: 'onbar',
+          }
         });
 
         // 2. Add item(s) to On-Bar inventory
