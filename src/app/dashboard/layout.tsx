@@ -5,8 +5,9 @@ import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -271,6 +272,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="secondary" size="icon" className="rounded-full">
                 <Avatar>
+                  {user.photoURL ? (
+                    <AvatarImage src={user.photoURL} alt={user.displayName || 'User'} />
+                  ) : null}
                   <AvatarFallback>
                     {user.displayName ? user.displayName.charAt(0).toUpperCase() : <User className="h-5 w-5" />}
                   </AvatarFallback>

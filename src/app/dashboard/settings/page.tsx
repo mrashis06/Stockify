@@ -1,14 +1,16 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { parseISO } from 'date-fns';
-import { CalendarIcon, ChevronRight, LogOut } from 'lucide-react';
+import { CalendarIcon, ChevronRight, LogOut, Camera, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
+import { useDropzone } from 'react-dropzone';
+import Image from 'next/image';
 
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
@@ -37,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 const formSchema = z.object({
@@ -83,7 +86,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
   const { toast } = useToast();
   const { dateFormat, setDateFormat, formatDate } = useDateFormat();
   const { settings, setSetting } = useNotificationSettings();
-
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(formSchema),
@@ -102,6 +105,67 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
     }
   }, [user, form]);
   
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (!user) return;
+      const file = acceptedFiles[0];
+      if (!file) return;
+
+      setIsUploading(true);
+
+      const reader = new FileReader();
+      reader.onload = (readEvent) => {
+        const img = document.createElement('img');
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 128;
+          const MAX_HEIGHT = 128;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL(file.type);
+          
+          updateUser(user.uid, { photoURL: dataUrl })
+            .then(() => {
+                toast({ title: 'Success', description: 'Profile picture updated.' });
+            })
+            .catch(() => {
+                toast({ title: 'Error', description: 'Failed to update profile picture.', variant: 'destructive' });
+            })
+            .finally(() => {
+                setIsUploading(false);
+            });
+        };
+        img.src = readEvent.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    },
+    [user, updateUser, toast]
+  );
+  
+  const { getRootProps, getInputProps } = useDropzone({
+    onDrop,
+    accept: { 'image/jpeg': [], 'image/png': [] },
+    multiple: false,
+    noClick: isUploading,
+    noKeyboard: isUploading,
+  });
+
 
   const onSubmit = async (data: ProfileFormValues) => {
     if (!user) return;
@@ -133,68 +197,90 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
             <CardTitle>User Profile</CardTitle>
         </CardHeader>
         <CardContent>
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                     <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Full Name</FormLabel>
-                            <FormControl>
-                                <Input placeholder="Your name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                     <FormField
-                        control={form.control}
-                        name="dob"
-                        render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                            <FormLabel>Date of birth</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
+            <div className="flex flex-col sm:flex-row gap-8">
+                <div {...getRootProps()} className="relative shrink-0 group w-24 h-24 sm:w-32 sm:h-32 cursor-pointer">
+                    <input {...getInputProps()} />
+                    <Avatar className="w-full h-full text-4xl">
+                        <AvatarImage src={user?.photoURL || undefined} alt={user?.name || 'User'} />
+                        <AvatarFallback>
+                            {user?.name ? user.name.charAt(0).toUpperCase() : '?'}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                       {isUploading ? (
+                           <Loader2 className="h-8 w-8 text-white animate-spin" />
+                       ) : (
+                           <Camera className="h-8 w-8 text-white" />
+                       )}
+                    </div>
+                </div>
+
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 flex-1">
+                         <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Full Name</FormLabel>
                                 <FormControl>
-                                    <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-[240px] pl-3 text-left font-normal",
-                                        !field.value && "text-muted-foreground"
-                                    )}
-                                    >
-                                    {field.value ? (
-                                        formatDate(field.value)
-                                    ) : (
-                                        <span>Pick a date</span>
-                                    )}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
+                                    <Input placeholder="Your name" {...field} />
                                 </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    disabled={(date) =>
-                                    date > new Date() || date < new Date("1900-01-01")
-                                    }
-                                    initialFocus
-                                    captionLayout="dropdown-buttons"
-                                    fromYear={1900}
-                                    toYear={new Date().getFullYear()}
-                                />
-                                </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <Button type="submit">Save Changes</Button>
-                </form>
-            </Form>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="dob"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                <FormLabel>Date of birth</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <FormControl>
+                                        <Button
+                                        variant={"outline"}
+                                        className={cn(
+                                            "w-[240px] pl-3 text-left font-normal",
+                                            !field.value && "text-muted-foreground"
+                                        )}
+                                        >
+                                        {field.value ? (
+                                            formatDate(field.value)
+                                        ) : (
+                                            <span>Pick a date</span>
+                                        )}
+                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={field.value}
+                                        onSelect={field.onChange}
+                                        disabled={(date) =>
+                                        date > new Date() || date < new Date("1900-01-01")
+                                        }
+                                        initialFocus
+                                        captionLayout="dropdown-buttons"
+                                        fromYear={1900}
+                                        toYear={new Date().getFullYear()}
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <Button type="submit" disabled={form.formState.isSubmitting}>
+                            {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Changes
+                        </Button>
+                    </form>
+                </Form>
+            </div>
         </CardContent>
       </Card>
 

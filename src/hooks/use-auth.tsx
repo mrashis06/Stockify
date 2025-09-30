@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, updateProfile } from 'firebase/auth';
 import { doc, onSnapshot, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { ADMIN_UIDS } from '@/lib/constants';
@@ -15,6 +15,7 @@ export type AppUser = User & {
     status?: 'active' | 'blocked';
     aadhaar?: string;
     pan?: string;
+    photoURL?: string | null;
 };
 
 type AuthContextType = {
@@ -63,7 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const isUserAdmin = ADMIN_UIDS.includes(authUser.uid);
                     const effectiveRole = isUserAdmin ? 'admin' : userData.role || 'staff';
 
-                    // Self-correction logic: If user is an admin but their DB role is 'staff', fix it.
                     if (isUserAdmin && userData.role !== 'admin') {
                         updateDoc(userDocRef, { role: 'admin' });
                     }
@@ -71,6 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const fullUser: AppUser = {
                         ...authUser,
                         displayName: userData.name || authUser.displayName,
+                        photoURL: userData.photoURL || authUser.photoURL,
                         role: effectiveRole,
                         name: userData.name || authUser.displayName,
                         dob: userData.dob,
@@ -111,6 +112,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUser = async (uid: string, data: Partial<AppUser>) => {
       const userDocRef = doc(db, 'users', uid);
       await updateDoc(userDocRef, data);
+      
+      // Also update the auth user profile if name or photoURL are changed
+      if (auth.currentUser && auth.currentUser.uid === uid && (data.name || data.photoURL)) {
+          await updateProfile(auth.currentUser, {
+            displayName: data.name,
+            photoURL: data.photoURL,
+          });
+      }
   };
   
   const value = { user, loading, updateUser, shopId, isStaffActive };
