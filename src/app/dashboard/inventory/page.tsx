@@ -60,6 +60,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         deleteBrand: deleteProduct,
         updateBrand,
         updateItemField,
+        forceRefetch,
     } = useInventory();
     const { onBarInventory, loading: onBarLoading } = useOnBarInventory();
     
@@ -104,16 +105,16 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         }
     };
     
-    const handleFieldChange = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: string | number) => {
+    const handleFieldChange = async (id: string, field: 'added' | 'sales' | 'price' | 'size', value: string) => {
         const originalItem = inventory.find(item => item.id === id);
         if (!originalItem) return;
 
         let processedValue: number | string = value;
-        if (field === 'added' || field === 'sales' || 'price') {
+        if (field === 'added' || field === 'sales' || field === 'price') {
              processedValue = Number(value);
              if (isNaN(processedValue) || processedValue < 0) {
                  toast({ title: 'Invalid Input', description: 'Please enter a valid non-negative number.', variant: 'destructive'});
-                 // Re-render will reset to original value from state
+                 forceRefetch(); // Re-fetch to reset the view to the correct value
                  return;
              }
         }
@@ -125,6 +126,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
             console.error(`Error updating ${field}:`, error);
             const errorMessage = (error as Error).message || `Failed to update ${field}.`;
             toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
+            forceRefetch(); // Re-fetch to reset the view to the correct value on error
         }
     };
 
@@ -171,7 +173,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const processedInventory = useMemo(() => {
         return inventory.map(item => {
-            // CRITICAL FIX: Ensure all values are treated as numbers before calculations
             const prevStock = Number(item.prevStock || 0);
             const added = Number(item.added || 0);
             const sales = Number(item.sales || 0);
@@ -190,7 +191,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const filteredInventory = useMemo(() => {
         return processedInventory.filter(item => {
-            // Only show items that have stock in the shop (opening > 0)
             if (item.opening <= 0) return false;
 
             const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
@@ -269,7 +269,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                 <AlertDialogHeader>
                     <AlertDialogTitle>End of Day Process</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Are you sure you want to run the end-of-day process? This will close out today's bar sales and prepare the system for the next day. You can still edit today's off-counter sales until midnight.
+                        This signals the end of the business day. This action does not prevent further edits today but prepares the system for the next day's rollover.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -544,7 +544,3 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-      
-
-    

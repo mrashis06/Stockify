@@ -120,8 +120,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
             const dailyItem = dailyData[id];
             const yesterdayItem = yesterdayData[id];
 
-            // Correctly calculate prevStock from yesterday's closing stock.
-            // If yesterday's log exists, calculate closing. Otherwise, use master prevStock.
             const prevStock = yesterdayItem 
                 ? (Number(masterItem.prevStock || 0) + Number(yesterdayItem.added || 0)) - Number(yesterdayItem.sales || 0)
                 : Number(masterItem.prevStock || 0);
@@ -197,11 +195,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
         if (result.matchedItems && result.matchedItems.length > 0) {
             for (const item of result.matchedItems) {
                 const productRef = doc(db, 'inventory', item.productId);
-                // We don't need to get() here because the batch will fail if the doc doesn't exist,
-                // and we trust the AI flow's output. We need to use a transaction for read-modify-write.
-                // For simplicity here, we'll assume a direct update is fine and rely on Firestore's atomicity for the batch.
-                // A more robust solution would use a transaction for each item.
-                 const productSnap = await getDoc(productRef); // Not in transaction, but acceptable for this use case
+                const productSnap = await getDoc(productRef); 
                 if (productSnap.exists()) {
                     const currentStock = productSnap.data().stockInGodown || 0;
                     batch.update(productRef, { 
@@ -319,13 +313,11 @@ export const useInventory = create<InventoryState>((set, get) => ({
                 throw new Error("Destination product already has a barcode mapped.");
             }
             
-            // 1. Move barcode and stock
             transaction.update(destRef, {
                 barcodeId: sourceData.barcodeId,
                 stockInGodown: (destData.stockInGodown || 0) + (sourceData.stockInGodown || 0),
             });
 
-            // 2. Delete the old "messy" product
             transaction.delete(sourceRef);
         });
         await get().fetchAllData();
@@ -355,7 +347,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
   deleteBrand: async (id) => {
     get().setSaving(true);
     try {
-        // This is a full delete, which should only be triggered from the main inventory page
         const batch = writeBatch(db);
         const masterRef = doc(db, 'inventory', id);
         batch.delete(masterRef);
@@ -446,7 +437,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
           throw new Error(`Not enough stock in godown. Available: ${masterData.stockInGodown || 0}`);
         }
 
-        // 1. Decrease stock from Godown and log transfer
         transaction.update(masterRef, {
           stockInGodown: masterData.stockInGodown - quantity,
           lastTransferred: {
@@ -456,7 +446,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
           }
         });
 
-        // 2. Add item(s) to On-Bar inventory
         const isBeer = masterData.category === 'Beer';
         const volumeMatch = masterData.size.match(/(\d+)/);
         const volume = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
@@ -499,14 +488,12 @@ export const useInventory = create<InventoryState>((set, get) => ({
       try {
         await runTransaction(db, async (transaction) => {
             const today = format(new Date(), 'yyyy-MM-dd');
-            const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
             const dailyDocRef = doc(db, 'dailyInventory', today);
             const masterRef = doc(db, 'inventory', id);
             
             const masterDoc = await transaction.get(masterRef);
             if (!masterDoc.exists()) throw new Error("Product not found.");
             
-            // This is the fix for the POS redirect bug. Re-fetch inventory.
             await get().fetchAllData();
             const liveInventory = get().inventory;
             const liveItem = liveInventory.find(i => i.id === id);
@@ -555,27 +542,37 @@ export const useInventory = create<InventoryState>((set, get) => ({
             const dailyDoc = await transaction.get(dailyRef);
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             const masterData = masterDoc.data();
+            const currentItemDaily = dailyData[id] || {};
+            
+            const updateData: any = {
+                ...currentItemDaily,
+                brand: masterData.brand,
+                size: masterData.size,
+                category: masterData.category,
+                price: masterData.price,
+            };
 
             if (field === 'price') {
+                updateData[field] = Number(value);
                 transaction.update(masterRef, { price: Number(value) });
             } else if (field === 'added') {
-                const currentAdded = dailyData[id]?.added || 0;
-                const newAdded = Number(value);
-                const difference = currentAdded - newAdded;
-                
-                if (difference > 0) { // Stock is being returned to godown
-                    const currentGodownStock = masterData.stockInGodown || 0;
-                    transaction.update(masterRef, { stockInGodown: currentGodownStock + difference });
-                } else if (difference < 0) { // Stock is being moved from godown
-                    const currentGodownStock = masterData.stockInGodown || 0;
-                    if (currentGodownStock < Math.abs(difference)) {
-                        throw new Error("Not enough stock in Godown to add.");
-                    }
-                    transaction.update(masterRef, { stockInGodown: currentGodownStock + difference });
-                }
-            }
+                 const currentAdded = Number(currentItemDaily.added || 0);
+                 const newAdded = Number(value);
+                 const difference = newAdded - currentAdded;
+                 
+                 const currentGodownStock = Number(masterData.stockInGodown || 0);
 
-            const updateData = { [field]: Number(value) };
+                 if (currentGodownStock < difference) {
+                     throw new Error(`Not enough stock in Godown. Available: ${currentGodownStock}`);
+                 }
+                 
+                 transaction.update(masterRef, { stockInGodown: currentGodownStock - difference });
+                 updateData[field] = newAdded;
+
+            } else {
+                 updateData[field] = Number(value);
+            }
+            
             transaction.set(dailyRef, { [id]: updateData }, { merge: true });
         });
         await get().fetchAllData();
@@ -588,7 +585,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
  },
 }));
 
-// Initialize listeners
 let inventoryUnsubscribe: () => void;
 let dailyUnsubscribe: () => void;
 let unprocessedUnsubscribe: () => void;
@@ -612,7 +608,6 @@ function initializeListeners() {
     });
 }
 
-// Ensure listeners are initialized on client side
 if (typeof window !== 'undefined') {
     initializeListeners();
 }
