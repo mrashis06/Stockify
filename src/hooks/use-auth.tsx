@@ -116,11 +116,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await updateDoc(userDocRef, data);
       
       // Also update the auth user profile if name or photoURL are changed
-      if (auth.currentUser && auth.currentUser.uid === uid && (data.name || data.photoURL)) {
-          await updateProfile(auth.currentUser, {
-            displayName: data.name,
-            photoURL: data.photoURL,
-          });
+      if (auth.currentUser && auth.currentUser.uid === uid) {
+          const profileUpdateData: { displayName?: string; photoURL?: string } = {};
+          if (data.name) {
+              profileUpdateData.displayName = data.name;
+          }
+          if (data.photoURL) {
+              profileUpdateData.photoURL = data.photoURL;
+          }
+          
+          if (Object.keys(profileUpdateData).length > 0) {
+            await updateProfile(auth.currentUser, profileUpdateData);
+          }
       }
   };
   
