@@ -61,7 +61,8 @@ export default function GodownPage() {
         transferToShop,
         transferToOnBar,
         forceRefetch,
-        updateBrand
+        updateBrand,
+        updateGodownStock,
     } = useInventory();
     
     usePageLoading(loading);
@@ -145,6 +146,25 @@ export default function GodownPage() {
             setSelectedUnprocessedRows(new Set());
         } catch (error) {
              toast({ title: 'Error', description: (error as Error).message || 'Failed to remove items.', variant: 'destructive' });
+        }
+    };
+
+    const handleGodownStockChange = async (id: string, value: string) => {
+        const newStock = Number(value);
+        if (isNaN(newStock) || newStock < 0) {
+            toast({ title: 'Invalid Input', description: 'Please enter a valid non-negative number.', variant: 'destructive' });
+            // Re-render will reset to original value from state
+            forceRefetch();
+            return;
+        }
+
+        try {
+            await updateGodownStock(id, newStock);
+            toast({ title: 'Success', description: `Godown stock updated.` });
+        } catch (error) {
+            console.error(`Error updating godown stock:`, error);
+            const errorMessage = (error as Error).message || `Failed to update stock.`;
+            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         }
     };
     
@@ -378,7 +398,15 @@ export default function GodownPage() {
                                         </TableCell>
                                         <TableCell className="font-medium">{item.brand}</TableCell>
                                         <TableCell>{item.size}</TableCell>
-                                        <TableCell>{item.stockInGodown || 0}</TableCell>
+                                        <TableCell>
+                                            <Input
+                                                type="number"
+                                                className="h-8 w-24 bg-card"
+                                                defaultValue={item.stockInGodown || 0}
+                                                onBlur={(e) => handleGodownStockChange(item.id, e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                            />
+                                        </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>

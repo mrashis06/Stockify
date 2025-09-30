@@ -68,6 +68,7 @@ type InventoryState = {
   processScannedBill: (billDataUri: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
   updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
+  updateGodownStock: (productId: string, newStock: number) => Promise<void>;
   deleteBrand: (id: string) => Promise<void>;
   deleteUnprocessedItems: (ids: string[]) => Promise<void>;
   transferToShop: (productId: string, quantityToTransfer: number, price?: number) => Promise<void>;
@@ -276,6 +277,20 @@ export const useInventory = create<InventoryState>((set, get) => ({
     } catch (error) {
       console.error("Error updating brand: ", error);
       throw error;
+    } finally {
+        get().setSaving(false);
+    }
+  },
+
+  updateGodownStock: async (productId, newStock) => {
+    get().setSaving(true);
+    try {
+        const docRef = doc(db, 'inventory', productId);
+        await updateDoc(docRef, { stockInGodown: newStock });
+        await get().fetchAllData();
+    } catch (error) {
+        console.error("Error updating godown stock: ", error);
+        throw error;
     } finally {
         get().setSaving(false);
     }
