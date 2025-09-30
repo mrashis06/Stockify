@@ -300,6 +300,4 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       </div>
     </main>
   );
-
-    
-
+}
