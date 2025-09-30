@@ -49,45 +49,56 @@ export default function MapBarcodePage() {
         }
     };
 
-    const handleMapBarcode = async (productId: string) => {
+    const handleMapBarcode = (productId: string) => {
         if (!scannedBarcode) return;
 
-        try {
-            await updateBrand(productId, { barcodeId: scannedBarcode });
-            const newlyMappedItem = inventory.find(item => item.id === productId);
-            if (newlyMappedItem) {
-                setMappedItemDetails({ brand: newlyMappedItem.brand, size: newlyMappedItem.size });
-            }
-            setMappingComplete(true);
-            toast({
-                title: "Mapping Successful",
-                description: `Barcode has been linked to ${newlyMappedItem?.brand} (${newlyMappedItem?.size}).`
-            });
-        } catch (error) {
-            console.error("Error mapping barcode:", error);
-            toast({ title: 'Error', description: 'Mapping failed. Please try again.', variant: 'destructive' });
-        } finally {
-            setIsMappingDialogOpen(false);
+        const newlyMappedItem = inventory.find(item => item.id === productId);
+        if (newlyMappedItem) {
+            setMappedItemDetails({ brand: newlyMappedItem.brand, size: newlyMappedItem.size });
         }
+        
+        // Optimistic UI update
+        setMappingComplete(true);
+        setIsMappingDialogOpen(false);
+        toast({
+            title: "Mapping Successful",
+            description: `Barcode has been linked to ${newlyMappedItem?.brand} (${newlyMappedItem?.size}).`
+        });
+        
+        // Perform DB operation in background
+        updateBrand(productId, { barcodeId: scannedBarcode })
+            .catch((error) => {
+                 // Revert UI on failure
+                setMappingComplete(false);
+                setMappedItemDetails(null);
+                console.error("Error mapping barcode:", error);
+                toast({ title: 'Sync Error', description: 'Mapping failed. Please try again.', variant: 'destructive' });
+            });
     };
     
-    const handleLinkProduct = async (destinationProductId: string) => {
+    const handleLinkProduct = (destinationProductId: string) => {
         if (!alreadyMappedItem) return;
 
-        try {
-            await linkBarcodeToProduct(alreadyMappedItem.id, destinationProductId);
-            const linkedItem = inventory.find(item => item.id === destinationProductId);
-            setMappedItemDetails({ brand: linkedItem?.brand || '', size: linkedItem?.size || '' });
-            setMappingComplete(true); // Re-use the same success UI
-            toast({
-                title: "Link Successful",
-                description: `Barcode and stock from "${alreadyMappedItem.brand}" have been moved to "${linkedItem?.brand}".`
+        const linkedItem = inventory.find(item => item.id === destinationProductId);
+        if (!linkedItem) return;
+
+        // Optimistic UI update
+        setMappedItemDetails({ brand: linkedItem.brand, size: linkedItem.size });
+        setMappingComplete(true);
+        setIsLinkDialogOpen(false);
+        toast({
+            title: "Link Successful",
+            description: `Barcode and stock from "${alreadyMappedItem.brand}" have been moved to "${linkedItem.brand}".`
+        });
+        
+        // Perform DB operation in background
+        linkBarcodeToProduct(alreadyMappedItem.id, destinationProductId)
+             .catch((error) => {
+                // Revert UI on failure
+                setMappingComplete(false);
+                setMappedItemDetails(null);
+                toast({ title: 'Sync Error', description: (error as Error).message || 'Failed to link products.', variant: 'destructive' });
             });
-        } catch(error) {
-            toast({ title: 'Error', description: (error as Error).message || 'Failed to link products.', variant: 'destructive' });
-        } finally {
-            setIsLinkDialogOpen(false);
-        }
     }
     
     const handleCancelMapping = () => {
