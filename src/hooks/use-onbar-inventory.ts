@@ -215,27 +215,23 @@ export function useOnBarInventory() {
             }
 
             const onBarItemData = onBarItemDoc.data() as OnBarItem;
+            const inventoryId = onBarItemData.inventoryId;
 
-            // Only return stock if nothing has been sold from this item
-            if (onBarItemData.salesVolume === 0) {
-                const inventoryId = onBarItemData.inventoryId;
+            // Only return stock if the item is from the main inventory and has not been sold.
+            if (inventoryId && inventoryId !== 'manual' && onBarItemData.salesVolume === 0) {
+                const masterInventoryRef = doc(db, "inventory", inventoryId);
+                const masterInventoryDoc = await transaction.get(masterInventoryRef);
+                
+                if (masterInventoryDoc.exists()) {
+                    const masterData = masterInventoryDoc.data();
+                    const currentGodownStock = masterData.stockInGodown || 0;
+                    const quantityToReturn = onBarItemData.category === 'Beer'
+                        ? onBarItemData.remainingVolume // Return all remaining units
+                        : 1; // Return 1 bottle
 
-                // Make sure this isn't a manually added item
-                if (inventoryId && inventoryId !== 'manual') {
-                    const masterInventoryRef = doc(db, "inventory", inventoryId);
-                    const masterInventoryDoc = await transaction.get(masterInventoryRef);
-                    
-                    if (masterInventoryDoc.exists()) {
-                        const masterData = masterInventoryDoc.data();
-                        const currentGodownStock = masterData.stockInGodown || 0;
-                        const quantityToReturn = onBarItemData.category === 'Beer'
-                            ? onBarItemData.remainingVolume // Return all remaining units
-                            : 1; // Return 1 bottle
-
-                        transaction.update(masterInventoryRef, {
-                            stockInGodown: currentGodownStock + quantityToReturn
-                        });
-                    }
+                    transaction.update(masterInventoryRef, {
+                        stockInGodown: currentGodownStock + quantityToReturn
+                    });
                 }
             }
             
@@ -256,5 +252,7 @@ export function useOnBarInventory() {
 
   return { onBarInventory, loading, saving, addOnBarItem, sellPeg, refillPeg, removeOnBarItem };
 }
+
+    
 
     
