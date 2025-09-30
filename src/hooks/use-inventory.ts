@@ -548,20 +548,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
             if (field === 'price') {
                 updateData[field] = Number(value);
                 transaction.update(masterRef, { price: Number(value) });
-            } else if (field === 'added') {
-                 const currentAdded = Number(currentItemDaily.added || 0);
-                 const newAdded = Number(value);
-                 const difference = newAdded - currentAdded;
-                 
-                 const currentGodownStock = Number(masterData.stockInGodown || 0);
-
-                 if (currentGodownStock < difference) {
-                     throw new Error(`Not enough stock in Godown. Available: ${currentGodownStock}`);
-                 }
-                 
-                 transaction.update(masterRef, { stockInGodown: currentGodownStock - difference });
-                 updateData[field] = newAdded;
-
             } else {
                  updateData[field] = Number(value);
             }
@@ -604,3 +590,4 @@ function initializeListeners() {
 if (typeof window !== 'undefined') {
     initializeListeners();
 }
+
