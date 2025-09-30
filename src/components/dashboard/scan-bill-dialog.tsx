@@ -11,17 +11,12 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useInventory, UnprocessedItem } from '@/hooks/use-inventory';
+import { useInventory } from '@/hooks/use-inventory';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, UploadCloud, FileCheck2, AlertCircle, Trash2, CheckCircle, Package } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { ScrollArea } from '../ui/scroll-area';
-import { Input } from '../ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ExtractedItem } from '@/ai/flows/extract-bill-flow';
 
 
 type ScanBillDialogProps = {
@@ -30,7 +25,7 @@ type ScanBillDialogProps = {
 };
 
 export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogProps) {
-    const { processScannedBill } = useInventory();
+    const { processScannedBill, forceRefetch } = useInventory();
     const { toast } = useToast();
     const [file, setFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -44,9 +39,14 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
         setResult(null);
     };
 
+    // This effect ensures that whenever the dialog is closed, its internal state is reset.
     useEffect(() => {
-        if(!isOpen) {
-            resetState();
+        if (!isOpen) {
+            // Add a small delay to allow the closing animation to finish before resetting state.
+            const timer = setTimeout(() => {
+                resetState();
+            }, 300);
+            return () => clearTimeout(timer);
         }
     }, [isOpen]);
 
@@ -84,6 +84,8 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                     title: "Bill Processed Successfully",
                     description: `${processResult.matchedCount} items auto-stocked, ${processResult.unmatchedCount} items need review.`,
                 });
+                // Force a refetch of inventory data on the main page
+                forceRefetch();
             } catch (err) {
                 console.error("Extraction error:", err);
                 const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -213,5 +215,3 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
         </Dialog>
     );
 }
-
-    
