@@ -537,16 +537,20 @@ export const useInventory = create<InventoryState>((set, get) => ({
             const masterData = masterDoc.data();
             const currentItemDaily = dailyData[id] || {};
             
+            // This is the fix: ensure all necessary fields are included in the update.
             const updateData: any = {
-                ...currentItemDaily,
                 brand: masterData.brand,
                 size: masterData.size,
                 category: masterData.category,
                 price: masterData.price,
+                added: currentItemDaily.added || 0,
+                sales: currentItemDaily.sales || 0,
             };
 
+            // Update the specific field that was changed
             if (field === 'price') {
                 updateData[field] = Number(value);
+                // Also update the master inventory price
                 transaction.update(masterRef, { price: Number(value) });
             } else {
                  updateData[field] = Number(value);
@@ -554,6 +558,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
             
             transaction.set(dailyRef, { [id]: updateData }, { merge: true });
         });
+        // Fetch all data to ensure UI is consistent after the transaction
         await get().fetchAllData();
     } catch (error) {
         console.error(`Error updating field ${field}:`, error);
@@ -590,4 +595,3 @@ function initializeListeners() {
 if (typeof window !== 'undefined') {
     initializeListeners();
 }
-
