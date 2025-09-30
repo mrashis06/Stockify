@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
@@ -84,12 +85,14 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             masterInventory.forEach((masterItem) => {
                 const id = masterItem.id;
                 const dailyItem = todayData[id];
-                // Use the master item's prevStock as the source of truth for opening stock
-                const prevStock = masterItem.prevStock ?? 0;
+                const prevDailyItem = yesterdayData[id];
+
+                // Calculate opening stock based on yesterday's closing stock if available.
+                const prevClosing = prevDailyItem ? (Number(masterItem.prevStock || 0) + Number(prevDailyItem.added || 0)) - Number(prevDailyItem.sales || 0) : Number(masterItem.prevStock || 0);
 
                 items.push({
                     ...masterItem,
-                    prevStock: Number(prevStock),
+                    prevStock: prevClosing,
                     added: Number(dailyItem?.added ?? 0),
                     sales: Number(dailyItem?.sales ?? 0),
                 });

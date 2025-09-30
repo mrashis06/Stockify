@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -97,8 +98,8 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         try {
             await endOfDayProcess();
             toast({
-                title: 'End of Day Successful',
-                description: 'Today\'s inventory has been closed and tomorrow\'s has been prepared.'
+                title: 'End of Day Processed',
+                description: 'The system has been signaled for end of day. Your inventory will roll over automatically after midnight.'
             });
         } catch (error) {
             console.error("End of day process failed:", error);
@@ -141,7 +142,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     <AlertDialogHeader>
                         <AlertDialogTitle>End of Day Process</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to close today's inventory? This will finalize all sales and stock for today and prepare the inventory for tomorrow. This action cannot be undone.
+                            Are you sure you want to run the end-of-day process? This will close out today's bar sales and prepare the system for the next day. You can still edit today's off-counter sales until midnight.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -274,3 +275,4 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
 }
 
     
+
