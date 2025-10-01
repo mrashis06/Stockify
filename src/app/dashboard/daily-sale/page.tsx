@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { useInventory } from '@/hooks/use-inventory';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { IndianRupee, Download } from 'lucide-react';
+import { IndianRupee, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { usePageLoading } from '@/hooks/use-loading';
 import { Button } from '@/components/ui/button';
 import { useDateFormat } from '@/hooks/use-date-format';
@@ -20,6 +20,7 @@ type AggregatedSale = {
     unitsSold: number;
     size: number;
     category: 'FL' | 'IML' | 'BEER';
+    breakdown: number[];
 };
 
 const IML_CATEGORIES = ['IML'];
@@ -29,8 +30,19 @@ const BEER_CATEGORIES = ['Beer'];
 export default function DailySalePage() {
     const { inventory, onBarInventory, loading } = useInventory();
     const { formatDate } = useDateFormat();
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     
     usePageLoading(loading);
+
+    const toggleRowExpansion = (key: string) => {
+        const newSet = new Set(expandedRows);
+        if (newSet.has(key)) {
+            newSet.delete(key);
+        } else {
+            newSet.add(key);
+        }
+        setExpandedRows(newSet);
+    };
 
     const { blReport, totalSalesValue } = useMemo(() => {
         const salesMap = new Map<string, AggregatedSale>();
@@ -48,8 +60,9 @@ export default function DailySalePage() {
 
                 if (category && sizeMl > 0) {
                     const key = `${category}-${sizeMl}`;
-                    const existing = salesMap.get(key) || { unitsSold: 0, size: sizeMl, category };
+                    const existing = salesMap.get(key) || { unitsSold: 0, size: sizeMl, category, breakdown: [] };
                     existing.unitsSold += item.sales;
+                    existing.breakdown.push(item.sales);
                     salesMap.set(key, existing);
                 }
             }
@@ -63,27 +76,26 @@ export default function DailySalePage() {
                  else if (IML_CATEGORIES.includes(item.category)) category = 'IML';
                  else if (BEER_CATEGORIES.includes(item.category)) category = 'BEER';
                  
-                 // Special handling for Beer vs Liquor from On-Bar
                  if (category === 'BEER') {
-                    // Beer sales are in units
                     const sizeMatch = item.size.match(/(\d+)/);
                     const sizeMl = sizeMatch ? parseInt(sizeMatch[0], 10) : 0;
                      if (sizeMl > 0) {
                          const key = `${category}-${sizeMl}`;
-                         const existing = salesMap.get(key) || { unitsSold: 0, size: sizeMl, category };
+                         const existing = salesMap.get(key) || { unitsSold: 0, size: sizeMl, category, breakdown: [] };
                          existing.unitsSold += item.salesVolume; // salesVolume for beer is in units
+                         existing.breakdown.push(item.salesVolume);
                          salesMap.set(key, existing);
                      }
                  } else if (category === 'FL' || category === 'IML') {
-                    // Liquor sales are in ml, convert to fractional bottles
                     const totalVolumeSold = item.salesVolume; 
                     const bottleSize = item.totalVolume;
                     if (bottleSize > 0) {
-                       const unitsSold = totalVolumeSold / bottleSize; // Can be fractional
+                       const unitsSold = totalVolumeSold / bottleSize;
                        
                        const key = `${category}-${bottleSize}`;
-                       const existing = salesMap.get(key) || { unitsSold: 0, size: bottleSize, category };
+                       const existing = salesMap.get(key) || { unitsSold: 0, size: bottleSize, category, breakdown: [] };
                        existing.unitsSold += unitsSold;
+                       existing.breakdown.push(unitsSold);
                        salesMap.set(key, existing);
                     }
                  }
@@ -163,6 +175,7 @@ export default function DailySalePage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12"></TableHead>
                                 <TableHead className="font-bold text-foreground">Category</TableHead>
                                 <TableHead className="font-bold text-foreground">Size (ml)</TableHead>
                                 <TableHead className="font-bold text-foreground text-right">Units Sold</TableHead>
@@ -171,17 +184,37 @@ export default function DailySalePage() {
                         </TableHeader>
                         <TableBody>
                             {blReport.length > 0 ? (
-                                blReport.map(row => (
-                                    <TableRow key={`${row.category}-${row.size}`}>
-                                        <TableCell className="font-medium">{row.category}</TableCell>
-                                        <TableCell>{row.size}</TableCell>
-                                        <TableCell className="text-right">{row.unitsSold.toFixed(3)}</TableCell>
-                                        <TableCell className="text-right font-semibold">{row.bulkLiters.toFixed(3)}</TableCell>
-                                    </TableRow>
-                                ))
+                                blReport.map(row => {
+                                    const rowKey = `${row.category}-${row.size}`;
+                                    const isExpanded = expandedRows.has(rowKey);
+                                    return (
+                                        <React.Fragment key={rowKey}>
+                                            <TableRow>
+                                                <TableCell>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleRowExpansion(rowKey)}>
+                                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell className="font-medium">{row.category}</TableCell>
+                                                <TableCell>{row.size}</TableCell>
+                                                <TableCell className="text-right">{row.unitsSold.toFixed(3)}</TableCell>
+                                                <TableCell className="text-right font-semibold">{row.bulkLiters.toFixed(3)}</TableCell>
+                                            </TableRow>
+                                            {isExpanded && (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="p-0">
+                                                        <div className="bg-muted/50 px-6 py-3 text-sm text-muted-foreground">
+                                                            <span className="font-semibold text-foreground">Breakdown:</span> {row.breakdown.map(n => n.toFixed(2)).join(' + ')}
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </React.Fragment>
+                                    )
+                                })
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
+                                    <TableCell colSpan={5} className="h-24 text-center">
                                         No sales recorded for today yet.
                                     </TableCell>
                                 </TableRow>
@@ -189,7 +222,7 @@ export default function DailySalePage() {
                         </TableBody>
                          <TableFooter>
                             <TableRow className="bg-muted/50 font-bold">
-                                <TableCell colSpan={3} className="text-right text-lg">Total Today's Sale Amount</TableCell>
+                                <TableCell colSpan={4} className="text-right text-lg">Total Today's Sale Amount</TableCell>
                                 <TableCell className="text-right text-lg">
                                     <div className="flex items-center justify-end">
                                         <IndianRupee className="h-5 w-5 mr-1" />
