@@ -62,6 +62,11 @@ const AnimatedBottle = () => {
     const { theme } = useTheme();
     const [currentColorSet, setCurrentColorSet] = useState(spiritColors.whiskey);
     const [colorIndex, setColorIndex] = useState(0);
+    const [hasMounted, setHasMounted] = useState(false);
+
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
 
     const colorKeys = Object.keys(spiritColors);
 
@@ -83,15 +88,17 @@ const AnimatedBottle = () => {
     return (
         <div className="relative w-full max-w-[300px] md:max-w-[500px] aspect-[3/5] flex items-center justify-center">
             
-            {/* Background Pulse */}
-            <motion.div
-                className={cn(
-                    "absolute inset-0 rounded-full",
-                    isDark ? "bg-gradient-radial from-gray-900 to-black" : "bg-gradient-radial from-white to-gray-100"
-                )}
-                animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.7, 0.5] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            />
+            {/* Background Pulse - Rendered only on client */}
+            {hasMounted && (
+                <motion.div
+                    className={cn(
+                        "absolute inset-0 rounded-full",
+                        isDark ? "bg-gradient-radial from-gray-900 to-black" : "bg-gradient-radial from-white to-gray-100"
+                    )}
+                    animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0.7, 0.5] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                />
+            )}
 
             <div className="relative w-full h-full">
                 {/* SVG for clipping mask */}
