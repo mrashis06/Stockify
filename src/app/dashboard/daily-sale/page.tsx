@@ -121,31 +121,53 @@ export default function DailySalePage() {
     }, [inventory, onBarInventory]);
 
     const handleExportPDF = () => {
-        const doc = new jsPDF() as jsPDFWithAutoTable;
+        const doc = new jsPDF();
         const today = formatDate(new Date(), 'dd/MM/yyyy');
         
+        const totalsByCategory = blReport.reduce((acc, sale) => {
+            if (!acc[sale.category]) {
+                acc[sale.category] = 0;
+            }
+            acc[sale.category] += sale.bulkLiters;
+            return acc;
+        }, {} as Record<string, number>);
+
+        const flTotal = totalsByCategory['FL'] || 0;
+        const imlTotal = totalsByCategory['IML'] || 0;
+        const beerTotal = totalsByCategory['BEER'] || 0;
+
         doc.setFontSize(10);
-        doc.text(`Date: ${today}`, 14, 15);
+        doc.text(`Date: ${today}`, 105, 15, { align: 'center' });
         
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
-        doc.text("BHOLE BABA FL ON SHOP", doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+        doc.text("BHOLE BABA FL ON SHOP", 105, 25, { align: 'center' });
 
-        doc.autoTable({
-            startY: 30,
-            head: [['Category', 'Size (ml)', 'Units Sold', 'Bulk Liters (BL)']],
-            body: blReport.map(row => [
-                row.category,
-                row.size,
-                row.unitsSold.toFixed(3),
-                row.bulkLiters.toFixed(3)
-            ]),
-            foot: [['Total Today\'s Sale Amount', '', '', `Rs. ${totalSalesValue.toFixed(2)}`]],
-            theme: 'striped',
-            headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
-            footStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [240, 240, 240] },
-        });
+        let yPos = 40;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+
+        if (flTotal > 0) {
+            doc.text(`FL: ${flTotal.toFixed(3)}`, 14, yPos);
+            yPos += 10;
+        }
+        if (imlTotal > 0) {
+            doc.text(`IML: ${imlTotal.toFixed(3)}`, 14, yPos);
+            yPos += 10;
+        }
+        if (beerTotal > 0) {
+            doc.text(`BEER: ${beerTotal.toFixed(3)}`, 14, yPos);
+            yPos += 10;
+        }
+        
+        yPos += 5; // Add some space before the total
+        doc.setLineWidth(0.5);
+        doc.line(14, yPos, 196, yPos); // Line separator
+        yPos += 10;
+
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Total Sale: Rs. ${totalSalesValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, yPos);
+        
 
         doc.save(`BL_Sale_Report_${formatDate(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
@@ -237,3 +259,5 @@ export default function DailySalePage() {
         </main>
     );
 }
+
+    
