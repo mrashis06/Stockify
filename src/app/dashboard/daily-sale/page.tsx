@@ -138,7 +138,7 @@ export default function DailySalePage() {
 
         // Header
         doc.setFontSize(10);
-        doc.setTextColor(150);
+        doc.setTextColor(0, 0, 0);
         doc.text(`Date: ${today}`, doc.internal.pageSize.width - 14, 15, { align: 'right' });
         
         doc.setFontSize(22);
@@ -277,3 +277,6 @@ export default function DailySalePage() {
 
     
 
+
+
+    
