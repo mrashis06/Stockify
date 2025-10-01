@@ -23,14 +23,27 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { createAdminNotification, deleteAdminNotificationByProductId } from './use-notifications';
-import { useAuth } from './use-auth';
-import { useNotificationSettings } from './use-notification-settings';
-import type { ExtractedItem, BillExtractionOutput } from '@/ai/flows/extract-bill-flow';
-import { extractItemsFromBill } from '@/ai/flows/extract-bill-flow';
+import { extractItemsFromBill, BillExtractionOutput } from '@/ai/flows/extract-bill-flow';
+import type { ExtractedItem } from '@/ai/flows/extract-bill-flow';
 
+export type OnBarItem = {
+  id: string;
+  inventoryId: string;
+  brand: string;
+  size: string;
+  category: string;
+  totalVolume: number;
+  remainingVolume: number;
+  totalQuantity?: number;
+  salesVolume: number;
+  salesValue: number;
+  price: number;
+  pegPrice30ml?: number;
+  pegPrice60ml?: number;
+  openedAt: any;
+};
 
 export type InventoryItem = {
   id: string;
@@ -61,10 +74,14 @@ export type UnprocessedItem = ExtractedItem & {
 type InventoryState = {
   inventory: InventoryItem[];
   unprocessedItems: UnprocessedItem[];
+  onBarInventory: OnBarItem[];
   loading: boolean;
   saving: boolean;
-  fetchAllData: () => Promise<void>;
-  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock'> & {prevStock: number}) => Promise<void>;
+  
+  // Actions
+  initListeners: () => () => void;
+  forceRefetch: () => Promise<void>;
+  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {prevStock: number}) => Promise<void>;
   processScannedBill: (billDataUri: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
   updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
@@ -76,73 +93,96 @@ type InventoryState = {
   transferToOnBar: (productId: string, quantity: number, pegPrices?: { '30ml': number; '60ml': number }) => Promise<void>;
   recordSale: (id: string, quantity: number, salePrice: number, soldBy: string) => Promise<void>;
   updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => Promise<void>;
-  forceRefetch: () => Promise<void>;
-  setLoading: (isLoading: boolean) => void;
-  setSaving: (isSaving: boolean) => void;
+  
+  // On-Bar Actions
+  addOnBarItem: (inventoryItemId: string, volume: number, quantity: number, price: number, pegPrices?: { '30ml': number, '60ml': number }) => Promise<void>;
+  sellPeg: (id: string, pegSize: 30 | 60 | 'custom', customVolume?: number, customPrice?: number) => Promise<void>;
+  refillPeg: (id: string, amount: number) => Promise<void>;
+  removeOnBarItem: (id: string) => Promise<void>;
+
+  // Internal state management
+  _setLoading: (isLoading: boolean) => void;
+  _setSaving: (isSaving: boolean) => void;
 };
 
-const LOW_STOCK_THRESHOLD = 10;
+let listenersInitialized = false;
 
+const useInventoryStore = create<InventoryState>((set, get) => ({
+    inventory: [],
+    unprocessedItems: [],
+    onBarInventory: [],
+    loading: true,
+    saving: false,
+    
+    _setLoading: (isLoading) => set({ loading: isLoading }),
+    _setSaving: (isSaving) => set({ saving: isSaving }),
 
-export const useInventory = create<InventoryState>((set, get) => ({
-  inventory: [],
-  unprocessedItems: [],
-  loading: true,
-  saving: false,
-  setLoading: (isLoading) => set({ loading: isLoading }),
-  setSaving: (isSaving) => set({ isSaving: isSaving }),
-  forceRefetch: async () => {
-    await get().fetchAllData();
-  },
-  
-  fetchAllData: async () => {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      set({ loading: true });
-      try {
-        const inventorySnapshot = await getDocs(collection(db, 'inventory'));
-        const masterInventory = new Map<string, any>();
-        inventorySnapshot.forEach(doc => {
-            masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
-        });
-
-        const dailyDocRef = doc(db, 'dailyInventory', today);
-        const dailySnap = await getDoc(dailyDocRef);
-        const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-
-        const items: InventoryItem[] = [];
-        masterInventory.forEach((masterItem) => {
-            const id = masterItem.id;
-            const dailyItem = dailyData[id];
+    initListeners: () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        
+        const invSub = onSnapshot(query(collection(db, "inventory")), (snapshot) => {
+            const masterInventory = new Map<string, any>();
+            snapshot.forEach(doc => {
+                masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
+            });
             
-            items.push({
-                ...masterItem,
-                prevStock: Number(masterItem.prevStock || 0),
-                added: Number(dailyItem?.added ?? 0),
-                sales: Number(dailyItem?.sales ?? 0),
+            const dailyDocRef = doc(db, 'dailyInventory', today);
+            getDoc(dailyDocRef).then(dailySnap => {
+                const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+                const items: InventoryItem[] = [];
+                masterInventory.forEach((masterItem) => {
+                    items.push({
+                        ...masterItem,
+                        prevStock: Number(masterItem.prevStock || 0),
+                        added: Number(dailyData[masterItem.id]?.added ?? 0),
+                        sales: Number(dailyData[masterItem.id]?.sales ?? 0),
+                    });
+                });
+                set({ inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)), loading: false });
             });
         });
 
-        const unprocessedSnapshot = await getDocs(query(collection(db, 'unprocessed_deliveries'), orderBy('createdAt', 'desc')));
-        const unprocessed: UnprocessedItem[] = [];
-        unprocessedSnapshot.forEach(doc => {
-            unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
+        const dailySub = onSnapshot(doc(db, 'dailyInventory', today), (dailySnap) => {
+            const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+            set(state => ({
+                inventory: state.inventory.map(item => ({
+                    ...item,
+                    added: Number(dailyData[item.id]?.added ?? 0),
+                    sales: Number(dailyData[item.id]?.sales ?? 0),
+                }))
+            }));
+        });
+        
+        const unprocessedSub = onSnapshot(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')), (snapshot) => {
+            const unprocessed: UnprocessedItem[] = [];
+            snapshot.forEach(doc => {
+                unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
+            });
+            set({ unprocessedItems: unprocessed });
+        });
+        
+        const onBarSub = onSnapshot(collection(db, "onBarInventory"), (snapshot) => {
+            const items: OnBarItem[] = [];
+            snapshot.forEach((doc) => {
+                items.push({ id: doc.id, ...doc.data() } as OnBarItem);
+            });
+            set({ onBarInventory: items.sort((a,b) => a.brand.localeCompare(b.brand)) });
         });
 
-        set({
-          inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)),
-          unprocessedItems: unprocessed
-        });
-
-      } catch (error) {
-        console.error("Error fetching inventory data: ", error);
-        toast({ title: 'Error', description: 'Failed to load inventory data.', variant: 'destructive' });
-      } finally {
-        set({ loading: false });
-      }
-  },
-
+        return () => {
+            invSub();
+            dailySub();
+            unprocessedSub();
+            onBarSub();
+        };
+    },
+    
+    forceRefetch: async () => {
+        // The listeners handle this automatically now. This can be a no-op or trigger a manual re-read if needed.
+    },
+  
   addBrand: async (newItemData) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         const id = `manual_${newItemData.brand.toLowerCase().replace(/[^a-z0-9]/g, '')}_${newItemData.size.toLowerCase().replace(/[^0-9]/g, '')}`;
         const docRef = doc(db, 'inventory', id);
@@ -158,18 +198,16 @@ export const useInventory = create<InventoryState>((set, get) => ({
         };
         
         await setDoc(docRef, masterItemData);
-        await get().fetchAllData();
-
     } catch (error) {
         console.error('Error adding brand:', error);
         throw error;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
   },
 
   processScannedBill: async (billDataUri: string) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         const currentInventory = get().inventory.map(item => ({
             id: item.id,
@@ -184,7 +222,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
 
         const batch = writeBatch(db);
 
-        // Process matched items
         if (result.matchedItems && result.matchedItems.length > 0) {
             for (const item of result.matchedItems) {
                 const productRef = doc(db, 'inventory', item.productId);
@@ -199,7 +236,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
             }
         }
 
-        // Process unmatched items
         if (result.unmatchedItems && result.unmatchedItems.length > 0) {
             result.unmatchedItems.forEach(item => {
                 const docRef = doc(collection(db, 'unprocessed_deliveries'));
@@ -208,7 +244,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
         }
         
         await batch.commit();
-        await get().fetchAllData();
         
         return {
             matchedCount: result.matchedItems?.length || 0,
@@ -219,12 +254,12 @@ export const useInventory = create<InventoryState>((set, get) => ({
         console.error("Error processing scanned bill:", e);
         throw e;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
   },
 
   processScannedDelivery: async (unprocessedItemId, barcode, details) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
             const inventoryQuery = query(collection(db, 'inventory'), where('barcodeId', '==', barcode), limit(1));
@@ -255,17 +290,16 @@ export const useInventory = create<InventoryState>((set, get) => ({
             const unprocessedRef = doc(db, 'unprocessed_deliveries', unprocessedItemId);
             transaction.delete(unprocessedRef);
         });
-        await get().fetchAllData();
     } catch(e) {
         console.error("Error processing delivery:", e);
         throw e;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
   },
 
   updateBrand: async (id, data) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         const docRef = doc(db, 'inventory', id);
         const updateData: Partial<InventoryItem> = { ...data };
@@ -273,17 +307,16 @@ export const useInventory = create<InventoryState>((set, get) => ({
           updateData.price = Number(data.price);
         }
         await updateDoc(docRef, updateData);
-        await get().fetchAllData();
     } catch (error) {
       console.error("Error updating brand: ", error);
       throw error;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
   },
   
   linkBarcodeToProduct: async (sourceProductId, destinationProductId) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
             const sourceRef = doc(db, 'inventory', sourceProductId);
@@ -313,49 +346,45 @@ export const useInventory = create<InventoryState>((set, get) => ({
 
             transaction.delete(sourceRef);
         });
-        await get().fetchAllData();
-
     } catch (error) {
         console.error("Error linking barcode: ", error);
         throw error;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
   },
 
   updateGodownStock: async (productId, newStock) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         const docRef = doc(db, 'inventory', productId);
         await updateDoc(docRef, { stockInGodown: newStock });
-        await get().fetchAllData();
     } catch (error) {
         console.error("Error updating godown stock: ", error);
         throw error;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
   },
 
   deleteBrand: async (id) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         const batch = writeBatch(db);
         const masterRef = doc(db, 'inventory', id);
         batch.delete(masterRef);
         await batch.commit();
-        await get().fetchAllData();
     } catch (error) {
         console.error("Error deleting product:", error);
         throw error;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
   },
   
   deleteUnprocessedItems: async (ids: string[]) => {
     if (ids.length === 0) return;
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         const batch = writeBatch(db);
         ids.forEach(id => {
@@ -363,17 +392,16 @@ export const useInventory = create<InventoryState>((set, get) => ({
             batch.delete(docRef);
         });
         await batch.commit();
-        await get().fetchAllData();
     } catch (error) {
         console.error("Error deleting unprocessed items:", error);
         throw error;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
   },
 
   transferToShop: async (productId, quantityToTransfer, price) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
             const masterRef = doc(db, 'inventory', productId);
@@ -408,17 +436,16 @@ export const useInventory = create<InventoryState>((set, get) => ({
             
             transaction.set(dailyRef, { [productId]: itemDailyData }, { merge: true });
         });
-        await get().fetchAllData();
     } catch (error) {
         console.error("Error transferring to shop:", error);
         throw error;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
  },
  
   transferToOnBar: async (productId, quantity, pegPrices) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
       await runTransaction(db, async (transaction) => {
         const masterRef = doc(db, 'inventory', productId);
@@ -443,7 +470,7 @@ export const useInventory = create<InventoryState>((set, get) => ({
         const volumeMatch = masterData.size.match(/(\d+)/);
         const volume = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
         
-        const onBarItemPayload: Omit<any, 'id' | 'openedAt'> = {
+        const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
             inventoryId: productId,
             brand: masterData.brand,
             size: masterData.size,
@@ -454,7 +481,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
             totalQuantity: isBeer ? quantity : 1,
             salesVolume: 0,
             salesValue: 0,
-            openedAt: serverTimestamp(),
         };
 
         if (!isBeer && pegPrices) {
@@ -463,31 +489,24 @@ export const useInventory = create<InventoryState>((set, get) => ({
         }
 
         const onBarDocRef = doc(collection(db, "onBarInventory"));
-        transaction.set(onBarDocRef, onBarItemPayload);
+        transaction.set(onBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
       });
-
-      await get().fetchAllData();
 
     } catch (error) {
       console.error("Error transferring to on-bar:", error);
       throw error;
     } finally {
-      get().setSaving(false);
+      get()._setSaving(false);
     }
   },
 
   recordSale: async (id, quantity, salePrice, soldBy) => {
-      get().setSaving(true);
+      get()._setSaving(true);
       try {
         await runTransaction(db, async (transaction) => {
             const today = format(new Date(), 'yyyy-MM-dd');
             const dailyDocRef = doc(db, 'dailyInventory', today);
-            const masterRef = doc(db, 'inventory', id);
             
-            const masterDoc = await transaction.get(masterRef);
-            if (!masterDoc.exists()) throw new Error("Product not found.");
-            
-            await get().fetchAllData();
             const liveInventory = get().inventory;
             const liveItem = liveInventory.find(i => i.id === id);
             if (!liveItem) throw new Error("Live product data not found.");
@@ -500,29 +519,22 @@ export const useInventory = create<InventoryState>((set, get) => ({
             }
 
             const dailyDoc = await transaction.get(dailyDocRef);
-            let dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            let itemDailyData = dailyData[id];
-             if (!itemDailyData) {
-                const masterData = masterDoc.data();
-                itemDailyData = { ...masterData, prevStock: openingStock, sales: 0 };
-            }
+            let itemDailyData = dailyDoc.exists() ? (dailyDoc.data()[id] || {}) : {};
 
             itemDailyData.sales = (itemDailyData.sales || 0) + quantity;
-            dailyData[id] = itemDailyData;
 
-            transaction.set(dailyDocRef, { [id]: { sales: itemDailyData.sales } }, { merge: true });
+            transaction.set(dailyDocRef, { [id]: itemDailyData }, { merge: true });
         });
-        await get().fetchAllData();
       } catch (error) {
           console.error(`Error recording sale:`, error);
           throw error;
       } finally {
-          get().setSaving(false);
+          get()._setSaving(false);
       }
   },
   
  updateItemField: async (id, field, value) => {
-    get().setSaving(true);
+    get()._setSaving(true);
     try {
         const today = format(new Date(), 'yyyy-MM-dd');
         await runTransaction(db, async (transaction) => {
@@ -537,7 +549,6 @@ export const useInventory = create<InventoryState>((set, get) => ({
             const masterData = masterDoc.data();
             const currentItemDaily = dailyData[id] || {};
             
-            // This is the fix: ensure all necessary fields are included in the update.
             const updateData: any = {
                 brand: masterData.brand,
                 size: masterData.size,
@@ -547,10 +558,8 @@ export const useInventory = create<InventoryState>((set, get) => ({
                 sales: currentItemDaily.sales || 0,
             };
 
-            // Update the specific field that was changed
             if (field === 'price') {
                 updateData[field] = Number(value);
-                // Also update the master inventory price
                 transaction.update(masterRef, { price: Number(value) });
             } else {
                  updateData[field] = Number(value);
@@ -558,40 +567,183 @@ export const useInventory = create<InventoryState>((set, get) => ({
             
             transaction.set(dailyRef, { [id]: updateData }, { merge: true });
         });
-        // Fetch all data to ensure UI is consistent after the transaction
-        await get().fetchAllData();
     } catch (error) {
         console.error(`Error updating field ${field}:`, error);
         throw error;
     } finally {
-        get().setSaving(false);
+        get()._setSaving(false);
     }
  },
+
+  // On-Bar Methods
+  addOnBarItem: async (inventoryItemId, volume, quantity, price, pegPrices) => {
+    if (get().saving) return;
+    get()._setSaving(true);
+    try {
+      const itemInShop = get().inventory.find(item => item.id === inventoryItemId);
+      if (!itemInShop) throw new Error("Item not found in shop inventory.");
+      
+      const newOnBarDocRef = doc(collection(db, "onBarInventory"));
+      const isBeer = itemInShop.category === 'Beer';
+
+      const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
+          inventoryId: inventoryItemId,
+          brand: itemInShop.brand,
+          size: itemInShop.size,
+          category: itemInShop.category,
+          totalVolume: volume,
+          remainingVolume: isBeer ? quantity : volume,
+          price: price,
+          totalQuantity: isBeer ? quantity : 1,
+          salesVolume: 0,
+          salesValue: 0,
+      };
+
+      if (!isBeer && pegPrices) {
+          onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
+          onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
+      }
+      
+      await setDoc(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
+    } catch (error) {
+        console.error("Error opening bottle: ", error);
+        throw error;
+    } finally {
+        get()._setSaving(false);
+    }
+  },
+
+  sellPeg: async (id, pegSize, customVolume, customPrice) => {
+    if (get().saving) return;
+    get()._setSaving(true);
+    try {
+        const itemRef = doc(db, 'onBarInventory', id);
+        await runTransaction(db, async (transaction) => {
+            const itemDoc = await transaction.get(itemRef);
+            if (!itemDoc.exists()) throw new Error("Item not found on bar.");
+            
+            const itemData = itemDoc.data() as OnBarItem;
+            
+            let volumeToSell: number;
+            let priceOfSale: number;
+
+            if (itemData.category === 'Beer') {
+                volumeToSell = customVolume || 1;
+                priceOfSale = customPrice || (itemData.price * volumeToSell);
+                if (itemData.remainingVolume < volumeToSell) {
+                    throw new Error(`Not enough bottles to sell. Available: ${itemData.remainingVolume}`);
+                }
+            } else {
+                if (pegSize === 'custom') {
+                    if (!customVolume || customPrice === undefined) throw new Error("Custom volume and price are required.");
+                    volumeToSell = customVolume;
+                    priceOfSale = customPrice;
+                } else {
+                    volumeToSell = pegSize;
+                    const priceKey = `pegPrice${pegSize}ml` as keyof OnBarItem;
+                    const pegPrice = itemData[priceKey] as number | undefined;
+                    if (pegPrice === undefined) throw new Error(`Price for ${pegSize}ml peg is not set for this item.`);
+                    priceOfSale = pegPrice;
+                }
+                 if (itemData.remainingVolume < volumeToSell) {
+                    throw new Error(`Not enough liquor remaining. Available: ${itemData.remainingVolume}ml`);
+                }
+            }
+            
+            const newRemainingVolume = itemData.remainingVolume - volumeToSell;
+            const newSalesVolume = (itemData.salesVolume || 0) + volumeToSell;
+            const newSalesValue = (itemData.salesValue || 0) + priceOfSale;
+
+            transaction.update(itemRef, {
+                remainingVolume: newRemainingVolume,
+                salesVolume: newSalesVolume,
+                salesValue: newSalesValue,
+            });
+        });
+    } catch(error) {
+        console.error("Error selling peg: ", error);
+        throw error;
+    } finally {
+        get()._setSaving(false);
+    }
+  },
+
+  refillPeg: async (id, amount) => {
+    if (get().saving) return;
+    get()._setSaving(true);
+    try {
+        const itemRef = doc(db, 'onBarInventory', id);
+        await runTransaction(db, async (transaction) => {
+            const itemDoc = await transaction.get(itemRef);
+            if (!itemDoc.exists()) throw new Error("Item not found on bar.");
+            
+            const itemData = itemDoc.data() as OnBarItem;
+            const isBeer = itemData.category === 'Beer';
+            const soldAmount = itemData.salesVolume || 0;
+            const amountToRefill = isBeer ? 1 : amount;
+
+            if (soldAmount < amountToRefill) throw new Error("Cannot refill more than what was sold.");
+
+            const newRemainingVolume = itemData.remainingVolume + amountToRefill;
+            const totalCapacity = isBeer ? (itemData.totalQuantity || 0) : itemData.totalVolume;
+            if (newRemainingVolume > totalCapacity) throw new Error("Refill amount exceeds bottle capacity.");
+            
+            const valueToRefund = isBeer ? itemData.price : ((itemData.salesValue || 0) / (soldAmount || 1)) * amountToRefill;
+            
+            const newSalesVolume = soldAmount - amountToRefill;
+            const newSalesValue = (itemData.salesValue || 0) - valueToRefund;
+
+            transaction.update(itemRef, {
+                remainingVolume: newRemainingVolume,
+                salesVolume: Math.max(0, newSalesVolume),
+                salesValue: Math.max(0, newSalesValue),
+            });
+        });
+    } catch (error) {
+        console.error("Error refilling peg: ", error);
+        throw error;
+    } finally {
+        get()._setSaving(false);
+    }
+  },
+
+  removeOnBarItem: async (id: string) => {
+    if(get().saving) return;
+    get()._setSaving(true);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const onBarItemRef = doc(db, "onBarInventory", id);
+            const onBarItemDoc = await transaction.get(onBarItemRef);
+            if (!onBarItemDoc.exists()) throw new Error("On-bar item not found.");
+
+            const onBarItemData = onBarItemDoc.data() as OnBarItem;
+            
+            if (onBarItemData.inventoryId && onBarItemData.inventoryId !== 'manual' && onBarItemData.salesVolume === 0) {
+                const masterInventoryRef = doc(db, "inventory", onBarItemData.inventoryId);
+                const masterInventoryDoc = await transaction.get(masterInventoryRef);
+                
+                if (masterInventoryDoc.exists()) {
+                    const masterData = masterInventoryDoc.data();
+                    const currentGodownStock = masterData.stockInGodown || 0;
+                    const quantityToReturn = onBarItemData.category === 'Beer' ? onBarItemData.remainingVolume : 1;
+                    transaction.update(masterInventoryRef, { stockInGodown: currentGodownStock + quantityToReturn });
+                }
+            }
+            transaction.delete(onBarItemRef);
+        });
+    } catch (error) {
+        console.error("Error removing on-bar item: ", error);
+        throw error;
+    } finally {
+        get()._setSaving(false);
+    }
+  },
 }));
 
-let inventoryUnsubscribe: () => void;
-let dailyUnsubscribe: () => void;
-let unprocessedUnsubscribe: () => void;
-
-function initializeListeners() {
-    const today = format(new Date(), 'yyyy-MM-dd');
-
-    if (inventoryUnsubscribe) inventoryUnsubscribe();
-    inventoryUnsubscribe = onSnapshot(query(collection(db, "inventory")), () => {
-        useInventory.getState().fetchAllData();
-    });
-
-    if (dailyUnsubscribe) dailyUnsubscribe();
-    dailyUnsubscribe = onSnapshot(doc(db, 'dailyInventory', today), () => {
-        useInventory.getState().fetchAllData();
-    });
-    
-    if (unprocessedUnsubscribe) unprocessedUnsubscribe();
-    unprocessedUnsubscribe = onSnapshot(query(collection(db, "unprocessed_deliveries")), () => {
-        useInventory.getState().fetchAllData();
-    });
+// Initialize listeners once
+if (typeof window !== 'undefined' && !listenersInitialized) {
+    useInventoryStore.getState().initListeners();
+    listenersInitialized = true;
 }
 
-if (typeof window !== 'undefined') {
-    initializeListeners();
-}
+export const useInventory = useInventoryStore;

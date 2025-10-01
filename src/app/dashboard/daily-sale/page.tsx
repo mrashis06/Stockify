@@ -3,7 +3,6 @@
 
 import React, { useMemo } from 'react';
 import { useInventory } from '@/hooks/use-inventory';
-import { useOnBarInventory } from '@/hooks/use-onbar-inventory';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { IndianRupee } from 'lucide-react';
@@ -20,10 +19,9 @@ const FL_CATEGORIES = ['Whiskey', 'Rum', 'Vodka', 'Wine', 'Gin', 'Tequila'];
 const BEER_CATEGORIES = ['Beer'];
 
 export default function DailySalePage() {
-    const { inventory, loading: inventoryLoading } = useInventory();
-    const { onBarInventory, loading: onBarLoading } = useOnBarInventory();
+    const { inventory, onBarInventory, loading } = useInventory();
     
-    usePageLoading(inventoryLoading || onBarLoading);
+    usePageLoading(loading);
 
     const { blReport, totalSalesValue } = useMemo(() => {
         const salesMap = new Map<string, AggregatedSale>();
@@ -89,7 +87,7 @@ export default function DailySalePage() {
 
     }, [inventory, onBarInventory]);
 
-    if (inventoryLoading || onBarLoading) {
+    if (loading) {
         return null; // Page loading is handled by the hook
     }
 

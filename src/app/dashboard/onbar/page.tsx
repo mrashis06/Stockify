@@ -17,16 +17,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { useOnBarInventory, OnBarItem } from '@/hooks/use-onbar-inventory';
+import { useInventory, OnBarItem } from '@/hooks/use-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
-import { useInventory } from '@/hooks/use-inventory';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
-    const { onBarInventory, loading, sellPeg, removeOnBarItem, refillPeg, addOnBarItem } = useOnBarInventory();
-    const { inventory: shopInventory } = useInventory();
+    const { 
+        inventory: shopInventory, 
+        onBarInventory, 
+        loading, 
+        sellPeg, 
+        removeOnBarItem, 
+        refillPeg, 
+        addOnBarItem 
+    } = useInventory();
+    
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
     const { toast } = useToast();
     

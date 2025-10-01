@@ -36,7 +36,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
-import { useOnBarInventory } from '@/hooks/use-onbar-inventory';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
 import {
   AlertDialog,
@@ -55,16 +54,16 @@ import { Separator } from '@/components/ui/separator';
 export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
         inventory,
-        loading: inventoryLoading,
+        onBarInventory,
+        loading,
         addBrand,
         deleteBrand: deleteProduct,
         updateBrand,
         updateItemField,
         forceRefetch,
     } = useInventory();
-    const { onBarInventory, loading: onBarLoading } = useOnBarInventory();
     
-    usePageLoading(inventoryLoading || onBarLoading);
+    usePageLoading(loading);
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -79,7 +78,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
 
-    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'added' | 'sales' | 'opening' | 'closing'>) => {
+    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing'>) => {
         try {
             await addBrand(newItemData);
             toast({ title: 'Success', description: 'New brand added successfully.' });
@@ -229,7 +228,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const grandTotalSales = totalOffCounterAmount + totalOnBarAmount;
 
 
-  if (inventoryLoading || onBarLoading) {
+  if (loading) {
     return null;
   }
 
