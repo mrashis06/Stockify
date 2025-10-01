@@ -1,10 +1,10 @@
 
 import React, { ReactNode } from 'react';
 
-export default function PerformanceLayout({ children }: { children: ReactNode }) {
+export default function DailySaleLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex-1 p-4 md:p-8">
-      {children}
+      <main>{children}</main>
     </div>
   );
 }

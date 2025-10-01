@@ -126,6 +126,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       { href: "/dashboard/inventory", pageName: 'OffCounter', icon: Warehouse, label: "OffCounter" },
       { href: "/dashboard/godown", pageName: 'Godown', icon: Archive, label: "Godown" },
       { href: "/dashboard/onbar", pageName: 'OnBar', icon: GlassWater, label: "OnBar" },
+      { href: "/dashboard/daily-sale", pageName: 'Daily Sale', icon: TrendingUp, label: "Daily Sale" },
       { href: "/dashboard/map-barcode", pageName: 'Map Barcodes', icon: Barcode, label: "Map Barcodes" },
       ...(isAdmin ? [{ href: "/dashboard/staff", pageName: 'Staff', icon: Users, label: "Staff" }] : []),
       { href: "/dashboard/reports", pageName: 'Reports', icon: FileText, label: "Reports" },
@@ -148,6 +149,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 onOpenChange={setIsProfilePicOpen}
                 imageUrl={user.photoURL_large}
                 userName={user.name || ''}
+                onEditClick={() => {
+                  const settingsElement = document.getElementById('profile-picture-upload-button');
+                  if(settingsElement) {
+                    router.push('/dashboard/settings');
+                    setTimeout(() => document.getElementById('profile-picture-upload-button')?.click(), 100);
+                  }
+                }}
             />
         )}
        <AlertDialog open={isSupportDialogOpen} onOpenChange={setIsSupportDialogOpen}>
