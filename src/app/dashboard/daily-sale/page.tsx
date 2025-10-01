@@ -121,7 +121,7 @@ export default function DailySalePage() {
     }, [inventory, onBarInventory]);
 
     const handleExportPDF = () => {
-        const doc = new jsPDF();
+        const doc = new jsPDF() as jsPDFWithAutoTable;
         const today = formatDate(new Date(), 'dd/MM/yyyy');
         
         const totalsByCategory = blReport.reduce((acc, sale) => {
@@ -137,11 +137,11 @@ export default function DailySalePage() {
         const beerTotal = totalsByCategory['BEER'] || 0;
 
         doc.setFontSize(10);
-        doc.text(`Date: ${today}`, 105, 15, { align: 'center' });
+        doc.text(`Date: ${today}`, doc.internal.pageSize.width - 14, 15, { align: 'right' });
         
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
-        doc.text("BHOLE BABA FL ON SHOP", 105, 25, { align: 'center' });
+        doc.text("BHOLE BABA FL ON SHOP", doc.internal.pageSize.width / 2, 25, { align: 'center' });
 
         let yPos = 40;
         doc.setFontSize(12);
@@ -162,7 +162,7 @@ export default function DailySalePage() {
         
         yPos += 5; // Add some space before the total
         doc.setLineWidth(0.5);
-        doc.line(14, yPos, 196, yPos); // Line separator
+        doc.line(14, yPos, doc.internal.pageSize.width - 14, yPos); // Line separator
         yPos += 10;
 
         doc.setFont('helvetica', 'bold');
