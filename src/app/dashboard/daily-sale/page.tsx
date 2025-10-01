@@ -136,41 +136,56 @@ export default function DailySalePage() {
         const imlTotal = totalsByCategory['IML'] || 0;
         const beerTotal = totalsByCategory['BEER'] || 0;
 
+        // Header
         doc.setFontSize(10);
+        doc.setTextColor(150);
         doc.text(`Date: ${today}`, doc.internal.pageSize.width - 14, 15, { align: 'right' });
         
-        doc.setFontSize(16);
+        doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
-        doc.text("BHOLE BABA FL ON SHOP", doc.internal.pageSize.width / 2, 25, { align: 'center' });
+        doc.setTextColor(40, 116, 91); // Primary color
+        doc.text("BHOLE BABA FL ON SHOP", doc.internal.pageSize.width / 2, 30, { align: 'center' });
 
-        let yPos = 40;
-        doc.setFontSize(12);
+        // Body
+        let yPos = 50;
+        doc.setFontSize(14);
+        doc.setTextColor(40, 40, 40); // Dark text color
         doc.setFont('helvetica', 'normal');
 
-        if (flTotal > 0) {
-            doc.text(`FL: ${flTotal.toFixed(3)}`, 14, yPos);
-            yPos += 10;
+        const drawLineItem = (label: string, value: string) => {
+            doc.text(label, 14, yPos);
+            doc.setFont('helvetica', 'bold');
+            doc.text(value, doc.internal.pageSize.width - 14, yPos, { align: 'right' });
+            doc.setFont('helvetica', 'normal');
+            yPos += 12;
         }
-        if (imlTotal > 0) {
-            doc.text(`IML: ${imlTotal.toFixed(3)}`, 14, yPos);
-            yPos += 10;
-        }
-        if (beerTotal > 0) {
-            doc.text(`BEER: ${beerTotal.toFixed(3)}`, 14, yPos);
-            yPos += 10;
-        }
+        
+        if (flTotal > 0) drawLineItem("FL (Foreign Liquor) BL:", `${flTotal.toFixed(3)} Ltrs`);
+        if (imlTotal > 0) drawLineItem("IML (Indian Made Liquor) BL:", `${imlTotal.toFixed(3)} Ltrs`);
+        if (beerTotal > 0) drawLineItem("BEER BL:", `${beerTotal.toFixed(3)} Ltrs`);
         
         yPos += 5; // Add some space before the total
+        doc.setDrawColor(220, 220, 220); // Light gray line
         doc.setLineWidth(0.5);
         doc.line(14, yPos, doc.internal.pageSize.width - 14, yPos); // Line separator
-        yPos += 10;
-
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Total Sale: Rs. ${totalSalesValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, yPos);
+        yPos += 15;
         
+        // Footer (Total Sale)
+        const totalString = `Rs. ${totalSalesValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const totalStringWidth = doc.getTextWidth(totalString);
+        
+        doc.setFillColor(22, 163, 74); // Green color for total
+        doc.roundedRect(14, yPos - 5, doc.internal.pageSize.width - 28, 16, 3, 3, 'F');
+
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.text("Total Sale", 22, yPos + 4);
+        doc.text(totalString, doc.internal.pageSize.width - 22, yPos + 4, { align: 'right' });
 
         doc.save(`BL_Sale_Report_${formatDate(new Date(), 'yyyy-MM-dd')}.pdf`);
     };
+
 
     if (loading) {
         return null; // Page loading is handled by the hook
@@ -261,3 +276,4 @@ export default function DailySalePage() {
 }
 
     
+
