@@ -447,6 +447,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     get()._setSaving(true);
     try {
       await runTransaction(db, async (transaction) => {
+        // 1. Decrement Godown Stock
         const masterRef = doc(db, 'inventory', productId);
         const masterDoc = await transaction.get(masterRef);
         if (!masterDoc.exists()) throw new Error("Product not found.");
@@ -465,30 +466,57 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
           }
         });
 
+        // 2. Check for existing OnBar item
+        const onBarQuery = query(collection(db, "onBarInventory"), where("inventoryId", "==", productId), limit(1));
+        const onBarSnapshot = await getDocs(onBarQuery);
         const isBeer = masterData.category === 'Beer';
         const volumeMatch = masterData.size.match(/(\d+)/);
-        const volume = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
+        const volumePerUnit = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
         
-        const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
-            inventoryId: productId,
-            brand: masterData.brand,
-            size: masterData.size,
-            category: masterData.category,
-            totalVolume: volume,
-            remainingVolume: isBeer ? quantity : volume,
-            price: masterData.price,
-            totalQuantity: isBeer ? quantity : 1,
-            salesVolume: 0,
-            salesValue: 0,
-        };
+        if (!onBarSnapshot.empty) {
+            // MERGE: Item already exists, update it
+            const existingOnBarDoc = onBarSnapshot.docs[0];
+            const existingData = existingOnBarDoc.data() as OnBarItem;
 
-        if (!isBeer && pegPrices) {
-            onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
-            onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
+            let newRemainingVolume = existingData.remainingVolume;
+            let newTotalQuantity = existingData.totalQuantity;
+
+            if (isBeer) {
+                newRemainingVolume += quantity;
+                newTotalQuantity = (newTotalQuantity || 0) + quantity;
+            } else {
+                newRemainingVolume += (volumePerUnit * quantity);
+                 newTotalQuantity = (newTotalQuantity || 0) + quantity;
+            }
+
+            transaction.update(existingOnBarDoc.ref, {
+                remainingVolume: newRemainingVolume,
+                totalQuantity: newTotalQuantity
+            });
+
+        } else {
+            // CREATE: Item is new to the bar
+            const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
+                inventoryId: productId,
+                brand: masterData.brand,
+                size: masterData.size,
+                category: masterData.category,
+                totalVolume: volumePerUnit,
+                remainingVolume: isBeer ? quantity : (volumePerUnit * quantity),
+                price: masterData.price,
+                totalQuantity: quantity,
+                salesVolume: 0,
+                salesValue: 0,
+            };
+
+            if (!isBeer && pegPrices) {
+                onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
+                onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
+            }
+
+            const newOnBarDocRef = doc(collection(db, "onBarInventory"));
+            transaction.set(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
         }
-
-        const onBarDocRef = doc(collection(db, "onBarInventory"));
-        transaction.set(onBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
       });
 
     } catch (error) {
