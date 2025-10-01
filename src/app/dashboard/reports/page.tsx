@@ -138,14 +138,15 @@ export default function ReportsPage() {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
                 if (item.sales && item.sales > 0 && item.price && item.brand && !productId.startsWith('on-bar-')) { // OffCounter
+                    const itemPrice = Number(item.price);
                     const existing = offCounterMap.get(productId);
                     if (existing) {
                         existing.unitsSold += item.sales;
-                        existing.totalAmount += item.sales * item.price;
+                        existing.totalAmount += item.sales * itemPrice;
                     } else {
                         offCounterMap.set(productId, {
                             productId, brand: item.brand, size: item.size, category: item.category,
-                            price: item.price, unitsSold: item.sales, totalAmount: item.sales * item.price,
+                            price: itemPrice, unitsSold: item.sales, totalAmount: item.sales * itemPrice,
                         });
                     }
                 } else if (item.salesValue && item.salesValue > 0 && productId.startsWith('on-bar-')) { // OnBar
@@ -196,13 +197,13 @@ export default function ReportsPage() {
                     if (isOffCounter) {
                          dailyRows.push([
                             entry.date, item.brand, item.size, item.category, 
-                            item.price.toFixed(2), item.sales, (item.sales * item.price).toFixed(2)
+                            Number(item.price).toFixed(2), item.sales, (item.sales * Number(item.price)).toFixed(2)
                         ]);
                     } else {
                         const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
                         dailyRows.push([
                            entry.date, item.brand, item.size, item.category, 
-                           `${item.salesVolume} ${unitLabel}`, item.salesValue.toFixed(2)
+                           `${item.salesVolume} ${unitLabel}`, Number(item.salesValue).toFixed(2)
                        ]);
                     }
                 }
@@ -247,12 +248,12 @@ export default function ReportsPage() {
                 
                 if (matchesReportType) {
                     if (isOffCounter) {
-                        tableRows.push([item.brand, item.size, item.category, item.price.toFixed(2), item.sales, (item.sales * item.price).toFixed(2)]);
+                        tableRows.push([item.brand, item.size, item.category, Number(item.price).toFixed(2), item.sales, (item.sales * Number(item.price)).toFixed(2)]);
                         dailyTotalUnits += item.sales;
-                        dailyTotalAmount += item.sales * item.price;
+                        dailyTotalAmount += item.sales * Number(item.price);
                     } else {
                         const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
-                        tableRows.push([item.brand, item.size, item.category, `${item.salesVolume} ${unitLabel}`, item.salesValue.toFixed(2)]);
+                        tableRows.push([item.brand, item.size, item.category, `${item.salesVolume} ${unitLabel}`, Number(item.salesValue).toFixed(2)]);
                         dailyTotalAmount += item.salesValue;
                     }
                 }
@@ -328,12 +329,12 @@ export default function ReportsPage() {
                 if (matchesReportType) {
                     let row;
                     if (isOffCounter) {
-                        row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, item.price.toFixed(2), item.sales, (item.sales * item.price).toFixed(2)];
+                        row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, Number(item.price).toFixed(2), item.sales, (item.sales * Number(item.price)).toFixed(2)];
                         dailyTotalUnits += item.sales;
-                        dailyTotalAmount += item.sales * item.price;
+                        dailyTotalAmount += item.sales * Number(item.price);
                     } else {
                         const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
-                        row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, `"${item.salesVolume} ${unitLabel}"`, item.salesValue.toFixed(2)];
+                        row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, `"${item.salesVolume} ${unitLabel}"`, Number(item.salesValue).toFixed(2)];
                         dailyTotalAmount += item.salesValue;
                     }
                     dailyRows.push(row);
