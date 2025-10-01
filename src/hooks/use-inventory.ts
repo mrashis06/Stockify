@@ -447,7 +447,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     get()._setSaving(true);
     try {
       await runTransaction(db, async (transaction) => {
-        // 1. Decrement Godown Stock
         const masterRef = doc(db, 'inventory', productId);
         const masterDoc = await transaction.get(masterRef);
         if (!masterDoc.exists()) throw new Error("Product not found.");
@@ -457,6 +456,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
           throw new Error(`Not enough stock in godown. Available: ${masterData.stockInGodown || 0}`);
         }
 
+        const onBarQuery = query(collection(db, "onBarInventory"), where("inventoryId", "==", productId), limit(1));
+        const onBarSnapshot = await getDocs(onBarQuery);
+        
         transaction.update(masterRef, {
           stockInGodown: masterData.stockInGodown - quantity,
           lastTransferred: {
@@ -466,15 +468,11 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
           }
         });
 
-        // 2. Check for existing OnBar item
-        const onBarQuery = query(collection(db, "onBarInventory"), where("inventoryId", "==", productId), limit(1));
-        const onBarSnapshot = await getDocs(onBarQuery);
         const isBeer = masterData.category === 'Beer';
         const volumeMatch = masterData.size.match(/(\d+)/);
         const volumePerUnit = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
         
         if (!onBarSnapshot.empty) {
-            // MERGE: Item already exists, update it
             const existingOnBarDoc = onBarSnapshot.docs[0];
             const existingData = existingOnBarDoc.data() as OnBarItem;
 
@@ -495,7 +493,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             });
 
         } else {
-            // CREATE: Item is new to the bar
             const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
                 inventoryId: productId,
                 brand: masterData.brand,
@@ -666,12 +663,22 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     get()._setSaving(true);
     try {
         const itemRef = doc(db, 'onBarInventory', id);
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const dailyDocRef = doc(db, 'dailyInventory', today);
+
         await runTransaction(db, async (transaction) => {
+            // --- ALL READS FIRST ---
             const itemDoc = await transaction.get(itemRef);
-            if (!itemDoc.exists()) throw new Error("Item not found on bar.");
+            const dailyDoc = await transaction.get(dailyDocRef);
+
+            if (!itemDoc.exists()) {
+                throw new Error("Item not found on bar.");
+            }
             
             const itemData = itemDoc.data() as OnBarItem;
+            const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             
+            // --- ALL CALCULATIONS ---
             let volumeToSell: number;
             let priceOfSale: number;
 
@@ -701,33 +708,26 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const newRemainingVolume = itemData.remainingVolume - volumeToSell;
             const newSalesVolume = (itemData.salesVolume || 0) + volumeToSell;
             const newSalesValue = (itemData.salesValue || 0) + priceOfSale;
+            
+            const onBarItemId = `on-bar-${itemData.inventoryId}`;
+            const itemDailyLog = dailyData[onBarItemId] || {
+                brand: itemData.brand,
+                size: itemData.size,
+                category: itemData.category,
+                totalVolume: itemData.totalVolume,
+                salesVolume: 0,
+                salesValue: 0
+            };
+            itemDailyLog.salesVolume += volumeToSell;
+            itemDailyLog.salesValue += priceOfSale;
 
+            // --- ALL WRITES LAST ---
             transaction.update(itemRef, {
                 remainingVolume: newRemainingVolume,
                 salesVolume: newSalesVolume,
                 salesValue: newSalesValue,
             });
-
-            // Log this sale to daily inventory for BL report
-             const today = format(new Date(), 'yyyy-MM-dd');
-             const dailyDocRef = doc(db, 'dailyInventory', today);
-             const dailyDoc = await transaction.get(dailyDocRef);
-             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-             
-             // Use a unique ID for On-Bar items to prevent conflicts
-             const onBarItemId = `on-bar-${itemData.inventoryId}`;
-             const itemDailyLog = dailyData[onBarItemId] || {
-                 brand: itemData.brand,
-                 size: itemData.size,
-                 category: itemData.category,
-                 salesVolume: 0,
-                 salesValue: 0
-             };
-
-             itemDailyLog.salesVolume += volumeToSell;
-             itemDailyLog.salesValue += priceOfSale;
-             
-             transaction.set(dailyDocRef, { [onBarItemId]: itemDailyLog }, { merge: true });
+            transaction.set(dailyDocRef, { [onBarItemId]: itemDailyLog }, { merge: true });
         });
     } catch(error) {
         console.error("Error selling peg: ", error);
@@ -800,7 +800,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
             const onBarItemData = onBarItemDoc.data() as OnBarItem;
             
-            // If the bottle is unopened (no sales), return its stock to the Godown.
             if (onBarItemData.inventoryId && onBarItemData.salesVolume === 0) {
                  const masterItemRef = doc(db, "inventory", onBarItemData.inventoryId);
                  const masterItemDoc = await transaction.get(masterItemRef);
@@ -813,7 +812,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                  }
             }
             
-            // Finally, delete the on-bar item.
             transaction.delete(onBarItemRef);
         });
     } catch (error) {
@@ -833,4 +831,3 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 
 export const useInventory = useInventoryStore;
 
-    
