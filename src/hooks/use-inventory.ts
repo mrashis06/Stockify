@@ -800,21 +800,20 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
             const onBarItemData = onBarItemDoc.data() as OnBarItem;
             
-            // If the bottle is unopened (no sales), return it to shop stock
+            // If the bottle is unopened (no sales), return its stock to the Godown.
             if (onBarItemData.inventoryId && onBarItemData.salesVolume === 0) {
-                 const today = format(new Date(), 'yyyy-MM-dd');
-                 const dailyDocRef = doc(db, 'dailyInventory', today);
-                 const dailyDoc = await transaction.get(dailyDocRef);
-                 
-                 if (dailyDoc.exists()) {
-                     const dailyData = dailyDoc.data();
-                     const itemDailyData = dailyData[onBarItemData.inventoryId];
-                     if (itemDailyData && itemDailyData.sales > 0) {
-                         const newSales = itemDailyData.sales - (onBarItemData.totalQuantity || 1);
-                         transaction.set(dailyDocRef, { [onBarItemData.inventoryId]: { ...itemDailyData, sales: newSales } }, { merge: true });
-                     }
+                 const masterItemRef = doc(db, "inventory", onBarItemData.inventoryId);
+                 const masterItemDoc = await transaction.get(masterItemRef);
+
+                 if(masterItemDoc.exists()) {
+                    const masterItemData = masterItemDoc.data();
+                    const quantityToReturn = onBarItemData.totalQuantity || 1;
+                    const newGodownStock = (masterItemData.stockInGodown || 0) + quantityToReturn;
+                    transaction.update(masterItemRef, { stockInGodown: newGodownStock });
                  }
             }
+            
+            // Finally, delete the on-bar item.
             transaction.delete(onBarItemRef);
         });
     } catch (error) {
@@ -833,3 +832,5 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
+
+    
