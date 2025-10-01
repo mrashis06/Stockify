@@ -47,6 +47,8 @@
     "framer-motion": "^11.3.19",
     "genkit": "^1.14.1",
     "html5-qrcode": "^2.3.8",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
     "lucide-react": "^0.475.0",
     "next": "15.3.3",
     "next-themes": "^0.3.0",
@@ -61,8 +63,6 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.24.2",
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2",
     "zustand": "^4.5.4",
     "uuid": "^9.0.1"
   },

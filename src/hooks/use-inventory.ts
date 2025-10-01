@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { create } from 'zustand';
@@ -161,12 +160,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             set({ unprocessedItems: unprocessed });
         });
         
-        const onBarSub = onSnapshot(collection(db, "onBarInventory"), (snapshot) => {
+        const onBarSub = onSnapshot(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')), (snapshot) => {
             const items: OnBarItem[] = [];
             snapshot.forEach((doc) => {
                 items.push({ id: doc.id, ...doc.data() } as OnBarItem);
             });
-            set({ onBarInventory: items.sort((a,b) => a.brand.localeCompare(b.brand)) });
+            set({ onBarInventory: items });
         });
 
         return () => {
@@ -580,31 +579,52 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     if (get().saving) return;
     get()._setSaving(true);
     try {
-      const itemInShop = get().inventory.find(item => item.id === inventoryItemId);
-      if (!itemInShop) throw new Error("Item not found in shop inventory.");
-      
-      const newOnBarDocRef = doc(collection(db, "onBarInventory"));
-      const isBeer = itemInShop.category === 'Beer';
+        await runTransaction(db, async (transaction) => {
+            const itemInShopRef = doc(db, "inventory", inventoryItemId);
+            const itemInShopDoc = await transaction.get(itemInShopRef);
 
-      const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
-          inventoryId: inventoryItemId,
-          brand: itemInShop.brand,
-          size: itemInShop.size,
-          category: itemInShop.category,
-          totalVolume: volume,
-          remainingVolume: isBeer ? quantity : volume,
-          price: price,
-          totalQuantity: isBeer ? quantity : 1,
-          salesVolume: 0,
-          salesValue: 0,
-      };
+            if (!itemInShopDoc.exists()) throw new Error("Item not found in shop inventory.");
+            
+            const itemInShopData = itemInShopDoc.data() as InventoryItem;
+            const openingStock = (itemInShopData.prevStock || 0) + (itemInShopData.added || 0);
+            const closingStock = openingStock - (itemInShopData.sales || 0);
 
-      if (!isBeer && pegPrices) {
-          onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
-          onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
-      }
-      
-      await setDoc(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
+            if (closingStock < quantity) {
+                throw new Error(`Not enough stock in shop. Available: ${closingStock}`);
+            }
+
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const dailyDoc = await transaction.get(dailyDocRef);
+            const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+            const itemDailyData = dailyData[inventoryItemId] || {};
+
+            const newSales = (itemDailyData.sales || 0) + quantity;
+            transaction.set(dailyDocRef, { [inventoryItemId]: { ...itemDailyData, sales: newSales } }, { merge: true });
+            
+            const newOnBarDocRef = doc(collection(db, "onBarInventory"));
+            const isBeer = itemInShopData.category === 'Beer';
+
+            const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
+                inventoryId: inventoryItemId,
+                brand: itemInShopData.brand,
+                size: itemInShopData.size,
+                category: itemInShopData.category,
+                totalVolume: volume,
+                remainingVolume: isBeer ? quantity : volume,
+                price: price,
+                totalQuantity: isBeer ? quantity : 1,
+                salesVolume: 0,
+                salesValue: 0,
+            };
+
+            if (!isBeer && pegPrices) {
+                onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
+                onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
+            }
+
+            transaction.set(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
+        });
     } catch (error) {
         console.error("Error opening bottle: ", error);
         throw error;
@@ -659,6 +679,27 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 salesVolume: newSalesVolume,
                 salesValue: newSalesValue,
             });
+
+            // Log this sale to daily inventory for BL report
+             const today = format(new Date(), 'yyyy-MM-dd');
+             const dailyDocRef = doc(db, 'dailyInventory', today);
+             const dailyDoc = await transaction.get(dailyDocRef);
+             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+             
+             // Use a unique ID for On-Bar items to prevent conflicts
+             const onBarItemId = `on-bar-${itemData.inventoryId}`;
+             const itemDailyLog = dailyData[onBarItemId] || {
+                 brand: itemData.brand,
+                 size: itemData.size,
+                 category: itemData.category,
+                 salesVolume: 0,
+                 salesValue: 0
+             };
+
+             itemDailyLog.salesVolume += volumeToSell;
+             itemDailyLog.salesValue += priceOfSale;
+             
+             transaction.set(dailyDocRef, { [onBarItemId]: itemDailyLog }, { merge: true });
         });
     } catch(error) {
         console.error("Error selling peg: ", error);
@@ -698,6 +739,19 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 salesVolume: Math.max(0, newSalesVolume),
                 salesValue: Math.max(0, newSalesValue),
             });
+
+             // Also reverse the sale in the daily log
+             const today = format(new Date(), 'yyyy-MM-dd');
+             const dailyDocRef = doc(db, 'dailyInventory', today);
+             const onBarItemId = `on-bar-${itemData.inventoryId}`;
+
+             const dailyDoc = await transaction.get(dailyDocRef);
+             if (dailyDoc.exists() && dailyDoc.data()[onBarItemId]) {
+                 const itemDailyLog = dailyDoc.data()[onBarItemId];
+                 itemDailyLog.salesVolume -= amountToRefill;
+                 itemDailyLog.salesValue -= valueToRefund;
+                 transaction.set(dailyDocRef, { [onBarItemId]: itemDailyLog }, { merge: true });
+             }
         });
     } catch (error) {
         console.error("Error refilling peg: ", error);
@@ -718,16 +772,20 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
             const onBarItemData = onBarItemDoc.data() as OnBarItem;
             
-            if (onBarItemData.inventoryId && onBarItemData.inventoryId !== 'manual' && onBarItemData.salesVolume === 0) {
-                const masterInventoryRef = doc(db, "inventory", onBarItemData.inventoryId);
-                const masterInventoryDoc = await transaction.get(masterInventoryRef);
-                
-                if (masterInventoryDoc.exists()) {
-                    const masterData = masterInventoryDoc.data();
-                    const currentGodownStock = masterData.stockInGodown || 0;
-                    const quantityToReturn = onBarItemData.category === 'Beer' ? onBarItemData.remainingVolume : 1;
-                    transaction.update(masterInventoryRef, { stockInGodown: currentGodownStock + quantityToReturn });
-                }
+            // If the bottle is unopened (no sales), return it to shop stock
+            if (onBarItemData.inventoryId && onBarItemData.salesVolume === 0) {
+                 const today = format(new Date(), 'yyyy-MM-dd');
+                 const dailyDocRef = doc(db, 'dailyInventory', today);
+                 const dailyDoc = await transaction.get(dailyDocRef);
+                 
+                 if (dailyDoc.exists()) {
+                     const dailyData = dailyDoc.data();
+                     const itemDailyData = dailyData[onBarItemData.inventoryId];
+                     if (itemDailyData && itemDailyData.sales > 0) {
+                         const newSales = itemDailyData.sales - (onBarItemData.totalQuantity || 1);
+                         transaction.set(dailyDocRef, { [onBarItemData.inventoryId]: { ...itemDailyData, sales: newSales } }, { merge: true });
+                     }
+                 }
             }
             transaction.delete(onBarItemRef);
         });

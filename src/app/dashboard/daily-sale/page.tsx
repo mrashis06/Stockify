@@ -2,11 +2,19 @@
 "use client";
 
 import React, { useMemo } from 'react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import { useInventory } from '@/hooks/use-inventory';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { IndianRupee } from 'lucide-react';
+import { IndianRupee, Download } from 'lucide-react';
 import { usePageLoading } from '@/hooks/use-loading';
+import { Button } from '@/components/ui/button';
+import { useDateFormat } from '@/hooks/use-date-format';
+
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
 
 type AggregatedSale = {
     unitsSold: number;
@@ -20,6 +28,7 @@ const BEER_CATEGORIES = ['Beer'];
 
 export default function DailySalePage() {
     const { inventory, onBarInventory, loading } = useInventory();
+    const { formatDate } = useDateFormat();
     
     usePageLoading(loading);
 
@@ -52,10 +61,22 @@ export default function DailySalePage() {
                  let category: AggregatedSale['category'] | null = null;
                  if (FL_CATEGORIES.includes(item.category)) category = 'FL';
                  else if (IML_CATEGORIES.includes(item.category)) category = 'IML';
+                 else if (BEER_CATEGORIES.includes(item.category)) category = 'BEER';
                  
-                 // Per user request, only count BEER units from off-counter sales for this report.
-                 if (category === 'FL' || category === 'IML') {
-                    const totalVolumeSold = item.salesVolume; // in ml
+                 // Special handling for Beer vs Liquor from On-Bar
+                 if (category === 'BEER') {
+                    // Beer sales are in units
+                    const sizeMatch = item.size.match(/(\d+)/);
+                    const sizeMl = sizeMatch ? parseInt(sizeMatch[0], 10) : 0;
+                     if (sizeMl > 0) {
+                         const key = `${category}-${sizeMl}`;
+                         const existing = salesMap.get(key) || { unitsSold: 0, size: sizeMl, category };
+                         existing.unitsSold += item.salesVolume; // salesVolume for beer is in units
+                         salesMap.set(key, existing);
+                     }
+                 } else if (category === 'FL' || category === 'IML') {
+                    // Liquor sales are in ml, convert to fractional bottles
+                    const totalVolumeSold = item.salesVolume; 
                     const bottleSize = item.totalVolume;
                     if (bottleSize > 0) {
                        const unitsSold = totalVolumeSold / bottleSize; // Can be fractional
@@ -87,13 +108,52 @@ export default function DailySalePage() {
 
     }, [inventory, onBarInventory]);
 
+    const handleExportPDF = () => {
+        const doc = new jsPDF() as jsPDFWithAutoTable;
+        const today = formatDate(new Date(), 'dd/MM/yyyy');
+        
+        doc.setFontSize(10);
+        doc.text(`Date: ${today}`, 14, 15);
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text("BHOLE BABA FL ON SHOP", doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+
+        doc.autoTable({
+            startY: 30,
+            head: [['Category', 'Size (ml)', 'Units Sold', 'Bulk Liters (BL)']],
+            body: blReport.map(row => [
+                row.category,
+                row.size,
+                row.unitsSold.toFixed(3),
+                row.bulkLiters.toFixed(3)
+            ]),
+            foot: [['Total Today\'s Sale Amount', '', '', `Rs. ${totalSalesValue.toFixed(2)}`]],
+            theme: 'striped',
+            headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+            footStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [240, 240, 240] },
+        });
+
+        doc.save(`BL_Sale_Report_${formatDate(new Date(), 'yyyy-MM-dd')}.pdf`);
+    };
+
     if (loading) {
         return null; // Page loading is handled by the hook
     }
 
     return (
         <main className="flex-1 p-4 md:p-8">
-            <h1 className="text-2xl font-bold tracking-tight mb-6">Today's BL Sale Report</h1>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight">Today's BL Sale Report</h1>
+                     <p className="text-muted-foreground">Generated on: {formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                </div>
+                <Button onClick={handleExportPDF} disabled={blReport.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export to PDF
+                </Button>
+            </div>
             <Card>
                 <CardHeader>
                     <CardTitle>Daily Bulk Liter (BL) Sales Summary</CardTitle>
