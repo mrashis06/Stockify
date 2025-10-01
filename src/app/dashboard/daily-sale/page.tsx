@@ -44,18 +44,19 @@ export default function DailySalePage() {
         }
         setExpandedRows(newSet);
     };
+    
+    const getCategory = (itemCategory: string): AggregatedSale['category'] | null => {
+        if (!itemCategory) return null;
+        const lowerCategory = itemCategory.toLowerCase();
+        if (FL_CATEGORIES.includes(lowerCategory)) return 'FL';
+        if (IML_CATEGORIES.includes(lowerCategory)) return 'IML';
+        if (BEER_CATEGORIES.includes(lowerCategory)) return 'BEER';
+        return null;
+    };
+
 
     const { blReport, totalSalesValue } = useMemo(() => {
         const salesMap = new Map<string, AggregatedSale>();
-
-        const getCategory = (itemCategory: string): AggregatedSale['category'] | null => {
-            if (!itemCategory) return null;
-            const lowerCategory = itemCategory.toLowerCase();
-            if (FL_CATEGORIES.includes(lowerCategory)) return 'FL';
-            if (IML_CATEGORIES.includes(lowerCategory)) return 'IML';
-            if (BEER_CATEGORIES.includes(lowerCategory)) return 'BEER';
-            return null;
-        };
 
         // 1. Process Off-Counter Sales
         inventory.forEach(item => {
@@ -176,7 +177,6 @@ export default function DailySalePage() {
         
         // Footer (Total Sale)
         const totalString = `Rs. ${totalSalesValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        const totalStringWidth = doc.getTextWidth(totalString);
         
         doc.setFillColor(22, 163, 74); // Green color for total
         doc.roundedRect(14, yPos - 5, doc.internal.pageSize.width - 28, 16, 3, 3, 'F');
@@ -278,3 +278,5 @@ export default function DailySalePage() {
         </main>
     );
 }
+
+    
