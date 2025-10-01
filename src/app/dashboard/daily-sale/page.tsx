@@ -23,9 +23,10 @@ type AggregatedSale = {
     breakdown: number[];
 };
 
-const IML_CATEGORIES = ['IML'];
-const FL_CATEGORIES = ['Whiskey', 'Rum', 'Vodka', 'Wine', 'Gin', 'Tequila'];
-const BEER_CATEGORIES = ['Beer'];
+const IML_CATEGORIES = ['iml'];
+const FL_CATEGORIES = ['whiskey', 'whisky', 'rum', 'vodka', 'wine', 'gin', 'tequila'];
+const BEER_CATEGORIES = ['beer'];
+
 
 export default function DailySalePage() {
     const { inventory, onBarInventory, loading } = useInventory();
@@ -47,16 +48,22 @@ export default function DailySalePage() {
     const { blReport, totalSalesValue } = useMemo(() => {
         const salesMap = new Map<string, AggregatedSale>();
 
+        const getCategory = (itemCategory: string): AggregatedSale['category'] | null => {
+            if (!itemCategory) return null;
+            const lowerCategory = itemCategory.toLowerCase();
+            if (FL_CATEGORIES.includes(lowerCategory)) return 'FL';
+            if (IML_CATEGORIES.includes(lowerCategory)) return 'IML';
+            if (BEER_CATEGORIES.includes(lowerCategory)) return 'BEER';
+            return null;
+        };
+
         // 1. Process Off-Counter Sales
         inventory.forEach(item => {
             if (item.sales > 0) {
                 const sizeMatch = item.size.match(/(\d+)/);
                 const sizeMl = sizeMatch ? parseInt(sizeMatch[0], 10) : 0;
                 
-                let category: AggregatedSale['category'] | null = null;
-                if (FL_CATEGORIES.includes(item.category)) category = 'FL';
-                else if (IML_CATEGORIES.includes(item.category)) category = 'IML';
-                else if (BEER_CATEGORIES.includes(item.category)) category = 'BEER';
+                const category = getCategory(item.category);
 
                 if (category && sizeMl > 0) {
                     const key = `${category}-${sizeMl}`;
@@ -71,10 +78,7 @@ export default function DailySalePage() {
         // 2. Process On-Bar Sales
         onBarInventory.forEach(item => {
             if (item.salesVolume > 0) {
-                 let category: AggregatedSale['category'] | null = null;
-                 if (FL_CATEGORIES.includes(item.category)) category = 'FL';
-                 else if (IML_CATEGORIES.includes(item.category)) category = 'IML';
-                 else if (BEER_CATEGORIES.includes(item.category)) category = 'BEER';
+                 const category = getCategory(item.category);
                  
                  if (category === 'BEER') {
                     const sizeMatch = item.size.match(/(\d+)/);
@@ -274,9 +278,3 @@ export default function DailySalePage() {
         </main>
     );
 }
-
-    
-
-
-
-    
