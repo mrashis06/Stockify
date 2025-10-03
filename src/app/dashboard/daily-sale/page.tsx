@@ -29,7 +29,7 @@ const BEER_CATEGORIES = ['beer'];
 
 
 export default function DailySalePage() {
-    const { inventory, onBarInventory, loading } = useInventory();
+    const { inventory, dailyOnBarSales, totalOnBarSales, loading } = useInventory();
     const { formatDate } = useDateFormat();
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     
@@ -76,12 +76,12 @@ export default function DailySalePage() {
             }
         });
         
-        // 2. Process On-Bar Sales
-        onBarInventory.forEach(item => {
+        // 2. Process On-Bar Sales from daily log
+        dailyOnBarSales.forEach(item => {
             if (item.salesVolume > 0) {
-                 const category = getCategory(item.category);
-                 
-                 if (category === 'BEER') {
+                const category = getCategory(item.category);
+                
+                if (category === 'BEER') {
                     const sizeMatch = item.size.match(/(\d+)/);
                     const sizeMl = sizeMatch ? parseInt(sizeMatch[0], 10) : 0;
                      if (sizeMl > 0) {
@@ -91,19 +91,21 @@ export default function DailySalePage() {
                          existing.breakdown.push(item.salesVolume);
                          salesMap.set(key, existing);
                      }
-                 } else if (category === 'FL' || category === 'IML') {
-                    const totalVolumeSold = item.salesVolume; 
-                    const bottleSize = item.totalVolume;
+                } else if (category === 'FL' || category === 'IML') {
+                    // For liquor, daily sales are logged per bottle. We need to find the master inventory item
+                    // to figure out how many "units" (bottles) were sold based on ml.
+                    const masterItem = inventory.find(inv => inv.id === item.id.replace('on-bar-', ''));
+                    const bottleSize = masterItem ? parseInt(masterItem.size.match(/(\d+)/)?.[0] || '0') : 0;
+
                     if (bottleSize > 0) {
-                       const unitsSold = totalVolumeSold / bottleSize;
-                       
+                       const unitsSold = item.salesVolume / bottleSize;
                        const key = `${category}-${bottleSize}`;
                        const existing = salesMap.get(key) || { unitsSold: 0, size: bottleSize, category, breakdown: [] };
                        existing.unitsSold += unitsSold;
                        existing.breakdown.push(unitsSold);
                        salesMap.set(key, existing);
                     }
-                 }
+                }
             }
         });
 
@@ -118,12 +120,11 @@ export default function DailySalePage() {
         });
 
         const offCounterTotal = inventory.reduce((sum, item) => sum + (item.sales * item.price), 0);
-        const onBarTotal = onBarInventory.reduce((sum, item) => sum + item.salesValue, 0);
-        const totalSalesValue = offCounterTotal + onBarTotal;
+        const totalSalesValue = offCounterTotal + totalOnBarSales;
 
         return { blReport, totalSalesValue };
 
-    }, [inventory, onBarInventory]);
+    }, [inventory, dailyOnBarSales, totalOnBarSales]);
 
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
