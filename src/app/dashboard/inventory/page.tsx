@@ -79,6 +79,17 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
 
+    // Store the initial inventory state to prevent UI shifts after EOD
+    const [initialDayInventory, setInitialDayInventory] = useState<InventoryItem[]>([]);
+
+    useEffect(() => {
+        // When inventory first loads and is not empty, capture its state.
+        // This serves as the baseline for the day's opening stock calculations.
+        if (!loading && inventory.length > 0 && initialDayInventory.length === 0) {
+            setInitialDayInventory(inventory);
+        }
+    }, [inventory, loading, initialDayInventory.length]);
+
 
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing'>) => {
         try {
@@ -162,6 +173,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                 title: 'End of Day Processed',
                 description: "Today's closing stock has been set as tomorrow's opening stock."
             });
+            // We don't need to refetch or reset state. The UI will stay as is.
         } catch (error) {
             console.error("End of day process failed:", error);
             toast({
@@ -173,22 +185,31 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     };
 
     const processedInventory = useMemo(() => {
-        return inventory.map(item => {
-            const prevStock = Number(item.prevStock || 0);
-            const added = Number(item.added || 0);
-            const sales = Number(item.sales || 0);
+        // Use the initial day's inventory for stable opening calculations.
+        // Use the live inventory for the most recent sales/added data.
+        const inventoryToProcess = initialDayInventory.length > 0 ? initialDayInventory : inventory;
+
+        return inventory.map(liveItem => {
+            const initialItem = inventoryToProcess.find(i => i.id === liveItem.id) || liveItem;
+
+            const prevStock = Number(initialItem.prevStock || 0);
+            const added = Number(liveItem.added || 0); // Use live 'added'
+            const sales = Number(liveItem.sales || 0); // Use live 'sales'
+
+            // **THE FIX**: Opening is always calculated from the day's starting prevStock.
             const opening = prevStock + added;
             const closing = opening - sales;
+
             return {
-                ...item,
-                prevStock,
+                ...liveItem,
+                prevStock: prevStock, // Show the day's starting prevStock
                 added,
                 sales,
                 opening,
                 closing,
             };
         });
-    }, [inventory]);
+    }, [inventory, initialDayInventory]);
 
     const filteredInventory = useMemo(() => {
         return processedInventory.filter(item => {
@@ -222,7 +243,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const grandTotalSales = totalOffCounterAmount + totalOnBarSales;
 
 
-  if (loading) {
+  if (loading && initialDayInventory.length === 0) {
     return null;
   }
 
@@ -262,7 +283,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                 <AlertDialogHeader>
                     <AlertDialogTitle>End of Day Process</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will finalize today's numbers and set the opening stock for tomorrow. You should run this as the last action of your business day. Are you sure you want to continue?
+                        This will finalize today's numbers and set the opening stock for tomorrow. You can still edit today's sales after running this. Are you sure you want to continue?
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

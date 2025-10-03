@@ -48,7 +48,7 @@ export type AddBrandFormValues = z.infer<typeof formSchema>;
 type AddBrandDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onAddBrand: (data: AddBrandFormValues) => void;
+  onAddBrand: (data: Omit<AddBrandFormValues, 'barcodeId'>) => void;
 };
 
 const categories = ['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine', 'Gin', 'Tequila', 'IML'];

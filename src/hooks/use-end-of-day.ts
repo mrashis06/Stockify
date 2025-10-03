@@ -8,12 +8,9 @@ import {
   getDoc,
   writeBatch,
   getDocs,
-  setDoc,
-  updateDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, addDays } from 'date-fns';
-import type { OnBarItem } from './use-onbar-inventory';
+import { format } from 'date-fns';
 import type { InventoryItem } from './use-inventory';
 
 export function useEndOfDay() {
@@ -22,7 +19,6 @@ export function useEndOfDay() {
   const endOfDayProcess = async () => {
     setIsEndingDay(true);
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const tomorrowStr = format(addDays(new Date(), 1), 'yyyy-MM-dd');
 
     try {
       const batch = writeBatch(db);
@@ -31,18 +27,22 @@ export function useEndOfDay() {
       const dailyDoc = await getDoc(dailyDocRef);
       const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
 
+      // This process will now ONLY update the prevStock in the master inventory.
+      // It no longer touches the next day's data, which was causing the issue.
       inventorySnapshot.forEach((doc) => {
         const item = { id: doc.id, ...doc.data() } as InventoryItem;
         const dailyItem = dailyData[item.id] || {};
         
+        // This calculation determines the final closing stock for today.
         const opening = Number(item.prevStock || 0) + Number(dailyItem.added || 0);
         const closing = opening - Number(dailyItem.sales || 0);
 
+        // Update the master inventory item's prevStock for the start of the next day.
         const inventoryUpdateRef = doc.ref;
-        batch.update(inventoryUpdateRef, { prevStock: closing });
+        batch.update(inventoryUpdateRef, { prevStock: closing < 0 ? 0 : closing });
       });
 
-      // Also reset on-bar sales data for the next day
+      // Also reset on-bar sales data (this part was correct)
       const onBarSnapshot = await getDocs(collection(db, 'onBarInventory'));
       onBarSnapshot.forEach((doc) => {
         batch.update(doc.ref, { salesVolume: 0, salesValue: 0 });
@@ -60,5 +60,3 @@ export function useEndOfDay() {
 
   return { isEndingDay, endOfDayProcess };
 }
-
-    
