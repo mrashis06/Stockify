@@ -64,6 +64,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         updateBrand,
         updateItemField,
         forceRefetch,
+        totalOnBarSales,
     } = useInventory();
     
     usePageLoading(loading);
@@ -80,34 +81,11 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
-    const [onBarSales, setOnBarSales] = useState<OnBarItem[]>([]);
-    const [totalOnBarAmount, setTotalOnBarAmount] = useState(0);
+    
+    const onBarSales = useMemo(() => {
+        return onBarInventory.filter(item => item.salesValue > 0);
+    }, [onBarInventory]);
 
-    useEffect(() => {
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const dailyDocRef = doc(db, 'dailyInventory', today);
-
-        const unsubscribe = onSnapshot(dailyDocRef, (docSnap) => {
-            let total = 0;
-            const sales: OnBarItem[] = [];
-            if (docSnap.exists()) {
-                const dailyData = docSnap.data();
-                for (const key in dailyData) {
-                    if (key.startsWith('on-bar-')) {
-                        const saleData = dailyData[key];
-                        total += saleData.salesValue || 0;
-                        if(saleData.salesValue > 0) {
-                            sales.push(saleData as OnBarItem);
-                        }
-                    }
-                }
-            }
-            setTotalOnBarAmount(total);
-            setOnBarSales(sales.sort((a,b) => a.brand.localeCompare(b.brand)));
-        });
-
-        return () => unsubscribe();
-    }, []);
 
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing'>) => {
         try {
@@ -248,7 +226,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         return filteredInventory.reduce((total, item) => total + (Number(item.sales) || 0) * (Number(item.price) || 0), 0);
     }, [filteredInventory]);
     
-    const grandTotalSales = totalOffCounterAmount + totalOnBarAmount;
+    const grandTotalSales = totalOffCounterAmount + totalOnBarSales;
 
 
   if (loading) {
@@ -523,7 +501,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                             <TableCell className="text-right font-bold">
                                                 <div className="flex items-center justify-end">
                                                     <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                                    {totalOnBarAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    {totalOnBarSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -548,7 +526,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                             <p className="font-medium">Total On-Bar Sales:</p>
                              <p className="font-semibold flex items-center">
                                 <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                {totalOnBarAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {totalOnBarSales.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
                          <div className="flex justify-between items-center pt-4">
