@@ -35,7 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
-import { useInventory, InventoryItem, OnBarItem } from '@/hooks/use-inventory';
+import { useInventory, InventoryItem, OnBarItem, DailyOnBarSale } from '@/hooks/use-inventory';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
 import {
   AlertDialog,
@@ -54,7 +54,7 @@ import { Separator } from '@/components/ui/separator';
 export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
         inventory,
-        onBarInventory,
+        dailyOnBarSales,
         loading,
         addBrand,
         deleteBrand: deleteProduct,
@@ -78,10 +78,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
-    
-    const onBarSales = useMemo(() => {
-        return onBarInventory.filter(item => item.salesValue > 0);
-    }, [onBarInventory]);
 
 
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing'>) => {
@@ -459,7 +455,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                     
                 </div>
 
-                {onBarInventory.length > 0 && (
+                {dailyOnBarSales.length > 0 && (
                     <div className="mt-8">
                         <Separator />
                         <Card className="mt-8 border-dashed bg-muted/30">
@@ -479,7 +475,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {onBarInventory.map(item => (
+                                        {dailyOnBarSales.map(item => (
                                             <TableRow key={item.id}>
                                                 <TableCell className="font-medium">{item.brand} ({item.size})</TableCell>
                                                 <TableCell>{item.salesVolume} {item.category === 'Beer' ? 'units' : 'ml'}</TableCell>

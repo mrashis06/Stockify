@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { create } from 'zustand';
@@ -44,6 +45,15 @@ export type OnBarItem = {
   openedAt: any;
 };
 
+export type DailyOnBarSale = {
+    id: string;
+    brand: string;
+    size: string;
+    category: string;
+    salesVolume: number;
+    salesValue: number;
+}
+
 export type InventoryItem = {
   id: string;
   brand: string;
@@ -74,6 +84,7 @@ type InventoryState = {
   inventory: InventoryItem[];
   unprocessedItems: UnprocessedItem[];
   onBarInventory: OnBarItem[];
+  dailyOnBarSales: DailyOnBarSale[];
   totalOnBarSales: number;
   loading: boolean;
   saving: boolean;
@@ -111,6 +122,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     inventory: [],
     unprocessedItems: [],
     onBarInventory: [],
+    dailyOnBarSales: [],
     totalOnBarSales: 0,
     loading: true,
     saving: false,
@@ -146,9 +158,22 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         const dailySub = onSnapshot(doc(db, 'dailyInventory', today), (dailySnap) => {
             const dailyData = dailySnap.exists() ? dailySnap.data() : {};
             let onBarTotal = 0;
+            const onBarSales: DailyOnBarSale[] = [];
+
             for (const key in dailyData) {
                 if (key.startsWith('on-bar-')) {
-                    onBarTotal += dailyData[key].salesValue || 0;
+                    const saleData = dailyData[key];
+                    if(saleData.salesValue > 0) {
+                        onBarTotal += saleData.salesValue || 0;
+                        onBarSales.push({
+                            id: key,
+                            brand: saleData.brand,
+                            size: saleData.size,
+                            category: saleData.category,
+                            salesVolume: saleData.salesVolume,
+                            salesValue: saleData.salesValue,
+                        });
+                    }
                 }
             }
 
@@ -159,6 +184,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     sales: Number(dailyData[item.id]?.sales ?? 0),
                 })),
                 totalOnBarSales: onBarTotal,
+                dailyOnBarSales: onBarSales,
             }));
         });
         
