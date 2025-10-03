@@ -69,10 +69,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       if (!user) {
         router.push('/login');
       } else if (user.role === 'staff' && !shopId) {
-        // If staff has no shopId, redirect them to join a shop
         router.push('/join-shop');
       } else if (user.role === 'staff' && !isStaffActive) {
-          // If staff is blocked, log them out and show an error.
           signOut(auth).then(() => {
             router.push('/login?error=blocked');
           });
@@ -109,7 +107,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   
   const isAdmin = user?.role === 'admin';
 
-  // While loading auth state or if there's no user (and we are about to redirect), show a loader.
   if (authLoading || !user || (user.role === 'staff' && !shopId) || (user.role === 'staff' && !isStaffActive)) {
     return (
         <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background">
@@ -118,7 +115,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   }
   
-  const navItems = [
+  const adminNavItems = [
       { href: "#", pageName: 'Back', icon: ArrowLeft, label: ""},
       { href: "/", pageName: 'Home', icon: Home, label: "Home" },
       { href: "/dashboard", pageName: 'Dashboard', icon: LayoutDashboard, label: "Dashboard" },
@@ -128,11 +125,21 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       { href: "/dashboard/onbar", pageName: 'OnBar', icon: GlassWater, label: "OnBar" },
       { href: "/dashboard/daily-sale", pageName: 'Daily Sale', icon: TrendingUp, label: "Daily Sale" },
       { href: "/dashboard/map-barcode", pageName: 'Map Barcodes', icon: Barcode, label: "Map Barcodes" },
-      ...(isAdmin ? [{ href: "/dashboard/staff", pageName: 'Staff', icon: Users, label: "Staff" }] : []),
+      { href: "/dashboard/staff", pageName: 'Staff', icon: Users, label: "Staff" },
       { href: "/dashboard/reports", pageName: 'Reports', icon: FileText, label: "Reports" },
       { href: "/dashboard/performance", pageName: 'Performance', icon: TrendingUp, label: "Performance" },
   ];
 
+  const staffNavItems = [
+      { href: "/dashboard/sales", pageName: 'POS', icon: ShoppingCart, label: "POS" },
+      { href: "/dashboard/inventory", pageName: 'OffCounter', icon: Warehouse, label: "OffCounter" },
+      { href: "/dashboard/godown", pageName: 'Godown', icon: Archive, label: "Godown" },
+      { href: "/dashboard/onbar", pageName: 'OnBar', icon: GlassWater, label: "OnBar" },
+      { href: "/dashboard/daily-sale", pageName: 'Daily Sale', icon: TrendingUp, label: "Daily Sale" },
+      { href: "/dashboard/map-barcode", pageName: 'Map Barcodes', icon: Barcode, label: "Map Barcodes" },
+  ];
+  
+  const navItems = isAdmin ? adminNavItems : staffNavItems;
   
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
