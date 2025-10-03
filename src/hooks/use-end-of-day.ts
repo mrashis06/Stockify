@@ -19,20 +19,36 @@ import type { InventoryItem } from './use-inventory';
 export function useEndOfDay() {
   const [isEndingDay, setIsEndingDay] = useState(false);
 
-  // The End of Day process is now simplified.
-  // It no longer handles the critical off-counter stock rollover.
-  // That logic is now handled automatically when the inventory page loads for a new day.
-  // This function's primary role can be to reset daily states, like On-Bar sales, if needed.
   const endOfDayProcess = async () => {
     setIsEndingDay(true);
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const tomorrowStr = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+
     try {
-      // This function is now safe to click.
-      // Currently, it performs no critical inventory actions.
-      // We can add logic here later to reset On-Bar inventory if required,
-      // but it will NOT touch the master inventory's prevStock.
-      
-      // Placeholder for any future non-critical EOD tasks.
-      await Promise.resolve();
+      const batch = writeBatch(db);
+      const inventorySnapshot = await getDocs(collection(db, 'inventory'));
+      const dailyDocRef = doc(db, 'dailyInventory', todayStr);
+      const dailyDoc = await getDoc(dailyDocRef);
+      const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+
+      inventorySnapshot.forEach((doc) => {
+        const item = { id: doc.id, ...doc.data() } as InventoryItem;
+        const dailyItem = dailyData[item.id] || {};
+        
+        const opening = Number(item.prevStock || 0) + Number(dailyItem.added || 0);
+        const closing = opening - Number(dailyItem.sales || 0);
+
+        const inventoryUpdateRef = doc.ref;
+        batch.update(inventoryUpdateRef, { prevStock: closing });
+      });
+
+      // Also reset on-bar sales data for the next day
+      const onBarSnapshot = await getDocs(collection(db, 'onBarInventory'));
+      onBarSnapshot.forEach((doc) => {
+        batch.update(doc.ref, { salesVolume: 0, salesValue: 0 });
+      });
+
+      await batch.commit();
 
     } catch (error) {
       console.error("Error during end of day process: ", error);
@@ -44,3 +60,5 @@ export function useEndOfDay() {
 
   return { isEndingDay, endOfDayProcess };
 }
+
+    

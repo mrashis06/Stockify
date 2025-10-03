@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut, GlassWater } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
-import { useInventory, InventoryItem } from '@/hooks/use-inventory';
+import { useInventory, InventoryItem, OnBarItem } from '@/hooks/use-inventory';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
 import {
   AlertDialog,
@@ -49,6 +49,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePageLoading } from '@/hooks/use-loading';
 import { Separator } from '@/components/ui/separator';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { format } from 'date-fns';
 
 
 export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
@@ -77,6 +80,34 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
+    const [onBarSales, setOnBarSales] = useState<OnBarItem[]>([]);
+    const [totalOnBarAmount, setTotalOnBarAmount] = useState(0);
+
+    useEffect(() => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const dailyDocRef = doc(db, 'dailyInventory', today);
+
+        const unsubscribe = onSnapshot(dailyDocRef, (docSnap) => {
+            let total = 0;
+            const sales: OnBarItem[] = [];
+            if (docSnap.exists()) {
+                const dailyData = docSnap.data();
+                for (const key in dailyData) {
+                    if (key.startsWith('on-bar-')) {
+                        const saleData = dailyData[key];
+                        total += saleData.salesValue || 0;
+                        if(saleData.salesValue > 0) {
+                            sales.push(saleData as OnBarItem);
+                        }
+                    }
+                }
+            }
+            setTotalOnBarAmount(total);
+            setOnBarSales(sales.sort((a,b) => a.brand.localeCompare(b.brand)));
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing'>) => {
         try {
@@ -216,14 +247,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const totalOffCounterAmount = useMemo(() => {
         return filteredInventory.reduce((total, item) => total + (Number(item.sales) || 0) * (Number(item.price) || 0), 0);
     }, [filteredInventory]);
-    
-    const onBarSales = useMemo(() => {
-        return onBarInventory.filter(item => item.salesValue && item.salesValue > 0);
-    }, [onBarInventory]);
-
-    const totalOnBarAmount = useMemo(() => {
-        return onBarSales.reduce((total, item) => total + item.salesValue, 0);
-    }, [onBarSales]);
     
     const grandTotalSales = totalOffCounterAmount + totalOnBarAmount;
 
@@ -543,3 +566,5 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
