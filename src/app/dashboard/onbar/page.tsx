@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -27,6 +26,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const { 
         inventory: shopInventory, 
         onBarInventory, 
+        dailyOnBarSales,
         loading, 
         sellPeg, 
         removeOnBarItem, 
@@ -205,10 +205,11 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                         const canSell30 = !isBeer && remaining >= 30 && item.pegPrice30ml !== undefined;
                         const canSell60 = !isBeer && remaining >= 60 && item.pegPrice60ml !== undefined;
                         
-                        const isRefillable = item.category === 'Beer' 
-                            ? (item.salesVolume || 0) >= 1
-                            : (item.salesVolume || 0) >= 30;
-
+                        const dailySaleRecord = dailyOnBarSales.find(sale => sale.id === `on-bar-${item.inventoryId}`);
+                        const todaysSalesVolume = dailySaleRecord?.salesVolume || 0;
+                        const isRefillable = isBeer 
+                            ? todaysSalesVolume >= 1
+                            : todaysSalesVolume >= 30;
 
                         return (
                         <Card key={item.id} className="flex flex-col h-full relative">
