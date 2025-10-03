@@ -5,6 +5,7 @@ import { IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
 import { useEffect, useState, useMemo } from "react";
+import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { subDays, format } from 'date-fns';
@@ -36,6 +37,7 @@ const categories = [
 
 export default function DashboardPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user } = useAuth();
+  const router = useRouter();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [todaySalesData, setTodaySalesData] = useState<any>({});
@@ -47,8 +49,16 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const yesterday = useMemo(() => subDays(new Date(), 1), []);
   const yesterdayString = useMemo(() => formatDate(yesterday, 'yyyy-MM-dd'), [yesterday, formatDate]);
 
+  useEffect(() => {
+    if (user?.role === 'staff') {
+      router.replace('/dashboard/sales');
+    }
+  }, [user, router]);
+
 
   useEffect(() => {
+    if (user?.role !== 'admin') return;
+
     const today = formatDate(new Date(), 'yyyy-MM-dd');
     const yesterdayDateStr = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
     
@@ -88,7 +98,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
     // Cleanup the listener when the component unmounts
     return () => unsubscribeDaily();
-  }, [formatDate]);
+  }, [user, formatDate]);
 
   const processedInventory = useMemo(() => {
     return inventory.map(item => {
@@ -174,7 +184,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
   const totalAlerts = lowStockItems.length + outOfStockItems.length;
 
-  if (loading) {
+  if (loading || user?.role !== 'admin') {
       return null;
   }
 
