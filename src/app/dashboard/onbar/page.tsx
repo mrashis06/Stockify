@@ -22,9 +22,6 @@ import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { format } from 'date-fns';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
@@ -34,7 +31,8 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         sellPeg, 
         removeOnBarItem, 
         refillPeg, 
-        addOnBarItem 
+        addOnBarItem,
+        totalOnBarSales,
     } = useInventory();
     
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
@@ -46,27 +44,6 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const [isSellItemOpen, setIsSellItemOpen] = useState(false);
     const [sellingItem, setSellingItem] = useState<OnBarItem | null>(null);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
-    const [totalOnBarSales, setTotalOnBarSales] = useState(0);
-
-    useEffect(() => {
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const dailyDocRef = doc(db, 'dailyInventory', today);
-
-        const unsubscribe = onSnapshot(dailyDocRef, (docSnap) => {
-            let total = 0;
-            if (docSnap.exists()) {
-                const dailyData = docSnap.data();
-                for (const key in dailyData) {
-                    if (key.startsWith('on-bar-')) {
-                        total += dailyData[key].salesValue || 0;
-                    }
-                }
-            }
-            setTotalOnBarSales(total);
-        });
-
-        return () => unsubscribe();
-    }, []);
 
     const handleOpenSellDialog = (item: OnBarItem) => {
         setSellingItem(item);
@@ -99,12 +76,15 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         }
     };
 
-    const handleRefill = async (id: string, amount: number) => {
+    const handleRefill = async (id: string) => {
         try {
             const item = onBarInventory.find(i => i.id === id);
-            const refillAmount = item?.category === 'Beer' ? 1 : 30; // Refill 1 unit for beer, 30ml for liquor
+            if (!item) return;
+
+            const refillAmount = item.category === 'Beer' ? 1 : 30;
             await refillPeg(id, refillAmount); 
-            const message = item?.category === 'Beer' ? 'Last beer sale cancelled.' : `Last sale of 30ml cancelled.`;
+            
+            const message = item.category === 'Beer' ? 'Last beer sale cancelled.' : `Last sale of 30ml cancelled.`;
             toast({ title: 'Success', description: message });
         } catch (error) {
             console.error('Error refilling item:', error);
@@ -280,7 +260,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                      <Button
                                         variant="outline"
                                         size="icon"
-                                        onClick={() => handleRefill(item.id, 30)}
+                                        onClick={() => handleRefill(item.id)}
                                         disabled={remaining >= total || !isRefillable}
                                         className="shrink-0 absolute bottom-6 right-6"
                                     >

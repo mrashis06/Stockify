@@ -74,6 +74,7 @@ type InventoryState = {
   inventory: InventoryItem[];
   unprocessedItems: UnprocessedItem[];
   onBarInventory: OnBarItem[];
+  totalOnBarSales: number;
   loading: boolean;
   saving: boolean;
   
@@ -110,6 +111,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     inventory: [],
     unprocessedItems: [],
     onBarInventory: [],
+    totalOnBarSales: 0,
     loading: true,
     saving: false,
     
@@ -143,12 +145,20 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
         const dailySub = onSnapshot(doc(db, 'dailyInventory', today), (dailySnap) => {
             const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+            let onBarTotal = 0;
+            for (const key in dailyData) {
+                if (key.startsWith('on-bar-')) {
+                    onBarTotal += dailyData[key].salesValue || 0;
+                }
+            }
+
             set(state => ({
                 inventory: state.inventory.map(item => ({
                     ...item,
                     added: Number(dailyData[item.id]?.added ?? 0),
                     sales: Number(dailyData[item.id]?.sales ?? 0),
-                }))
+                })),
+                totalOnBarSales: onBarTotal,
             }));
         });
         
@@ -157,7 +167,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             snapshot.forEach(doc => {
                 unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
             });
-            set({ unprocessedItems: unprocessed });
+            set({ unprocessedItems: unprocessed.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()) });
         });
         
         const onBarSub = onSnapshot(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')), (snapshot) => {
@@ -604,52 +614,37 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     if (get().saving) return;
     get()._setSaving(true);
     try {
-        await runTransaction(db, async (transaction) => {
-            const itemInShopRef = doc(db, "inventory", inventoryItemId);
-            const itemInShopDoc = await transaction.get(itemInShopRef);
+        const itemInShopRef = doc(db, "inventory", inventoryItemId);
+        const itemInShopDoc = await getDoc(itemInShopRef);
+        
+        if (!itemInShopDoc.exists()) {
+            throw new Error("Item not found in shop inventory.");
+        }
+        
+        const itemInShopData = itemInShopDoc.data() as InventoryItem;
+        const newOnBarDocRef = doc(collection(db, "onBarInventory"));
+        const isBeer = itemInShopData.category === 'Beer';
 
-            if (!itemInShopDoc.exists()) throw new Error("Item not found in shop inventory.");
-            
-            const itemInShopData = itemInShopDoc.data() as InventoryItem;
-            const openingStock = (itemInShopData.prevStock || 0) + (itemInShopData.added || 0);
-            const closingStock = openingStock - (itemInShopData.sales || 0);
+        const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
+            inventoryId: inventoryItemId,
+            brand: itemInShopData.brand,
+            size: itemInShopData.size,
+            category: itemInShopData.category,
+            totalVolume: volume,
+            remainingVolume: isBeer ? quantity : volume,
+            price: price, // Use the price passed from the dialog
+            totalQuantity: isBeer ? quantity : 1,
+            salesVolume: 0,
+            salesValue: 0,
+        };
 
-            if (closingStock < quantity) {
-                throw new Error(`Not enough stock in shop. Available: ${closingStock}`);
-            }
+        if (!isBeer && pegPrices) {
+            onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
+            onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
+        }
 
-            const today = format(new Date(), 'yyyy-MM-dd');
-            const dailyDocRef = doc(db, 'dailyInventory', today);
-            const dailyDoc = await transaction.get(dailyDocRef);
-            const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            const itemDailyData = dailyData[inventoryItemId] || {};
-
-            const newSales = (itemDailyData.sales || 0) + quantity;
-            transaction.set(dailyDocRef, { [inventoryItemId]: { ...itemDailyData, sales: newSales } }, { merge: true });
-            
-            const newOnBarDocRef = doc(collection(db, "onBarInventory"));
-            const isBeer = itemInShopData.category === 'Beer';
-
-            const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
-                inventoryId: inventoryItemId,
-                brand: itemInShopData.brand,
-                size: itemInShopData.size,
-                category: itemInShopData.category,
-                totalVolume: volume,
-                remainingVolume: isBeer ? quantity : volume,
-                price: price,
-                totalQuantity: isBeer ? quantity : 1,
-                salesVolume: 0,
-                salesValue: 0,
-            };
-
-            if (!isBeer && pegPrices) {
-                onBarItemPayload.pegPrice30ml = pegPrices['30ml'];
-                onBarItemPayload.pegPrice60ml = pegPrices['60ml'];
-            }
-
-            transaction.set(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
-        });
+        await setDoc(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
+        
     } catch (error) {
         console.error("Error opening bottle: ", error);
         throw error;
@@ -763,17 +758,18 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const newRemainingVolume = itemData.remainingVolume + amountToRefill;
             const totalCapacity = isBeer ? (itemData.totalQuantity || 0) : itemData.totalVolume;
             
-            if (isBeer && newRemainingVolume > totalCapacity) {
-                 throw new Error("Refill amount exceeds number of bottles opened.");
-            }
-            if (!isBeer && newRemainingVolume > totalCapacity) {
-                throw new Error("Refill amount exceeds bottle capacity.");
+            if ((isBeer && newRemainingVolume > totalCapacity) || (!isBeer && newRemainingVolume > itemData.totalVolume)) {
+                 throw new Error("Refill amount exceeds original capacity.");
             }
             
             let valueToRefund: number;
             if (isBeer) {
-                valueToRefund = itemData.price; // Price per unit for beer
+                // For beer, the price is per unit.
+                if (itemData.price === undefined) throw new Error("Beer unit price is not set.");
+                valueToRefund = itemData.price;
             } else {
+                // For liquor, calculate refund based on average price per ml sold today.
+                if (soldAmount === 0) throw new Error("Cannot calculate refund value with zero sales volume.");
                 valueToRefund = (dailyLog.salesValue / soldAmount) * amountToRefill;
             }
 
@@ -839,5 +835,3 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
-
-    

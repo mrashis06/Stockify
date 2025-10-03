@@ -49,9 +49,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePageLoading } from '@/hooks/use-loading';
 import { Separator } from '@/components/ui/separator';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { format } from 'date-fns';
 
 
 export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
@@ -462,7 +459,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                     
                 </div>
 
-                {onBarSales.length > 0 && (
+                {onBarInventory.length > 0 && (
                     <div className="mt-8">
                         <Separator />
                         <Card className="mt-8 border-dashed bg-muted/30">
@@ -482,7 +479,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {onBarSales.map(item => (
+                                        {onBarInventory.map(item => (
                                             <TableRow key={item.id}>
                                                 <TableCell className="font-medium">{item.brand} ({item.size})</TableCell>
                                                 <TableCell>{item.salesVolume} {item.category === 'Beer' ? 'units' : 'ml'}</TableCell>
@@ -544,5 +541,3 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
