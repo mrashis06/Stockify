@@ -706,8 +706,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             }
             
             const newRemainingVolume = itemData.remainingVolume - volumeToSell;
-            const newSalesVolume = (itemData.salesVolume || 0) + volumeToSell;
-            const newSalesValue = (itemData.salesValue || 0) + priceOfSale;
             
             const onBarItemId = `on-bar-${itemData.inventoryId}`;
             const itemDailyLog = dailyData[onBarItemId] || {
@@ -718,14 +716,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 salesVolume: 0,
                 salesValue: 0
             };
-            itemDailyLog.salesVolume += volumeToSell;
-            itemDailyLog.salesValue += priceOfSale;
+            itemDailyLog.salesVolume = (itemDailyLog.salesVolume || 0) + volumeToSell;
+            itemDailyLog.salesValue = (itemDailyLog.salesValue || 0) + priceOfSale;
 
             // --- ALL WRITES LAST ---
             transaction.update(itemRef, {
                 remainingVolume: newRemainingVolume,
-                salesVolume: newSalesVolume,
-                salesValue: newSalesValue,
             });
             transaction.set(dailyDocRef, { [onBarItemId]: itemDailyLog }, { merge: true });
         });
@@ -748,38 +744,36 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             
             const itemData = itemDoc.data() as OnBarItem;
             const isBeer = itemData.category === 'Beer';
-            const soldAmount = itemData.salesVolume || 0;
+            
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const onBarItemId = `on-bar-${itemData.inventoryId}`;
+            const dailyDoc = await transaction.get(dailyDocRef);
+            
+            if (!dailyDoc.exists() || !dailyDoc.data()?.[onBarItemId]) {
+                 throw new Error("No sales recorded for this item today to reverse.");
+            }
+
+            const dailyLog = dailyDoc.data()?.[onBarItemId];
+            const soldAmount = dailyLog.salesVolume || 0;
             const amountToRefill = isBeer ? 1 : amount;
 
-            if (soldAmount < amountToRefill) throw new Error("Cannot refill more than what was sold.");
+            if (soldAmount < amountToRefill) throw new Error("Cannot refill more than what was sold today.");
 
             const newRemainingVolume = itemData.remainingVolume + amountToRefill;
             const totalCapacity = isBeer ? (itemData.totalQuantity || 0) : itemData.totalVolume;
             if (newRemainingVolume > totalCapacity) throw new Error("Refill amount exceeds bottle capacity.");
             
-            const valueToRefund = isBeer ? itemData.price : ((itemData.salesValue || 0) / (soldAmount || 1)) * amountToRefill;
+            const valueToRefund = isBeer ? itemData.price : (dailyLog.salesValue / soldAmount) * amountToRefill;
             
-            const newSalesVolume = soldAmount - amountToRefill;
-            const newSalesValue = (itemData.salesValue || 0) - valueToRefund;
-
+            // --- ALL WRITES ---
             transaction.update(itemRef, {
                 remainingVolume: newRemainingVolume,
-                salesVolume: Math.max(0, newSalesVolume),
-                salesValue: Math.max(0, newSalesValue),
             });
-
-             // Also reverse the sale in the daily log
-             const today = format(new Date(), 'yyyy-MM-dd');
-             const dailyDocRef = doc(db, 'dailyInventory', today);
-             const onBarItemId = `on-bar-${itemData.inventoryId}`;
-
-             const dailyDoc = await transaction.get(dailyDocRef);
-             if (dailyDoc.exists() && dailyDoc.data()[onBarItemId]) {
-                 const itemDailyLog = dailyDoc.data()[onBarItemId];
-                 itemDailyLog.salesVolume -= amountToRefill;
-                 itemDailyLog.salesValue -= valueToRefund;
-                 transaction.set(dailyDocRef, { [onBarItemId]: itemDailyLog }, { merge: true });
-             }
+            
+            dailyLog.salesVolume -= amountToRefill;
+            dailyLog.salesValue -= valueToRefund;
+            transaction.set(dailyDocRef, { [onBarItemId]: dailyLog }, { merge: true });
         });
     } catch (error) {
         console.error("Error refilling peg: ", error);
@@ -830,4 +824,3 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
-

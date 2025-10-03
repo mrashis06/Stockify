@@ -9,6 +9,7 @@ export type { OnBarItem } from './use-inventory';
 
 
 export function useOnBarInventory() {
+    // This is now just a pass-through to the main inventory hook
     const { onBarInventory, loading, saving, addOnBarItem, sellPeg, refillPeg, removeOnBarItem } = useInventory();
     return { onBarInventory, loading, saving, addOnBarItem, sellPeg, refillPeg, removeOnBarItem };
 }

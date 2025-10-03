@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee, Trash2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -22,6 +22,9 @@ import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { format } from 'date-fns';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
@@ -43,6 +46,27 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const [isSellItemOpen, setIsSellItemOpen] = useState(false);
     const [sellingItem, setSellingItem] = useState<OnBarItem | null>(null);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
+    const [totalOnBarSales, setTotalOnBarSales] = useState(0);
+
+    useEffect(() => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const dailyDocRef = doc(db, 'dailyInventory', today);
+
+        const unsubscribe = onSnapshot(dailyDocRef, (docSnap) => {
+            let total = 0;
+            if (docSnap.exists()) {
+                const dailyData = docSnap.data();
+                for (const key in dailyData) {
+                    if (key.startsWith('on-bar-')) {
+                        total += dailyData[key].salesValue || 0;
+                    }
+                }
+            }
+            setTotalOnBarSales(total);
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     const handleOpenSellDialog = (item: OnBarItem) => {
         setSellingItem(item);
@@ -117,10 +141,6 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             });
         }
     };
-
-    const totalOnBarSales = useMemo(() => {
-        return onBarInventory.reduce((total, item) => total + (item.salesValue || 0), 0);
-    }, [onBarInventory]);
     
     if (loading) {
         return null;
@@ -204,6 +224,11 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                         const unitLabel = isBeer ? 'units' : 'ml';
                         const canSell30 = !isBeer && remaining >= 30 && item.pegPrice30ml !== undefined;
                         const canSell60 = !isBeer && remaining >= 60 && item.pegPrice60ml !== undefined;
+                        
+                        const isRefillable = item.category === 'Beer' 
+                            ? (item.salesVolume || 0) >= 1
+                            : (item.salesVolume || 0) >= 30;
+
 
                         return (
                         <Card key={item.id} className="flex flex-col h-full relative">
@@ -256,7 +281,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                                         variant="outline"
                                         size="icon"
                                         onClick={() => handleRefill(item.id, 30)}
-                                        disabled={remaining >= total || (item.salesVolume || 0) < (isBeer ? 1 : 30)}
+                                        disabled={remaining >= total || !isRefillable}
                                         className="shrink-0 absolute bottom-6 right-6"
                                     >
                                         <Plus className="h-4 w-4" />
@@ -280,5 +305,3 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
-
-    
