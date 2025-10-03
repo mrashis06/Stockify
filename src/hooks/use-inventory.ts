@@ -762,9 +762,24 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
             const newRemainingVolume = itemData.remainingVolume + amountToRefill;
             const totalCapacity = isBeer ? (itemData.totalQuantity || 0) : itemData.totalVolume;
-            if (newRemainingVolume > totalCapacity) throw new Error("Refill amount exceeds bottle capacity.");
             
-            const valueToRefund = isBeer ? itemData.price : (dailyLog.salesValue / soldAmount) * amountToRefill;
+            if (isBeer && newRemainingVolume > totalCapacity) {
+                 throw new Error("Refill amount exceeds number of bottles opened.");
+            }
+            if (!isBeer && newRemainingVolume > totalCapacity) {
+                throw new Error("Refill amount exceeds bottle capacity.");
+            }
+            
+            let valueToRefund: number;
+            if (isBeer) {
+                valueToRefund = itemData.price; // Price per unit for beer
+            } else {
+                valueToRefund = (dailyLog.salesValue / soldAmount) * amountToRefill;
+            }
+
+            if (isNaN(valueToRefund)) {
+                throw new Error("Could not calculate refund value. The transaction cannot proceed.");
+            }
             
             // --- ALL WRITES ---
             transaction.update(itemRef, {
@@ -824,3 +839,5 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
+
+    
