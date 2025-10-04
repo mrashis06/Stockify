@@ -80,7 +80,23 @@ export function useNotifications() {
         }
     };
 
-    return { notifications, loading, markAsRead };
+    const markAllAsRead = async () => {
+        if (user && user.shopId && user.uid) {
+            const unreadNotifications = notifications.filter(n => !n.readBy.includes(user.uid!));
+            if (unreadNotifications.length === 0) return;
+
+            const batch = writeBatch(db);
+            unreadNotifications.forEach(n => {
+                const notifRef = doc(db, `shops/${user.shopId}/notifications`, n.id);
+                batch.update(notifRef, {
+                    readBy: arrayUnion(user.uid)
+                });
+            });
+            await batch.commit();
+        }
+    };
+
+    return { notifications, loading, markAsRead, markAllAsRead };
 }
 
 // Function for creating admin-targeted notifications

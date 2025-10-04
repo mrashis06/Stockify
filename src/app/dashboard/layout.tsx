@@ -46,7 +46,7 @@ import ProfilePictureDialog from '@/components/dashboard/profile-picture-dialog'
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
-  const { notifications, markAsRead } = useNotifications();
+  const { notifications, markAsRead, markAllAsRead } = useNotifications();
   const { settings } = useNotificationSettings();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
@@ -264,7 +264,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <div className="flex items-center justify-between p-2">
+                    <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+                    {unreadCount > 0 && (
+                        <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => markAllAsRead()}>
+                            Mark all as read
+                        </Button>
+                    )}
+                </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
                     {displayedNotifications.length > 0 ? (
