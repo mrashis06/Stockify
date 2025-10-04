@@ -165,19 +165,17 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     const out: InventoryItem[] = [];
 
     processedInventory.forEach(item => {
-        const closingStock = item.closing ?? 0;
-        const openingStock = item.opening ?? 0;
-        
-        // Skip items that were never in the shop inventory today
-        if (openingStock <= 0) {
-            return;
-        }
-
-        if (closingStock <= 0) {
-            out.push(item);
-        } else if (closingStock < 10) {
-            low.push(item);
-        }
+      // "Out of Stock" means it started with 0 and nothing was added.
+      if (item.prevStock === 0 && item.added === 0) {
+          out.push(item);
+      }
+      
+      // "Low Stock" means it has active stock, but the closing amount is low.
+      const closingStock = item.closing ?? 0;
+      const openingStock = item.opening ?? 0;
+      if (openingStock > 0 && closingStock > 0 && closingStock < 10) {
+          low.push(item);
+      }
     });
     
     return { lowStockItems: low, outOfStockItems: out };
