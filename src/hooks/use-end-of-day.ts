@@ -1,45 +1,42 @@
 
-
 "use client";
 
 import { useState } from 'react';
 import {
-  collection,
   doc,
-  getDoc,
   writeBatch,
-  getDocs,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format } from 'date-fns';
 import type { InventoryItem } from './use-inventory';
 
 export function useEndOfDay() {
   const [isEndingDay, setIsEndingDay] = useState(false);
 
-  const endOfDayProcess = async () => {
+  /**
+   * Processes the end of day by updating the master inventory's `prevStock`
+   * with the final closing stock values calculated on the client.
+   * This function does not perform calculations; it only writes the provided data.
+   * @param finalInventoryState The array of inventory items with the final `closing` stock values.
+   */
+  const endOfDayProcess = async (finalInventoryState: InventoryItem[]) => {
     setIsEndingDay(true);
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
 
     try {
+      if (!finalInventoryState || finalInventoryState.length === 0) {
+        throw new Error("No inventory data provided to process.");
+      }
+
       const batch = writeBatch(db);
-      const inventorySnapshot = await getDocs(collection(db, 'inventory'));
-      const dailyDocRef = doc(db, 'dailyInventory', todayStr);
-      const dailyDoc = await getDoc(dailyDocRef);
-      const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
 
-      // This process will now ONLY update the prevStock in the master inventory.
-      inventorySnapshot.forEach((doc) => {
-        const item = { id: doc.id, ...doc.data() } as InventoryItem;
-        const dailyItem = dailyData[item.id] || {};
-        
-        // This calculation determines the final closing stock for today.
-        const opening = Number(item.prevStock || 0) + Number(dailyItem.added || 0);
-        const closing = opening - Number(dailyItem.sales || 0);
-
-        // Update the master inventory item's prevStock for the start of the next day.
-        const inventoryUpdateRef = doc.ref;
-        batch.update(inventoryUpdateRef, { prevStock: closing < 0 ? 0 : closing });
+      finalInventoryState.forEach((item) => {
+        // We only care about items that are actually in the shop inventory
+        if (item.opening && item.opening > 0) {
+            const inventoryUpdateRef = doc(db, 'inventory', item.id);
+            const finalClosingStock = item.closing ?? 0;
+            
+            // Update the master inventory item's prevStock for the start of the next day.
+            batch.update(inventoryUpdateRef, { prevStock: finalClosingStock < 0 ? 0 : finalClosingStock });
+        }
       });
 
       await batch.commit();

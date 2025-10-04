@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -79,18 +78,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
 
-    // Store the initial inventory state to prevent UI shifts after EOD
-    const [initialDayInventory, setInitialDayInventory] = useState<InventoryItem[]>([]);
-
-    useEffect(() => {
-        // When inventory first loads and is not empty, capture its state.
-        // This serves as the baseline for the day's opening stock calculations.
-        if (!loading && inventory.length > 0 && initialDayInventory.length === 0) {
-            setInitialDayInventory(inventory);
-        }
-    }, [inventory, loading, initialDayInventory.length]);
-
-
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing'>) => {
         try {
             await addBrand(newItemData);
@@ -168,12 +155,12 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const handleEndOfDay = async () => {
         setIsEndOfDayDialogOpen(false);
         try {
-            await endOfDayProcess();
+            // Pass the current, correctly calculated inventory state to the EOD process.
+            await endOfDayProcess(processedInventory);
             toast({
                 title: 'End of Day Processed',
-                description: "Today's closing stock has been set as tomorrow's opening stock."
+                description: "Today's final stock has been saved as tomorrow's opening stock."
             });
-            // We don't need to refetch or reset state. The UI will stay as is.
         } catch (error) {
             console.error("End of day process failed:", error);
             toast({
@@ -183,6 +170,17 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
             });
         }
     };
+    
+    const [initialDayInventory, setInitialDayInventory] = useState<InventoryItem[]>([]);
+
+    useEffect(() => {
+        // When inventory first loads for the day, capture its state.
+        // This serves as the stable baseline for the day's opening stock calculations.
+        if (!loading && inventory.length > 0 && initialDayInventory.length === 0) {
+            setInitialDayInventory(inventory);
+        }
+    }, [inventory, loading, initialDayInventory.length]);
+
 
     const processedInventory = useMemo(() => {
         // Use the initial day's inventory for stable opening calculations.
@@ -190,19 +188,21 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         const inventoryToProcess = initialDayInventory.length > 0 ? initialDayInventory : inventory;
 
         return inventory.map(liveItem => {
+            // Find the corresponding item from the initial snapshot of the day.
             const initialItem = inventoryToProcess.find(i => i.id === liveItem.id) || liveItem;
 
-            const prevStock = Number(initialItem.prevStock || 0);
-            const added = Number(liveItem.added || 0); // Use live 'added'
-            const sales = Number(liveItem.sales || 0); // Use live 'sales'
+            // Use live values for fields that can be edited during the day.
+            const added = Number(liveItem.added || 0);
+            const sales = Number(liveItem.sales || 0);
 
-            // **THE FIX**: Opening is always calculated from the day's starting prevStock.
-            const opening = prevStock + added;
+            // **THE FIX**: Opening is always calculated from the day's starting `prevStock`.
+            // It is not affected by the EOD process updating the `prevStock` for the next day.
+            const opening = Number(initialItem.prevStock || 0) + added;
             const closing = opening - sales;
-
+            
             return {
                 ...liveItem,
-                prevStock: prevStock, // Show the day's starting prevStock
+                prevStock: Number(initialItem.prevStock || 0), // Show the day's starting prevStock
                 added,
                 sales,
                 opening,
@@ -210,6 +210,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
             };
         });
     }, [inventory, initialDayInventory]);
+
 
     const filteredInventory = useMemo(() => {
         return processedInventory.filter(item => {
