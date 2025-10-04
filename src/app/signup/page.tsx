@@ -10,6 +10,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { differenceInYears } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -31,7 +32,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { ADMIN_UIDS } from '@/lib/constants';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Eye, EyeOff } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
@@ -40,7 +41,10 @@ const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email address'),
     phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number is too long'),
-    dob: z.date({ required_error: 'Date of birth is required.' }),
+    dob: z.date({ required_error: 'Date of birth is required.' })
+      .refine(date => differenceInYears(new Date(), date) >= 20, {
+        message: 'You must be at least 20 years old to sign up.',
+      }),
     aadhaar: z.string().length(12, 'Aadhaar number must be 12 digits'),
     pan: z.string().length(10, 'PAN number must be 10 characters').regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -57,6 +61,8 @@ export default function SignupPage() {
   const { toast } = useToast();
   const { formatDate } = useDateFormat();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const form = useForm<SignupFormValues>({
       resolver: zodResolver(formSchema),
@@ -152,7 +158,7 @@ export default function SignupPage() {
                                 </Button>
                                 </FormControl>
                             </PopoverTrigger><PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus captionLayout="dropdown-buttons" fromYear={1900} toYear={new Date().getFullYear()}/>
+                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus captionLayout="dropdown-buttons" fromYear={1900} toYear={new Date().getFullYear() - 20}/>
                             </PopoverContent></Popover>
                         <FormMessage /></FormItem>
                     )} />
@@ -166,10 +172,46 @@ export default function SignupPage() {
                     )} />
                 </div>
                 <FormField control={form.control} name="password" render={({ field }) => (
-                    <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <div className="relative">
+                             <FormControl>
+                                <Input type={showPassword ? 'text' : 'password'} {...field} disabled={loading} className="pr-10" />
+                             </FormControl>
+                             <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
+                                onClick={() => setShowPassword(prev => !prev)}
+                            >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
+                            </Button>
+                        </div>
+                        <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                    <FormItem><FormLabel>Confirm Password</FormLabel><FormControl><Input type="password" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <div className="relative">
+                            <FormControl>
+                                <Input type={showConfirmPassword ? 'text' : 'password'} {...field} disabled={loading} className="pr-10" />
+                            </FormControl>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
+                                onClick={() => setShowConfirmPassword(prev => !prev)}
+                            >
+                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                <span className="sr-only">{showConfirmPassword ? 'Hide password' : 'Show password'}</span>
+                            </Button>
+                        </div>
+                        <FormMessage />
+                    </FormItem>
                 )} />
 
               <Button type="submit" className="w-full" disabled={loading}>
@@ -189,5 +231,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
-    
