@@ -420,7 +420,7 @@ export default function GodownPage() {
                                                         <Archive className="mr-2 h-4 w-4" />
                                                         Transfer to Shop
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'onbar')} disabled={!['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine'].includes(item.category)}>
+                                                    <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'onbar')} disabled={item.category === 'IML'}>
                                                          <GlassWater className="mr-2 h-4 w-4" />
                                                         Transfer to On-Bar
                                                     </DropdownMenuItem>

@@ -43,6 +43,7 @@ export type OnBarItem = {
   pegPrice30ml?: number;
   pegPrice60ml?: number;
   openedAt: any;
+  source: 'godown' | 'manual'; // Track where the bottle came from
 };
 
 export type DailyOnBarSale = {
@@ -540,6 +541,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 totalQuantity: quantity,
                 salesVolume: 0,
                 salesValue: 0,
+                source: 'godown',
             };
 
             if (!isBeer && pegPrices) {
@@ -662,6 +664,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             totalQuantity: isBeer ? quantity : 1,
             salesVolume: 0,
             salesValue: 0,
+            source: 'manual' // Manually opened from shop inventory
         };
 
         if (!isBeer && pegPrices) {
@@ -831,7 +834,8 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
             const onBarItemData = onBarItemDoc.data() as OnBarItem;
             
-            if (onBarItemData.inventoryId && onBarItemData.salesVolume === 0) {
+            // Only return stock if the item came from godown AND has not been sold from.
+            if (onBarItemData.source === 'godown' && onBarItemData.salesVolume === 0) {
                  const masterItemRef = doc(db, "inventory", onBarItemData.inventoryId);
                  const masterItemDoc = await transaction.get(masterItemRef);
 
