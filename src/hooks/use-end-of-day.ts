@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from 'react';
@@ -28,7 +29,6 @@ export function useEndOfDay() {
       const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
 
       // This process will now ONLY update the prevStock in the master inventory.
-      // It no longer touches the next day's data, which was causing the issue.
       inventorySnapshot.forEach((doc) => {
         const item = { id: doc.id, ...doc.data() } as InventoryItem;
         const dailyItem = dailyData[item.id] || {};
@@ -40,12 +40,6 @@ export function useEndOfDay() {
         // Update the master inventory item's prevStock for the start of the next day.
         const inventoryUpdateRef = doc.ref;
         batch.update(inventoryUpdateRef, { prevStock: closing < 0 ? 0 : closing });
-      });
-
-      // Also reset on-bar sales data (this part was correct)
-      const onBarSnapshot = await getDocs(collection(db, 'onBarInventory'));
-      onBarSnapshot.forEach((doc) => {
-        batch.update(doc.ref, { salesVolume: 0, salesValue: 0 });
       });
 
       await batch.commit();
