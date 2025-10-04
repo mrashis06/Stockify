@@ -55,6 +55,8 @@ function Calendar({
         day_hidden: "invisible",
         ...classNames,
       }}
+      hideNext
+      hidePrevious
       components={{
         Dropdown: ({ value, onChange, children, ...props }: DropdownProps) => {
           const options = React.Children.toArray(children) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[];
