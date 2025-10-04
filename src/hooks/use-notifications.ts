@@ -13,9 +13,9 @@ export type Notification = {
     description: string;
     readBy: string[]; // Array of user UIDs who have read it
     createdAt: any; // Firestore Timestamp
-    type: 'low-stock' | 'info' | 'staff-request' | 'staff-broadcast';
+    type: 'low-stock' | 'info' | 'staff-request' | 'staff-broadcast' | 'shared';
     link?: string;
-    target?: 'admin' | 'staff'; // Specify who the notification is for
+    target?: 'admin' | 'staff' | 'all'; // Specify who the notification is for
     author?: string; // Who sent the notification
     productId?: string; // To link notification to a specific product
 };
@@ -32,32 +32,23 @@ export function useNotifications() {
             setLoading(true);
             const notificationsRef = collection(db, `shops/${user.shopId}/notifications`);
             
-            // Simplified query to avoid composite index requirement.
-            // We will filter by target on the client-side.
+            // Listen for notifications targeted to 'all' or the user's specific role.
             const q = query(notificationsRef, orderBy('createdAt', 'desc'), limit(50));
 
             const unsubscribe = onSnapshot(q, (snapshot) => {
                 const allNotifications: Notification[] = [];
                 snapshot.forEach(doc => {
-                    const data = doc.data();
                     allNotifications.push({ 
                         id: doc.id, 
-                        readBy: data.readBy || [], // Ensure readBy is always an array
-                        ...data,
+                        readBy: doc.data().readBy || [], // Ensure readBy is always an array
+                        ...doc.data(),
                      } as Notification);
                 });
 
-                // Perform client-side filtering based on user role
+                // Perform client-side filtering
                 const userRole = user.role;
                 const filteredNotifications = allNotifications.filter(n => {
-                    if (userRole === 'admin') {
-                        // Admin sees low-stock, info, and other admin-targeted notifications
-                        return n.target === 'admin';
-                    } else if (userRole === 'staff') {
-                        // Staff sees staff-broadcasts
-                        return n.target === 'staff';
-                    }
-                    return false; // Should not happen for logged-in users
+                    return n.target === 'all' || n.target === userRole;
                 });
 
                 setNotifications(filteredNotifications);
@@ -115,6 +106,32 @@ export const createAdminNotification = async (shopId: string, data: Omit<Notific
         });
     } catch (error) {
         console.error("Failed to create admin notification:", error);
+    }
+};
+
+// NEW: Function for creating notifications targeted to both Admins and Staff
+export const createSharedNotification = async (shopId: string, data: Omit<NotificationData, 'target'>) => {
+    try {
+        const notificationRef = collection(db, `shops/${shopId}/notifications`);
+        
+        // Prevent duplicate low-stock alerts within a short time frame for anyone
+        if (data.type === 'low-stock' && data.productId) {
+            const q = query(notificationRef, where("type", "==", "low-stock"), where("productId", "==", data.productId), limit(1));
+            const existing = await getDocs(q);
+            if (!existing.empty) {
+                // An alert for this product already exists.
+                return;
+            }
+        }
+
+        await addDoc(notificationRef, {
+            ...data,
+            target: 'all', // Target everyone in the shop
+            readBy: [],
+            createdAt: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error("Failed to create shared notification:", error);
     }
 };
 

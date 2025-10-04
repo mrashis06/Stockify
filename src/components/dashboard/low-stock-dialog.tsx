@@ -69,7 +69,7 @@ export default function LowStockDialog({ isOpen, onOpenChange, lowStockItems, ou
             Stock Alerts
           </DialogTitle>
           <DialogDescription>
-            The following items need your attention. Items that were newly added today are excluded from this list.
+            The following items need your attention.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">

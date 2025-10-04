@@ -24,6 +24,7 @@ import { usePageLoading } from "@/hooks/use-loading";
 import LowStockDialog from "@/components/dashboard/low-stock-dialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { createSharedNotification } from "@/hooks/use-notifications";
 
 
 const categories = [
@@ -36,7 +37,7 @@ const categories = [
 ];
 
 export default function DashboardPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
-  const { user } = useAuth();
+  const { user, shopId } = useAuth();
   const router = useRouter();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,11 +169,11 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         const openingStock = item.opening ?? 0;
         
         // Skip items that are not in the shop inventory for the day.
-        if (openingStock === 0) {
+        if (openingStock <= 0) {
             return;
         }
 
-        if (closingStock === 0) {
+        if (closingStock <= 0) {
             out.push(item);
         } else if (closingStock > 0 && closingStock < 10) {
             low.push(item);
@@ -181,6 +182,29 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     
     return { lowStockItems: low, outOfStockItems: out };
   }, [processedInventory]);
+
+  useEffect(() => {
+    if (shopId && !loading) {
+        lowStockItems.forEach(item => {
+            createSharedNotification(shopId, {
+                title: 'Low Stock Alert',
+                description: `${item.brand} (${item.size}) is low on stock. Remaining: ${item.closing} units.`,
+                type: 'low-stock',
+                productId: item.id,
+                link: '/dashboard/inventory'
+            });
+        });
+        outOfStockItems.forEach(item => {
+            createSharedNotification(shopId, {
+                title: 'Out of Stock Alert',
+                description: `${item.brand} (${item.size}) is now out of stock.`,
+                type: 'low-stock',
+                productId: item.id,
+                link: '/dashboard/inventory'
+            });
+        });
+    }
+  }, [lowStockItems, outOfStockItems, shopId, loading]);
 
   const totalAlerts = lowStockItems.length + outOfStockItems.length;
 
