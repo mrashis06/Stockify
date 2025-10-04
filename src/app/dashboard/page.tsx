@@ -168,14 +168,14 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         const closingStock = item.closing ?? 0;
         const openingStock = item.opening ?? 0;
         
-        // Skip items that are not in the shop inventory for the day.
+        // Skip items that were never in the shop inventory today
         if (openingStock <= 0) {
             return;
         }
 
         if (closingStock <= 0) {
             out.push(item);
-        } else if (closingStock > 0 && closingStock < 10) {
+        } else if (closingStock < 10) {
             low.push(item);
         }
     });
@@ -335,5 +335,3 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
