@@ -20,7 +20,6 @@ import { useInventory, OnBarItem } from '@/hooks/use-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
-import { useEndOfDay } from '@/hooks/use-end-of-day';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
@@ -28,14 +27,15 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         onBarInventory, 
         dailyOnBarSales,
         loading, 
+        saving,
         sellPeg, 
         removeOnBarItem, 
         refillPeg, 
         addOnBarItem,
         totalOnBarSales,
+        endOfDayOnBar,
     } = useInventory();
     
-    const { isEndingDay, endOfDayProcess } = useEndOfDay();
     const { toast } = useToast();
     
     usePageLoading(loading);
@@ -107,13 +107,13 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const handleEndOfDay = async () => {
         setIsEndOfDayDialogOpen(false);
         try {
-            await endOfDayProcess();
+            await endOfDayOnBar();
             toast({
-                title: 'End of Day Processed',
-                description: "Today's closing stock has been set as tomorrow's opening stock."
+                title: 'On-Bar EOD Processed',
+                description: "Today's closing volumes have been set as tomorrow's opening volumes for all open bottles."
             });
         } catch (error) {
-            console.error("End of day process failed:", error);
+            console.error("On-Bar end of day process failed:", error);
             toast({
                 title: 'End of Day Failed',
                 description: (error as Error).message || 'An unexpected error occurred.',
@@ -147,15 +147,15 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             <AlertDialog open={isEndOfDayDialogOpen} onOpenChange={setIsEndOfDayDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>End of Day Process</AlertDialogTitle>
+                        <AlertDialogTitle>On-Bar End of Day</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will finalize today's numbers and set the opening stock for tomorrow. You should run this as the last action of your business day. Are you sure you want to continue?
+                            This will reset today's sales for open bottles and set their opening stock for tomorrow to what's currently remaining. This action only affects on-bar items. Continue?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleEndOfDay} disabled={isEndingDay}>
-                             {isEndingDay ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        <AlertDialogAction onClick={handleEndOfDay} disabled={saving}>
+                             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             Confirm End of Day
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -168,7 +168,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
                         <Plus className="mr-2 h-4 w-4" /> Open a Bottle
                     </Button>
-                    <Button onClick={() => setIsEndOfDayDialogOpen(true)} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isEndingDay}>
+                    <Button onClick={() => setIsEndOfDayDialogOpen(true)} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={saving}>
                         <LogOut className="mr-2 h-4 w-4" /> End of Day
                     </Button>
                 </div>

@@ -13,9 +13,9 @@ export function useEndOfDay() {
   const [isEndingDay, setIsEndingDay] = useState(false);
 
   /**
-   * Processes the end of day by updating the master inventory's `prevStock`
+   * Processes the end of day for the Off-Counter inventory by updating the master inventory's `prevStock`
    * with the final closing stock values calculated on the client.
-   * This function does not perform calculations; it only writes the provided data.
+   * This function only writes the provided data.
    * @param finalInventoryState The array of inventory items with the final `closing` stock values.
    */
   const endOfDayProcess = async (finalInventoryState: InventoryItem[]) => {
@@ -23,14 +23,18 @@ export function useEndOfDay() {
 
     try {
       if (!finalInventoryState || finalInventoryState.length === 0) {
-        throw new Error("No inventory data provided to process.");
+        // This is not an error if there's simply no off-counter inventory to process.
+        // It might be an EOD process from the On-Bar page.
+        console.log("No Off-Counter inventory data provided to process.");
+        return;
       }
 
       const batch = writeBatch(db);
 
       finalInventoryState.forEach((item) => {
         // We only care about items that are actually in the shop inventory
-        if (item.opening && item.opening > 0) {
+        const openingStock = item.opening ?? 0;
+        if (openingStock > 0) {
             const inventoryUpdateRef = doc(db, 'inventory', item.id);
             const finalClosingStock = item.closing ?? 0;
             
@@ -42,8 +46,8 @@ export function useEndOfDay() {
       await batch.commit();
 
     } catch (error) {
-      console.error("Error during end of day process: ", error);
-      throw new Error("Failed to process end of day. " + (error as Error).message);
+      console.error("Error during Off-Counter end of day process: ", error);
+      throw new Error("Failed to process Off-Counter EOD. " + (error as Error).message);
     } finally {
       setIsEndingDay(false);
     }

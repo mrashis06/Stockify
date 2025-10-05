@@ -111,6 +111,7 @@ type InventoryState = {
   sellPeg: (id: string, pegSize: 30 | 60 | 'custom', customVolume?: number, customPrice?: number) => Promise<void>;
   refillPeg: (id: string, amount: number) => Promise<void>;
   removeOnBarItem: (id: string) => Promise<void>;
+  endOfDayOnBar: () => Promise<void>;
 
   // Internal state management
   _setLoading: (isLoading: boolean) => void;
@@ -856,6 +857,44 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         get()._setSaving(false);
     }
   },
+
+    endOfDayOnBar: async () => {
+        get()._setSaving(true);
+        try {
+            const onBarItems = get().onBarInventory;
+            if (onBarItems.length === 0) {
+                toast({ title: "No items on bar", description: "There are no open bottles to process." });
+                return;
+            };
+
+            const batch = writeBatch(db);
+            onBarItems.forEach(item => {
+                const itemRef = doc(db, 'onBarInventory', item.id);
+                if (item.category === 'Beer') {
+                    // For beer, 'remainingVolume' is the count. This becomes the new total quantity.
+                     batch.update(itemRef, {
+                        totalQuantity: item.remainingVolume,
+                        salesVolume: 0,
+                        salesValue: 0,
+                    });
+                } else {
+                    // For liquor, the 'remainingVolume' becomes the new 'totalVolume'
+                    batch.update(itemRef, {
+                        totalVolume: item.remainingVolume,
+                        salesVolume: 0,
+                        salesValue: 0,
+                    });
+                }
+            });
+            await batch.commit();
+
+        } catch (error) {
+            console.error("Error during On-Bar end of day process: ", error);
+            throw error;
+        } finally {
+            get()._setSaving(false);
+        }
+    },
 }));
 
 // Initialize listeners once
