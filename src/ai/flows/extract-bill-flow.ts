@@ -137,8 +137,7 @@ Existing Inventory to match against:
 {{{existingInventoryString}}}
 
 Return the final result as valid JSON.
-`,
-  model: 'googleai/gemini-1.5-flash',
+`
 });
 
 
