@@ -257,8 +257,10 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             existingInventory: currentInventory,
         });
 
-        const processedBillRef = doc(db, 'processed_bills', result.billId);
+        const sanitizedBillId = result.billId.replace(/\//g, '-');
+        const processedBillRef = doc(db, 'processed_bills', sanitizedBillId);
         const processedBillSnap = await getDoc(processedBillRef);
+
         if (processedBillSnap.exists()) {
             throw new Error(`Bill with ID ${result.billId} has already been processed.`);
         }
@@ -286,8 +288,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             });
         }
         
-        // Mark bill as processed
-        batch.set(processedBillRef, { processedAt: serverTimestamp() });
+        batch.set(processedBillRef, { processedAt: serverTimestamp(), originalId: result.billId });
 
         await batch.commit();
         
