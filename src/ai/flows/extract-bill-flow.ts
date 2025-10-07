@@ -38,6 +38,7 @@ export type BillExtractionInput = z.infer<typeof BillExtractionInputSchema>;
 
 // Define the output schema for the flow
 const BillExtractionOutputSchema = z.object({
+  billId: z.string().describe("A unique invoice number, bill number, or receipt ID found on the bill. This is mandatory."),
   matchedItems: z.array(z.object({
       productId: z.string().describe("The ID of the matched product from the existing inventory."),
       quantity: z.number().describe("The quantity of the matched product."),
@@ -66,9 +67,11 @@ const billExtractionPrompt = ai.definePrompt({
     format: 'json'
   },
   prompt: `
-You are an expert data entry and matching agent for a liquor store. Your task is to extract all line items from the provided bill and match them against the user's existing inventory with very high accuracy.
+You are an expert data entry and matching agent for a liquor store. Your task is to extract all line items from the provided bill and match them against the user's existing inventory with very high accuracy. You must also extract a unique Bill ID.
 
 INSTRUCTIONS:
+
+0.  **Extract Bill ID:** Find a unique identifier on the bill. This could be labeled "Invoice No.", "Bill No.", "Receipt #", etc. This is a mandatory field. If no clear ID is found, create a unique ID from the date and a prominent number on the bill.
 
 1.  **Extract Details:** For each line item on the bill, extract:
     *   **brand:** The brand name (e.g., "Old Monk", "Kingfisher Ultra").
@@ -85,51 +88,6 @@ INSTRUCTIONS:
 3.  **Categorize Results:**
     *   If a **strict match** is found: Add the item to the \`matchedItems\` array. You must provide the \`productId\` from the \`existingInventory\` and the \`quantity\` from the bill.
     *   If **no strict match** is found: This is a new or different product. Add its full extracted details (brand, size, quantity, category) to the \`unmatchedItems\` array for manual user review.
-
-**EXAMPLES:**
-
-*Bill shows:*
-1.  "McDowell's No.1 750ml - 10 units"
-2.  "Tuborg Beer 650ml - 5 units"
-3.  "Seagrams Royal Stag 750ml - 8 units"
-4.  "I Blue 750ml - 3 units"
-
-*existingInventory contains:*
-1.  { id: 'mcdowells_750', brand: 'McDowells', size: '750' }
-2.  { id: 'royalstag_barrel_750', brand: 'Royal Stag Barrel', size: '750' }
-3.  { id: 'imperial_blue_750', brand: 'I Blue', size: '750' }
-
-
-*Expected JSON Output:*
-\`\`\`json
-{
-  "matchedItems": [
-    {
-      "productId": "mcdowells_750",
-      "quantity": 10
-    },
-    {
-      "productId": "imperial_blue_750",
-      "quantity": 3
-    }
-  ],
-  "unmatchedItems": [
-    {
-      "brand": "Tuborg Beer",
-      "size": "650",
-      "quantity": 5,
-      "category": "Beer"
-    },
-    {
-      "brand": "Seagrams Royal Stag",
-      "size": "750",
-      "quantity": 8,
-      "category": "Whiskey"
-    }
-  ]
-}
-\`\`\`
-*Explanation for the example: "Seagrams Royal Stag" from the bill did NOT match "Royal Stag Barrel" from inventory because the word "Barrel" was missing. It was correctly placed in \`unmatchedItems\`. "I Blue" from the bill correctly matched "I Blue" from inventory as a common abbreviation.*
 
 
 Bill document to process: {{media url=billDataUri}}
@@ -157,6 +115,9 @@ const extractBillFlow = ai.defineFlow(
         
         if (!output) {
             throw new Error("The AI model did not return a valid response. It might be temporarily unavailable.");
+        }
+        if (!output.billId) {
+             throw new Error("The AI model failed to extract a Bill ID from the document.");
         }
         return output;
 

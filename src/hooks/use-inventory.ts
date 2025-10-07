@@ -257,6 +257,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             existingInventory: currentInventory,
         });
 
+        const processedBillRef = doc(db, 'processed_bills', result.billId);
+        const processedBillSnap = await getDoc(processedBillRef);
+        if (processedBillSnap.exists()) {
+            throw new Error(`Bill with ID ${result.billId} has already been processed.`);
+        }
+
         const batch = writeBatch(db);
 
         if (result.matchedItems && result.matchedItems.length > 0) {
@@ -280,6 +286,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             });
         }
         
+        // Mark bill as processed
+        batch.set(processedBillRef, { processedAt: serverTimestamp() });
+
         await batch.commit();
         
         return {
@@ -599,8 +608,8 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
  updateItemField: async (id, field, value) => {
     get()._setSaving(true);
     try {
-        const today = format(new Date(), 'yyyy-MM-dd');
         await runTransaction(db, async (transaction) => {
+            const today = format(new Date(), 'yyyy-MM-dd');
             const masterRef = doc(db, 'inventory', id);
             const dailyRef = doc(db, 'dailyInventory', today);
 
@@ -610,15 +619,14 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const dailyDoc = await transaction.get(dailyRef);
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             const masterData = masterDoc.data() as InventoryItem;
-            const currentItemDaily = dailyData[id] || {};
             
-            const updateData: any = {
+            const currentItemDaily = dailyData[id] || {
                 brand: masterData.brand,
                 size: masterData.size,
                 category: masterData.category,
                 price: masterData.price,
-                added: Number(currentItemDaily.added ?? 0),
-                sales: Number(currentItemDaily.sales ?? 0),
+                added: 0,
+                sales: 0,
             };
 
             if (field === 'added') {
@@ -631,15 +639,16 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     if (newGodownStock < 0) throw new Error("This change would result in negative godown stock.");
                     transaction.update(masterRef, { stockInGodown: newGodownStock });
                 }
-                updateData.added = newValue;
+                currentItemDaily.added = newValue;
             } else if (field === 'price') {
-                updateData.price = Number(value);
-                transaction.update(masterRef, { price: Number(value) });
+                const newPrice = Number(value);
+                currentItemDaily.price = newPrice;
+                transaction.update(masterRef, { price: newPrice });
             } else {
-                 updateData[field] = Number(value);
+                 currentItemDaily[field] = Number(value);
             }
             
-            transaction.set(dailyRef, { [id]: updateData }, { merge: true });
+            transaction.set(dailyRef, { [id]: currentItemDaily }, { merge: true });
         });
     } catch (error) {
         console.error(`Error updating field ${field}:`, error);
