@@ -94,7 +94,7 @@ type InventoryState = {
   initListeners: () => () => void;
   forceRefetch: () => Promise<void>;
   addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {prevStock: number}) => Promise<void>;
-  processScannedBill: (billDataUri: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
+  processScannedBill: (billDataUri: string, fileName: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
   updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
   linkBarcodeToProduct: (sourceProductId: string, destinationProductId: string) => Promise<void>;
@@ -249,9 +249,17 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  processScannedBill: async (billDataUri: string) => {
+  processScannedBill: async (billDataUri, fileName) => {
     get()._setSaving(true);
     try {
+        const billId = fileName; // Use the filename as the unique ID
+        const processedBillRef = doc(db, 'processed_bills', billId);
+        const processedBillSnap = await getDoc(processedBillRef);
+
+        if (processedBillSnap.exists()) {
+            throw new Error(`Bill with name "${billId}" has already been processed.`);
+        }
+        
         const currentInventory = get().inventory.map(item => ({
             id: item.id,
             brand: item.brand,
@@ -262,18 +270,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             billDataUri,
             existingInventory: currentInventory,
         });
-
-        if (!result.billId) {
-            throw new Error("The AI failed to extract a Bill ID. Please check the bill image quality and try again.");
-        }
-        
-        const sanitizedBillId = result.billId.replace(/\//g, '-');
-        const processedBillRef = doc(db, 'processed_bills', sanitizedBillId);
-        const processedBillSnap = await getDoc(processedBillRef);
-
-        if (processedBillSnap.exists()) {
-            throw new Error(`Bill with ID ${result.billId} has already been processed.`);
-        }
 
         const batch = writeBatch(db);
 
@@ -298,7 +294,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             });
         }
         
-        batch.set(processedBillRef, { processedAt: serverTimestamp(), originalId: result.billId });
+        batch.set(processedBillRef, { processedAt: serverTimestamp(), originalName: billId });
 
         await batch.commit();
         

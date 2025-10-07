@@ -79,7 +79,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
         reader.onload = async (event) => {
             const dataUri = event.target?.result as string;
             try {
-                const processResult = await processScannedBill(dataUri);
+                const processResult = await processScannedBill(dataUri, file.name);
                 setResult(processResult);
                 toast({
                     title: "Bill Processed Successfully",
@@ -93,7 +93,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                 if (errorMessage.includes("quota")) {
                     setError("Could not process bill. The AI service quota may be exceeded. Please check your API key billing status or try again later.");
                 } else {
-                    setError("An error occurred while processing the bill. The AI might be unavailable, or the file could be corrupted.");
+                    setError(errorMessage); // Display the specific error message from the hook
                 }
             } finally {
                 setIsLoading(false);

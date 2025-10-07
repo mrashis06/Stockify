@@ -38,7 +38,6 @@ export type BillExtractionInput = z.infer<typeof BillExtractionInputSchema>;
 
 // Define the output schema for the flow
 const BillExtractionOutputSchema = z.object({
-  billId: z.string().describe("A unique invoice number, bill number, or receipt ID found on the bill. This is mandatory."),
   matchedItems: z.array(z.object({
       productId: z.string().describe("The ID of the matched product from the existing inventory."),
       quantity: z.number().describe("The quantity of the matched product."),
@@ -67,13 +66,11 @@ const billExtractionPrompt = ai.definePrompt({
     format: 'json'
   },
   prompt: `
-You are an expert data entry and matching agent for a liquor store. Your task is to extract all line items from the provided bill and match them against the user's existing inventory with very high accuracy. You must also extract a unique Bill ID.
+You are an expert data entry and matching agent for a liquor store. Your task is to extract all line items from the provided bill and match them against the user's existing inventory with very high accuracy.
 
 INSTRUCTIONS:
 
-0.  **Extract Bill ID (Mandatory):** You MUST find a unique identifier on the bill. This could be labeled "Invoice No.", "Bill No.", "Receipt #", etc. This is a mandatory field. If you cannot find a clear, unique Bill ID on any page of the document, you must return an error and stop. Do NOT invent an ID.
-
-1.  **Process ALL Pages:** If the document is a multi-page PDF, you MUST process every single page to ensure all items and the correct Bill ID are extracted.
+1.  **Process ALL Pages:** If the document is a multi-page PDF, you MUST process every single page to ensure all items are extracted.
 
 2.  **Extract Details:** For each line item on the bill, extract:
     *   **brand:** The brand name (e.g., "Old Monk", "Kingfisher Ultra").
@@ -117,9 +114,6 @@ const extractBillFlow = ai.defineFlow(
         
         if (!output) {
             throw new Error("The AI model did not return a valid response. It might be temporarily unavailable.");
-        }
-        if (!output.billId || output.billId.trim() === '') {
-             throw new Error("The AI model failed to extract a unique Bill ID from the document. Please ensure the bill is clear and try again.");
         }
         return output;
 
