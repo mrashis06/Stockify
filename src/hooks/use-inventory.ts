@@ -257,6 +257,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             existingInventory: currentInventory,
         });
 
+        // **THE FIX IS HERE**: Sanitize the ID *before* checking the database.
         const sanitizedBillId = result.billId.replace(/\//g, '-');
         const processedBillRef = doc(db, 'processed_bills', sanitizedBillId);
         const processedBillSnap = await getDoc(processedBillRef);
@@ -288,6 +289,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             });
         }
         
+        // Use the same sanitized ID to save the record.
         batch.set(processedBillRef, { processedAt: serverTimestamp(), originalId: result.billId });
 
         await batch.commit();
@@ -646,7 +648,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 currentItemDaily.price = newPrice;
                 transaction.update(masterRef, { price: newPrice });
             } else {
-                 currentItemDaily[field] = Number(value);
+                 currentItemDaily[field] = Number(value) || 0;
             }
             
             transaction.set(dailyRef, { [id]: currentItemDaily }, { merge: true });
