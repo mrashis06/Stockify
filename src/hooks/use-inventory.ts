@@ -609,20 +609,32 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             
             const dailyDoc = await transaction.get(dailyRef);
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            const masterData = masterDoc.data();
-            const currentItemDaily = dailyData[id] || {};
+            const masterData = masterDoc.data() as InventoryItem;
+            const currentItemDaily = dailyData[id] || { added: 0, sales: 0 };
             
             const updateData: any = {
                 brand: masterData.brand,
                 size: masterData.size,
                 category: masterData.category,
                 price: masterData.price,
-                added: currentItemDaily.added || 0,
-                sales: currentItemDaily.sales || 0,
+                added: currentItemDaily.added,
+                sales: currentItemDaily.sales,
             };
 
-            if (field === 'price') {
-                updateData[field] = Number(value);
+            if (field === 'added') {
+                const oldValue = Number(currentItemDaily.added || 0);
+                const newValue = Number(value);
+                const difference = oldValue - newValue; // If new value is smaller, difference is positive.
+                
+                // Return the difference to godown stock
+                if (difference !== 0) {
+                    const newGodownStock = (masterData.stockInGodown || 0) + difference;
+                    if (newGodownStock < 0) throw new Error("This change would result in negative godown stock.");
+                    transaction.update(masterRef, { stockInGodown: newGodownStock });
+                }
+                updateData.added = newValue;
+            } else if (field === 'price') {
+                updateData.price = Number(value);
                 transaction.update(masterRef, { price: Number(value) });
             } else {
                  updateData[field] = Number(value);
