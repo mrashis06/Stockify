@@ -400,6 +400,7 @@ export default function GodownPage() {
                                         <TableCell>{item.size}</TableCell>
                                         <TableCell>
                                             <Input
+                                                key={item.id + '-' + item.stockInGodown}
                                                 type="number"
                                                 className="h-8 w-24 bg-card"
                                                 defaultValue={item.stockInGodown || 0}
