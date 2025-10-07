@@ -260,15 +260,16 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             throw new Error(`Bill with name "${billId}" has already been processed.`);
         }
         
-        const currentInventory = get().inventory.map(item => ({
-            id: item.id,
-            brand: item.brand,
-            size: item.size
-        }));
+        // Filter inventory to only include items with godown stock > 0
+        const inStockInventory = get().inventory.filter(item => (item.stockInGodown || 0) > 0);
 
         const result: BillExtractionOutput = await extractItemsFromBill({
             billDataUri,
-            existingInventory: currentInventory,
+            existingInventory: inStockInventory.map(item => ({
+                id: item.id,
+                brand: item.brand,
+                size: item.size
+            })),
         });
 
         const batch = writeBatch(db);
