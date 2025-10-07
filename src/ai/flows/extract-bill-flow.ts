@@ -138,9 +138,11 @@ Existing Inventory to match against:
 
 Return the final result as valid JSON.
 `,
-  model: 'googleai/gemini-2.5-flash',
-  requestOptions: {
-    timeout: 120000, // 120 seconds to prevent cold start and complex bill timeouts
+  model: 'googleai/gemini-1.5-flash',
+  config: {
+    requestOptions: {
+        timeout: 120000, // 120 seconds to prevent cold start and complex bill timeouts
+    },
   },
 });
 
