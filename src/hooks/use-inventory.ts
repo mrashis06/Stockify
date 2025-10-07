@@ -195,7 +195,13 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             snapshot.forEach(doc => {
                 unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
             });
-            set({ unprocessedItems: unprocessed.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()) });
+            set({ 
+                unprocessedItems: unprocessed.sort((a, b) => {
+                    const timeA = a.createdAt?.toMillis() || 0;
+                    const timeB = b.createdAt?.toMillis() || 0;
+                    return timeB - timeA;
+                })
+            });
         });
         
         const onBarSub = onSnapshot(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')), (snapshot) => {
@@ -257,7 +263,10 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             existingInventory: currentInventory,
         });
 
-        // **THE FIX IS HERE**: Sanitize the ID *before* checking the database.
+        if (!result.billId) {
+            throw new Error("The AI failed to extract a Bill ID. Please check the bill image quality and try again.");
+        }
+        
         const sanitizedBillId = result.billId.replace(/\//g, '-');
         const processedBillRef = doc(db, 'processed_bills', sanitizedBillId);
         const processedBillSnap = await getDoc(processedBillRef);
@@ -289,7 +298,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             });
         }
         
-        // Use the same sanitized ID to save the record.
         batch.set(processedBillRef, { processedAt: serverTimestamp(), originalId: result.billId });
 
         await batch.commit();
