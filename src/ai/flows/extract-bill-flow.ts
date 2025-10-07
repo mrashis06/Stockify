@@ -71,21 +71,23 @@ You are an expert data entry and matching agent for a liquor store. Your task is
 
 INSTRUCTIONS:
 
-0.  **Extract Bill ID:** Find a unique identifier on the bill. This could be labeled "Invoice No.", "Bill No.", "Receipt #", etc. This is a mandatory field. If no clear ID is found, create a unique ID from the date and a prominent number on the bill.
+0.  **Extract Bill ID (Mandatory):** You MUST find a unique identifier on the bill. This could be labeled "Invoice No.", "Bill No.", "Receipt #", etc. This is a mandatory field. If you cannot find a clear, unique Bill ID on any page of the document, you must return an error and stop. Do NOT invent an ID.
 
-1.  **Extract Details:** For each line item on the bill, extract:
+1.  **Process ALL Pages:** If the document is a multi-page PDF, you MUST process every single page to ensure all items and the correct Bill ID are extracted.
+
+2.  **Extract Details:** For each line item on the bill, extract:
     *   **brand:** The brand name (e.g., "Old Monk", "Kingfisher Ultra").
     *   **size:** Extract ONLY the numeric value of the size. Discard units like "ml", "ML". (e.g., "750ml" -> "750").
     *   **quantity:** The number of units.
     *   **category:** The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
 
-2.  **Strictly Match Against Inventory:** For each extracted item, compare it to the \`existingInventory\` list.
+3.  **Strictly Match Against Inventory:** For each extracted item, compare it to the \`existingInventory\` list.
     *   A **MATCH** occurs ONLY IF the brand and size from the bill are a **near-perfect match** to an item in the inventory.
     *   Common abbreviations ARE acceptable (e.g., bill says "I Blue" and inventory has "Imperial Blue").
     *   Descriptive words are fine if they don't conflict (e.g., bill says "Seagrams Royal Stag Whiskey" and inventory has "Royal Stag").
     *   A **MISMATCH** occurs if there are conflicting words. For example, if the inventory has "Royal Stag **Barrel**" but the bill just says "Royal Stag", that is a MISMATCH. The extra word "Barrel" in the inventory item makes it a different product.
 
-3.  **Categorize Results:**
+4.  **Categorize Results:**
     *   If a **strict match** is found: Add the item to the \`matchedItems\` array. You must provide the \`productId\` from the \`existingInventory\` and the \`quantity\` from the bill.
     *   If **no strict match** is found: This is a new or different product. Add its full extracted details (brand, size, quantity, category) to the \`unmatchedItems\` array for manual user review.
 
@@ -116,8 +118,8 @@ const extractBillFlow = ai.defineFlow(
         if (!output) {
             throw new Error("The AI model did not return a valid response. It might be temporarily unavailable.");
         }
-        if (!output.billId) {
-             throw new Error("The AI model failed to extract a Bill ID from the document.");
+        if (!output.billId || output.billId.trim() === '') {
+             throw new Error("The AI model failed to extract a unique Bill ID from the document. Please ensure the bill is clear and try again.");
         }
         return output;
 
@@ -130,5 +132,3 @@ const extractBillFlow = ai.defineFlow(
     }
   }
 );
-
-    
