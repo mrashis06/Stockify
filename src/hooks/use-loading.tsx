@@ -60,7 +60,7 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
       set({ dataReady: true });
       // If progress animation is already done, hide the loader.
       if (get().progress >= 100) {
-          get().hideLoader();
+          setTimeout(() => get().hideLoader(), 300); // add a small delay
       }
   },
 
@@ -84,7 +84,7 @@ const useLoadingStore = create<LoadingStore & LoadingActions>((set, get) => ({
           clearInterval(intervalId);
           // If data is ready when animation finishes, hide the loader.
           if (state.dataReady) {
-            hideLoader();
+             setTimeout(() => hideLoader(), 300); // add a small delay
           }
           return { progress: 100, dynamicText: getDynamicText(100) };
         }
