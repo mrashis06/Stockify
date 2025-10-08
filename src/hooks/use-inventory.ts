@@ -433,35 +433,30 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 transaction.get(dailyRef)
             ]);
 
-            if (!sourceDoc.exists()) {
-                throw new Error("Source product to link from not found.");
-            }
-            if (!destDoc.exists()) {
-                 throw new Error("Destination product to link to not found.");
-            }
+            if (!sourceDoc.exists()) throw new Error("Source product to link from not found.");
+            if (!destDoc.exists()) throw new Error("Destination product to link to not found.");
 
             const sourceData = sourceDoc.data() as InventoryItem;
             const destData = destDoc.data() as InventoryItem;
             
-            if (!sourceData.barcodeId) {
-                throw new Error("Source product does not have a barcode to link.");
-            }
-             if (destData.barcodeId) {
-                throw new Error("Destination product already has a barcode mapped.");
+            if (!sourceData.barcodeId) throw new Error("Source product does not have a barcode to link.");
+            if (destData.barcodeId && destData.barcodeId !== sourceData.barcodeId) {
+                throw new Error("Destination product is already mapped to a different barcode.");
             }
             
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            const sourceDaily = dailyData[sourceProductId] || {};
-            const destDaily = dailyData[destinationProductId] || {};
+            const sourceDaily = dailyData[sourceProductId] || { added: 0, sales: 0 };
+            const destDaily = dailyData[destinationProductId] || { added: 0, sales: 0 };
             
-            const newGodownStock = (destData.stockInGodown || 0) + (sourceData.stockInGodown || 0);
-            const stockToMergeFromShop = (sourceData.prevStock || 0) + (sourceDaily.added || 0);
+            const totalStockToMerge = (sourceData.prevStock || 0) + (sourceDaily.added || 0);
 
+            // Update destination product
             transaction.update(destRef, {
                 barcodeId: destData.barcodeId || sourceData.barcodeId,
-                stockInGodown: newGodownStock,
+                stockInGodown: (destData.stockInGodown || 0) + (sourceData.stockInGodown || 0),
             });
             
+            // Update destination daily record
             transaction.set(dailyRef, {
                 [destinationProductId]: {
                     ...destDaily,
@@ -469,12 +464,16 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     size: destData.size,
                     category: destData.category,
                     price: destData.price,
-                    added: (destDaily.added || 0) + stockToMergeFromShop,
+                    added: (destDaily.added || 0) + totalStockToMerge,
                     sales: (destDaily.sales || 0) + (sourceDaily.sales || 0)
                 }
             }, { merge: true });
 
+            // Delete the source product
             transaction.delete(sourceRef);
+            
+            // Nullify the old daily record entry for the source product
+            transaction.set(dailyRef, { [sourceProductId]: null }, { merge: true });
         });
     } catch (error) {
         console.error("Error linking barcode: ", error);
@@ -718,6 +717,19 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 const newPrice = Number(value);
                 currentItemDaily.price = newPrice;
                 transaction.update(masterRef, { price: newPrice });
+            } else if (field === 'added') {
+                const oldValue = Number(currentItemDaily.added) || 0;
+                const newValue = Number(value) || 0;
+                const difference = newValue - oldValue;
+
+                if (difference < 0) { // Returning stock to godown
+                    const stockToReturn = -difference;
+                    const newGodownStock = (masterData.stockInGodown || 0) + stockToReturn;
+                    transaction.update(masterRef, { stockInGodown: newGodownStock });
+                }
+                // If stock is increased (difference > 0), we no longer check godown stock.
+                // This allows for manual additions from other sources.
+                currentItemDaily.added = newValue;
             } else {
                  currentItemDaily[field] = Number(value) || 0;
             }
