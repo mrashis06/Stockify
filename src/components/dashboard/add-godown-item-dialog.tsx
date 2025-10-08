@@ -40,7 +40,7 @@ const formSchema = z.object({
   quantity: z.coerce.number().int().min(1, 'Quantity must be at least 1'),
 });
 
-type AddGodownItemFormValues = z.infer<typeof formSchema>;
+export type AddGodownItemFormValues = z.infer<typeof formSchema>;
 
 type AddGodownItemDialogProps = {
   isOpen: boolean;

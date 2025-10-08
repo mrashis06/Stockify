@@ -48,6 +48,8 @@ import { useInventory, InventoryItem, UnprocessedItem } from '@/hooks/use-invent
 import ProcessDeliveryDialog from '@/components/dashboard/process-delivery-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDateFormat } from '@/hooks/use-date-format';
+import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
+import type { AddGodownItemFormValues } from '@/components/dashboard/add-godown-item-dialog';
 
 
 export default function GodownPage() {
@@ -63,6 +65,7 @@ export default function GodownPage() {
         forceRefetch,
         updateBrand,
         updateGodownStock,
+        addGodownItem,
     } = useInventory();
     
     usePageLoading(loading);
@@ -70,6 +73,7 @@ export default function GodownPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [isScanBillOpen, setIsScanBillOpen] = useState(false);
+    const [isAddDeliveryOpen, setIsAddDeliveryOpen] = useState(false);
     const [isTransferShopOpen, setIsTransferShopOpen] = useState(false);
     const [isTransferOnBarOpen, setIsTransferOnBarOpen] = useState(false);
     const [isProcessDeliveryOpen, setIsProcessDeliveryOpen] = useState(false);
@@ -94,6 +98,16 @@ export default function GodownPage() {
     const handleOpenProcessDialog = (item: any) => {
         setProcessingItem(item);
         setIsProcessDeliveryOpen(true);
+    }
+
+    const handleAddGodownItem = async (data: AddGodownItemFormValues) => {
+        try {
+            await addGodownItem(data);
+        } catch (error) {
+            console.error('Error adding item to godown:', error);
+            const errorMessage = (error as Error).message || 'Failed to add item.';
+            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+        }
     }
 
     const handleTransferToShop = async (productId: string, quantity: number, price?: number) => {
@@ -248,6 +262,11 @@ export default function GodownPage() {
             isOpen={isScanBillOpen}
             onOpenChange={setIsScanBillOpen}
         />
+        <AddGodownItemDialog
+            isOpen={isAddDeliveryOpen}
+            onOpenChange={setIsAddDeliveryOpen}
+            onAddItem={handleAddGodownItem}
+        />
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -353,6 +372,9 @@ export default function GodownPage() {
                                 ))}
                             </SelectContent>
                         </Select>
+                         <Button className="w-full sm:w-auto" onClick={() => setIsAddDeliveryOpen(true)}>
+                            <PackagePlus className="mr-2 h-4 w-4" /> Add Delivery
+                        </Button>
                         <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsScanBillOpen(true)}>
                             <FileScan className="mr-2 h-4 w-4" /> Scan Bill
                         </Button>

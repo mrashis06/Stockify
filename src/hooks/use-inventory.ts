@@ -27,6 +27,7 @@ import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { extractItemsFromBill, BillExtractionOutput } from '@/ai/flows/extract-bill-flow';
 import type { ExtractedItem } from '@/ai/flows/extract-bill-flow';
+import type { AddGodownItemFormValues } from '@/components/dashboard/add-godown-item-dialog';
 
 export type OnBarItem = {
   id: string;
@@ -94,6 +95,7 @@ type InventoryState = {
   initListeners: () => () => void;
   forceRefetch: () => Promise<void>;
   addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {prevStock: number}) => Promise<void>;
+  addGodownItem: (data: AddGodownItemFormValues) => Promise<void>;
   processScannedBill: (billDataUri: string, fileName: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
   updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
@@ -249,6 +251,51 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
+  addGodownItem: async (data: AddGodownItemFormValues) => {
+    get()._setSaving(true);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const normalizedBrand = data.brand.trim().toLowerCase();
+            const normalizedSize = data.size.trim().toLowerCase();
+            const invQuery = query(
+                collection(db, 'inventory'), 
+                where('brand', '==', data.brand), 
+                where('size', '==', data.size)
+            );
+            const querySnapshot = await getDocs(invQuery);
+
+            if (!querySnapshot.empty) {
+                // Product exists, update its godown stock
+                const existingDoc = querySnapshot.docs[0];
+                const currentStock = existingDoc.data().stockInGodown || 0;
+                transaction.update(existingDoc.ref, { 
+                    stockInGodown: currentStock + data.quantity,
+                    dateAddedToGodown: serverTimestamp(),
+                 });
+            } else {
+                // New product, create it
+                const newId = `manual_${normalizedBrand.replace(/[^a-z0-9]/g, '')}_${normalizedSize.replace(/[^a-z0-9]/g, '')}`;
+                const newProductRef = doc(db, 'inventory', newId);
+                transaction.set(newProductRef, {
+                    brand: data.brand.trim(),
+                    size: data.size.trim(),
+                    category: data.category,
+                    stockInGodown: data.quantity,
+                    price: 0, // Price to be set on first transfer to shop
+                    prevStock: 0,
+                    barcodeId: null,
+                    dateAddedToGodown: serverTimestamp(),
+                });
+            }
+        });
+    } catch (e) {
+        console.error("Error in addGodownItem transaction:", e);
+        throw new Error("Failed to add item to godown.");
+    } finally {
+        get()._setSaving(false);
+    }
+},
+
   processScannedBill: async (billDataUri, fileName) => {
     get()._setSaving(true);
     try {
@@ -402,34 +449,32 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const sourceDaily = dailyData[sourceProductId] || {};
             const destDaily = dailyData[destinationProductId] || {};
             
-            // Merge Godown Stock
             const newGodownStock = (destData.stockInGodown || 0) + (sourceData.stockInGodown || 0);
+            
+            // Merge shop stock: prevStock and added from source go into 'added' of destination
+            const totalAddedToMerge = (sourceData.prevStock || 0) + (sourceDaily.added || 0);
+            const newDestAdded = (destDaily.added || 0) + totalAddedToMerge;
 
-            // Merge Daily Shop Stock ('added' and 'prevStock')
-            const sourcePrevStock = sourceData.prevStock || 0;
-            const sourceAdded = sourceDaily.added || 0;
-            const destAdded = destDaily.added || 0;
-            const totalAddedToMerge = sourcePrevStock + sourceAdded;
-
-            const newDestAdded = destAdded + totalAddedToMerge;
-
-            // Update Destination Product
             transaction.update(destRef, {
                 barcodeId: destData.barcodeId || sourceData.barcodeId,
                 stockInGodown: newGodownStock,
             });
             
-            // Update Destination Daily Log
             transaction.set(dailyRef, {
                 [destinationProductId]: {
                     ...destDaily,
+                    brand: destData.brand, // Ensure metadata is present
+                    size: destData.size,
+                    category: destData.category,
+                    price: destData.price,
                     added: newDestAdded,
+                    sales: (destDaily.sales || 0) + (sourceDaily.sales || 0)
                 }
             }, { merge: true });
 
-            // Clean up source
             if (dailyData[sourceProductId]) {
-                transaction.update(dailyRef, { [sourceProductId]: deleteDoc_() }); // Firestore special sentinel for field deletion
+                const { [sourceProductId]: _, ...rest } = dailyData;
+                transaction.set(dailyRef, rest);
             }
             transaction.delete(sourceRef);
         });
