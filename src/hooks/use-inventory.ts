@@ -28,6 +28,8 @@ import { toast } from '@/hooks/use-toast';
 import { extractItemsFromBill, BillExtractionOutput } from '@/ai/flows/extract-bill-flow';
 import type { ExtractedItem } from '@/ai/flows/extract-bill-flow';
 import type { AddGodownItemFormValues } from '@/components/dashboard/add-godown-item-dialog';
+import { v4 as uuidv4 } from 'uuid';
+
 
 export type OnBarItem = {
   id: string;
@@ -229,7 +231,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
   addBrand: async (newItemData) => {
     get()._setSaving(true);
     try {
-        const id = `manual_${newItemData.brand.toLowerCase().replace(/[^a-z0-9]/g, '')}_${newItemData.size.toLowerCase().replace(/[^0-9]/g, '')}`;
+        const id = `manual_${uuidv4()}`;
         const docRef = doc(db, 'inventory', id);
 
         const masterItemData = {
@@ -255,12 +257,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     get()._setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
-            const normalizedBrand = data.brand.trim().toLowerCase();
-            const normalizedSize = data.size.trim().toLowerCase();
+            const normalizedBrand = data.brand.trim();
+            const normalizedSize = data.size.trim();
             const invQuery = query(
                 collection(db, 'inventory'), 
-                where('brand', '==', data.brand), 
-                where('size', '==', data.size)
+                where('brand', '==', normalizedBrand), 
+                where('size', '==', normalizedSize)
             );
             const querySnapshot = await getDocs(invQuery);
 
@@ -274,7 +276,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                  });
             } else {
                 // New product, create it
-                const newId = `manual_${normalizedBrand.replace(/[^a-z0-9]/g, '')}_${normalizedSize.replace(/[^a-z0-9]/g, '')}`;
+                const newId = `manual_${uuidv4()}`;
                 const newProductRef = doc(db, 'inventory', newId);
                 transaction.set(newProductRef, {
                     brand: data.brand.trim(),
@@ -431,8 +433,11 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 transaction.get(dailyRef)
             ]);
 
-            if (!sourceDoc.exists() || !destDoc.exists()) {
-                throw new Error("One or both products not found.");
+            if (!sourceDoc.exists()) {
+                throw new Error("Source product to link from not found.");
+            }
+            if (!destDoc.exists()) {
+                 throw new Error("Destination product to link to not found.");
             }
 
             const sourceData = sourceDoc.data() as InventoryItem;
@@ -441,8 +446,8 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             if (!sourceData.barcodeId) {
                 throw new Error("Source product does not have a barcode to link.");
             }
-            if (destData.barcodeId && destData.barcodeId !== sourceData.barcodeId) {
-                throw new Error("Destination product already has a different barcode mapped.");
+             if (destData.barcodeId) {
+                throw new Error("Destination product already has a barcode mapped.");
             }
             
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
@@ -450,10 +455,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const destDaily = dailyData[destinationProductId] || {};
             
             const newGodownStock = (destData.stockInGodown || 0) + (sourceData.stockInGodown || 0);
-            
-            // Merge shop stock: prevStock and added from source go into 'added' of destination
-            const totalAddedToMerge = (sourceData.prevStock || 0) + (sourceDaily.added || 0);
-            const newDestAdded = (destDaily.added || 0) + totalAddedToMerge;
+            const stockToMergeFromShop = (sourceData.prevStock || 0) + (sourceDaily.added || 0);
 
             transaction.update(destRef, {
                 barcodeId: destData.barcodeId || sourceData.barcodeId,
@@ -463,19 +465,15 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             transaction.set(dailyRef, {
                 [destinationProductId]: {
                     ...destDaily,
-                    brand: destData.brand, // Ensure metadata is present
+                    brand: destData.brand,
                     size: destData.size,
                     category: destData.category,
                     price: destData.price,
-                    added: newDestAdded,
+                    added: (destDaily.added || 0) + stockToMergeFromShop,
                     sales: (destDaily.sales || 0) + (sourceDaily.sales || 0)
                 }
             }, { merge: true });
 
-            if (dailyData[sourceProductId]) {
-                const { [sourceProductId]: _, ...rest } = dailyData;
-                transaction.set(dailyRef, rest);
-            }
             transaction.delete(sourceRef);
         });
     } catch (error) {
@@ -716,25 +714,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 sales: 0,
             };
 
-            if (field === 'added') {
-                const oldValue = Number(currentItemDaily.added || 0);
-                const newValue = Number(value);
-                const change = newValue - oldValue;
-                
-                if (change > 0) { // Only check godown if adding stock
-                    const godownStock = masterData.stockInGodown || 0;
-                    if (godownStock < change) {
-                        throw new Error(`Cannot add ${change} units. Only ${godownStock} available in Godown.`);
-                    }
-                    transaction.update(masterRef, { stockInGodown: godownStock - change });
-                } else if (change < 0) { // Return stock to godown if decreasing
-                    const godownStock = masterData.stockInGodown || 0;
-                    transaction.update(masterRef, { stockInGodown: godownStock - change }); // -change is positive
-                }
-                
-                currentItemDaily.added = newValue;
-
-            } else if (field === 'price') {
+            if (field === 'price') {
                 const newPrice = Number(value);
                 currentItemDaily.price = newPrice;
                 transaction.update(masterRef, { price: newPrice });
