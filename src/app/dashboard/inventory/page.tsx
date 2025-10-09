@@ -543,7 +543,3 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
-
-    

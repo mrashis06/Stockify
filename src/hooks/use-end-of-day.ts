@@ -14,10 +14,10 @@ export function useEndOfDay() {
   const [isEndingDay, setIsEndingDay] = useState(false);
 
   /**
-   * This function's ONLY responsibility is to update the master inventory's `prevStock` 
-   * with the final `closing` stock to prepare for the next day.
-   * It is a non-destructive action regarding the current day's logs, allowing
-   * sales to be edited even after it has been run.
+   * Processes the end-of-day by updating the master inventory's `prevStock` 
+   * for each item with its final closing stock for the day. This function
+   * is designed to be a simple "writer" and relies on the calling component
+   * to provide the correct final inventory state.
    * @param finalInventoryState The complete, final state of the inventory for the day.
    */
   const endOfDayProcess = async (finalInventoryState: InventoryItem[]) => {
@@ -32,8 +32,10 @@ export function useEndOfDay() {
       const batch = writeBatch(db);
 
       finalInventoryState.forEach((item) => {
-        // We only need to update the master record.
         const inventoryUpdateRef = doc(db, 'inventory', item.id);
+        
+        // The final closing stock is calculated on the page and passed in.
+        // This value will be used as the opening stock for the next day.
         const finalClosingStock = item.closing ?? 0;
         
         // Update master inventory's prevStock for the start of the next day.
@@ -52,5 +54,3 @@ export function useEndOfDay() {
 
   return { isEndingDay, endOfDayProcess };
 }
-
-    
