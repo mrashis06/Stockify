@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useToast } from '@/hooks/use-toast';
-import { useInventory, InventoryItem, OnBarItem, DailyOnBarSale } from '@/hooks/use-inventory';
+import { useInventory, InventoryItem, DailyOnBarSale } from '@/hooks/use-inventory';
 import { useEndOfDay } from '@/hooks/use-end-of-day';
 import {
   AlertDialog,
@@ -171,45 +171,25 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         }
     };
     
-    const [initialDayInventory, setInitialDayInventory] = useState<InventoryItem[]>([]);
-
-    useEffect(() => {
-        // When inventory first loads for the day, capture its state.
-        // This serves as the stable baseline for the day's opening stock calculations.
-        if (!loading && inventory.length > 0 && initialDayInventory.length === 0) {
-            setInitialDayInventory(inventory);
-        }
-    }, [inventory, loading, initialDayInventory.length]);
-
-
     const processedInventory = useMemo(() => {
-        // Use the initial day's inventory for stable opening calculations.
-        // Use the live inventory for the most recent sales/added data.
-        const inventoryToProcess = initialDayInventory.length > 0 ? initialDayInventory : inventory;
+        return inventory.map(item => {
+            const added = Number(item.added || 0);
+            const sales = Number(item.sales || 0);
+            const prevStock = Number(item.prevStock || 0);
 
-        return inventory.map(liveItem => {
-            // Find the corresponding item from the initial snapshot of the day.
-            const initialItem = inventoryToProcess.find(i => i.id === liveItem.id) || liveItem;
-
-            // Use live values for fields that can be edited during the day.
-            const added = Number(liveItem.added || 0);
-            const sales = Number(liveItem.sales || 0);
-
-            // **THE FIX**: Opening is always calculated from the day's starting `prevStock`.
-            // It is not affected by the EOD process updating the `prevStock` for the next day.
-            const opening = Number(initialItem.prevStock || 0) + added;
+            const opening = prevStock + added;
             const closing = opening - sales;
             
             return {
-                ...liveItem,
-                prevStock: Number(initialItem.prevStock || 0), // Show the day's starting prevStock
+                ...item,
                 added,
                 sales,
+                prevStock,
                 opening,
                 closing,
             };
         });
-    }, [inventory, initialDayInventory]);
+    }, [inventory]);
 
 
     const filteredInventory = useMemo(() => {
@@ -244,7 +224,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const grandTotalSales = totalOffCounterAmount + totalOnBarSales;
 
 
-  if (loading && initialDayInventory.length === 0) {
+  if (loading) {
     return null;
   }
 
@@ -559,3 +539,5 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    

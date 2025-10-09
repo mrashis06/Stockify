@@ -137,7 +137,8 @@ export default function ReportsPage() {
         reportData.forEach(entry => {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
-                if (item.sales && item.sales > 0 && item.price && item.brand && !productId.startsWith('on-bar-')) { // OffCounter
+                // OffCounter items are now saved with price and have `sales > 0`
+                if (item && item.sales > 0 && item.price > 0 && !productId.startsWith('on-bar-')) { 
                     const itemPrice = Number(item.price);
                     const existing = offCounterMap.get(productId);
                     if (existing) {
@@ -149,7 +150,7 @@ export default function ReportsPage() {
                             price: itemPrice, unitsSold: item.sales, totalAmount: item.sales * itemPrice,
                         });
                     }
-                } else if (item.salesValue && item.salesValue > 0 && productId.startsWith('on-bar-')) { // OnBar
+                } else if (item && item.salesValue > 0 && productId.startsWith('on-bar-')) { // OnBar
                      const existing = onBarMap.get(productId);
                      if (existing) {
                          existing.unitsSold += item.salesVolume;
@@ -190,7 +191,7 @@ export default function ReportsPage() {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
                 const matchesReportType = isOffCounter 
-                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
+                    ? (item.sales > 0 && item.price > 0 && !productId.startsWith('on-bar-')) 
                     : (item.salesValue > 0 && productId.startsWith('on-bar-'));
 
                 if (matchesReportType) {
@@ -243,7 +244,7 @@ export default function ReportsPage() {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
                  const matchesReportType = isOffCounter 
-                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
+                    ? (item.sales > 0 && item.price > 0 && !productId.startsWith('on-bar-')) 
                     : (item.salesValue > 0 && productId.startsWith('on-bar-'));
                 
                 if (matchesReportType) {
@@ -323,7 +324,7 @@ export default function ReportsPage() {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
                 const matchesReportType = isOffCounter 
-                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
+                    ? (item.sales > 0 && item.price > 0 && !productId.startsWith('on-bar-')) 
                     : (item.salesValue > 0 && productId.startsWith('on-bar-'));
 
                 if (matchesReportType) {
@@ -532,3 +533,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

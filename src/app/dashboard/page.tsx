@@ -129,23 +129,16 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     }, 0);
   }, [processedInventory]);
 
-  const calculateTotalSales = (salesData: any, inventoryMap: InventoryItem[]) => {
+  const calculateTotalSales = (salesData: any) => {
     let total = 0;
     for (const key in salesData) {
         if (Object.prototype.hasOwnProperty.call(salesData, key)) {
             const item = salesData[key];
             
-            // Handle On-Bar sales, which have a direct salesValue
-            if (item.salesValue && item.salesValue > 0) {
+            if (item && item.salesValue) { // For On-Bar sales which store direct value
                 total += Number(item.salesValue);
-            } 
-            // Handle Off-Counter sales
-            else if (item.sales && item.sales > 0) {
-                const masterItem = inventoryMap.find(inv => inv.id === key);
-                const price = Number(item.price ?? masterItem?.price ?? 0);
-                if (price) {
-                     total += Number(item.sales) * price;
-                }
+            } else if (item && item.sales > 0 && item.price > 0) { // For Off-Counter sales from a snapshot
+                 total += Number(item.sales) * Number(item.price);
             }
         }
     }
@@ -153,12 +146,12 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   };
 
   const todaysSales = useMemo(() => {
-    return calculateTotalSales(todaySalesData, inventory);
-  }, [todaySalesData, inventory]);
+    return calculateTotalSales(todaySalesData);
+  }, [todaySalesData]);
   
   const yesterdaysSales = useMemo(() => {
-    return calculateTotalSales(yesterdaySalesData, inventory)
-  }, [yesterdaySalesData, inventory]);
+    return calculateTotalSales(yesterdaySalesData)
+  }, [yesterdaySalesData]);
 
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const low: InventoryItem[] = [];
@@ -333,3 +326,5 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
