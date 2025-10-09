@@ -138,16 +138,19 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
     initListeners: () => {
         const today = format(new Date(), 'yyyy-MM-dd');
-        
-        // This is the main combined listener. It watches the master inventory
-        // and the daily log simultaneously to keep data perfectly in sync.
+        let initialLoad = true;
+        let masterInventoryState: Map<string, any> = new Map();
+
         const invSub = onSnapshot(query(collection(db, "inventory")), (inventorySnapshot) => {
-            const masterInventory = new Map<string, any>();
+            const tempMasterInventory = new Map<string, any>();
             inventorySnapshot.forEach(doc => {
-                masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
+                tempMasterInventory.set(doc.id, { id: doc.id, ...doc.data() });
             });
-            
-            // Now listen to the daily log and combine it with the fresh master data
+
+            if (initialLoad) {
+                masterInventoryState = tempMasterInventory;
+            }
+
             const dailyDocRef = doc(db, 'dailyInventory', today);
             const dailySub = onSnapshot(dailyDocRef, (dailySnap) => {
                 const dailyData = dailySnap.exists() ? dailySnap.data() : {};
@@ -155,15 +158,22 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 let onBarTotal = 0;
                 const onBarSales: DailyOnBarSale[] = [];
 
-                masterInventory.forEach((masterItem, id) => {
+                masterInventoryState.forEach((masterItem, id) => {
+                    const latestMasterData = tempMasterInventory.get(id);
                     items.push({
                         ...masterItem,
+                        // Use latest data for dynamic fields, but keep original day's prevStock for UI consistency
+                        price: latestMasterData?.price ?? masterItem.price,
+                        stockInGodown: latestMasterData?.stockInGodown ?? masterItem.stockInGodown,
+                        barcodeId: latestMasterData?.barcodeId ?? masterItem.barcodeId,
+                        lastTransferred: latestMasterData?.lastTransferred ?? masterItem.lastTransferred,
+
                         prevStock: Number(masterItem.prevStock || 0),
                         added: Number(dailyData[id]?.added ?? 0),
                         sales: Number(dailyData[id]?.sales ?? 0),
                     });
                 });
-
+                
                 for (const key in dailyData) {
                     if (key.startsWith('on-bar-')) {
                         const saleData = dailyData[key];
@@ -187,14 +197,13 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     dailyOnBarSales: onBarSales,
                     loading: false 
                 });
+                initialLoad = false; // Initial load is complete
             });
 
-             // Return the unsub function for the daily listener to be managed by the parent
-            return dailySub;
-
+            return dailySub; // This is managed by the invSub's lifecycle
         }, (error) => {
             console.error("Error in master inventory listener:", error);
-            set({loading: false});
+            set({ loading: false });
         });
         
         const unprocessedSub = onSnapshot(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')), (snapshot) => {
@@ -219,7 +228,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             set({ onBarInventory: items });
         });
 
-        // Return a function that unsubscribes from all listeners
         return () => {
             invSub();
             unprocessedSub();
@@ -228,7 +236,54 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     },
     
     forceRefetch: async () => {
-        // The listeners handle this automatically now. This can be a no-op or trigger a manual re-read if needed.
+        get()._setLoading(true);
+        // This function will now re-trigger a fetch similar to the initial one
+        const today = format(new Date(), 'yyyy-MM-dd');
+        
+        try {
+            const inventorySnapshot = await getDocs(query(collection(db, "inventory")));
+            const masterInventory = new Map<string, any>();
+            inventorySnapshot.forEach(doc => {
+                masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
+            });
+
+            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const dailySnap = await getDoc(dailyDocRef);
+            
+            const dailyData = dailySnap.exists() ? dailySnap.data() : {};
+            const items: InventoryItem[] = [];
+            let onBarTotal = 0;
+            const onBarSales: DailyOnBarSale[] = [];
+
+            masterInventory.forEach((masterItem, id) => {
+                items.push({
+                    ...masterItem,
+                    prevStock: Number(masterItem.prevStock || 0),
+                    added: Number(dailyData[id]?.added ?? 0),
+                    sales: Number(dailyData[id]?.sales ?? 0),
+                });
+            });
+            
+             for (const key in dailyData) {
+                if (key.startsWith('on-bar-')) {
+                    const saleData = dailyData[key];
+                    if(saleData.salesValue > 0) {
+                        onBarTotal += saleData.salesValue || 0;
+                        onBarSales.push({
+                            id: key, brand: saleData.brand, size: saleData.size,
+                            category: saleData.category, salesVolume: saleData.salesVolume,
+                            salesValue: saleData.salesValue,
+                        });
+                    }
+                }
+            }
+            set({ inventory: items.sort((a,b)=>a.brand.localeCompare(b.brand)), totalOnBarSales: onBarTotal, dailyOnBarSales: onBarSales });
+
+        } catch (error) {
+            console.error("Force refetch failed:", error);
+        } finally {
+            get()._setLoading(false);
+        }
     },
   
   addBrand: async (newItemData) => {
