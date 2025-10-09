@@ -149,7 +149,7 @@ export default function ReportsPage() {
                 
                 if (item && item.sales > 0 && !productId.startsWith('on-bar-')) { 
                     const masterItem = masterInventoryMap.get(productId);
-                    const itemPrice = item.price || masterItem?.price || 0; // Fallback to master price
+                    const itemPrice = Number(item.price || masterItem?.price || 0); // Fallback to master price
 
                     if (itemPrice > 0) {
                         const existing = offCounterMap.get(productId);
@@ -534,7 +534,7 @@ export default function ReportsPage() {
                                         <TableCell className="font-medium">{item.brand}</TableCell>
                                         <TableCell>{item.size}</TableCell>
                                         <TableCell>{item.category}</TableCell>
-                                        <TableCell className="text-right">{item.price.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">{Number(item.price).toFixed(2)}</TableCell>
                                         <TableCell className="text-right">{item.unitsSold}</TableCell>
                                         <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
                                     </TableRow>
