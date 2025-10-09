@@ -202,12 +202,11 @@ export default function PerformancePage() {
 
              doc.autoTable({
                  startY: 30,
-                 head: [['Date', 'Units Sold', 'Units Added']],
-                 body: history.map(item => [formatDate(item.date), item.unitsSold, item.unitsAdded]),
+                 head: [['Date', 'Units Sold']],
+                 body: history.map(item => [formatDate(item.date), item.unitsSold]),
                  foot: [[
                      'Total',
                      history.reduce((sum, item) => sum + item.unitsSold, 0),
-                     history.reduce((sum, item) => sum + item.unitsAdded, 0)
                  ]],
                  headStyles: { fillColor: [40, 40, 40] },
                  footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold' }
@@ -225,12 +224,11 @@ export default function PerformancePage() {
 
             doc.autoTable({
                 startY: 35,
-                head: [['Brand', 'Size', 'Category', 'Units Sold', 'Units Added']],
-                body: performanceData.map(item => [item.brand, item.size, item.category, item.unitsSold, item.unitsAdded]),
+                head: [['Brand', 'Size', 'Category', 'Units Sold']],
+                body: performanceData.map(item => [item.brand, item.size, item.category, item.unitsSold]),
                 foot: [[
                     'Total', '', '', 
                     performanceData.reduce((sum, item) => sum + item.unitsSold, 0),
-                    performanceData.reduce((sum, item) => sum + item.unitsAdded, 0)
                 ]],
                 headStyles: { fillColor: [40, 40, 40] },
                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold' }
@@ -247,7 +245,7 @@ export default function PerformancePage() {
         <div className="flex flex-col gap-8">
             <header>
                 <h1 className="text-2xl font-bold tracking-tight">Product Performance</h1>
-                <p className="text-muted-foreground">Analyze product sales and stock additions over time.</p>
+                <p className="text-muted-foreground">Analyze product sales over time.</p>
             </header>
 
             <Card>
@@ -303,7 +301,7 @@ export default function PerformancePage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
                         <CardTitle>Performance Results</CardTitle>
-                        <CardDescription>Aggregated data for the selected period and filters.</CardDescription>
+                        <CardDescription>Aggregated sales data for the selected period and filters.</CardDescription>
                     </div>
                      <Button onClick={handleExportPDF} disabled={loading || performanceData.length === 0} variant="outline">
                         <Download className="mr-2 h-4 w-4" />
@@ -319,7 +317,6 @@ export default function PerformancePage() {
                                     <TableHead>Size</TableHead>
                                     <TableHead>Category</TableHead>
                                     <TableHead className="text-right text-destructive">Units Sold</TableHead>
-                                    <TableHead className="text-right text-green-600">Units Added</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -335,17 +332,11 @@ export default function PerformancePage() {
                                                     {item.unitsSold}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-right font-bold text-green-600">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <PackagePlus className="h-4 w-4" />
-                                                    {item.unitsAdded}
-                                                </div>
-                                            </TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">
+                                        <TableCell colSpan={4} className="h-24 text-center">
                                             No data found for the selected filters.
                                         </TableCell>
                                     </TableRow>
@@ -358,9 +349,6 @@ export default function PerformancePage() {
                                         <TableCell className="text-right font-extrabold text-destructive text-base">
                                             {performanceData.reduce((sum, item) => sum + item.unitsSold, 0)}
                                         </TableCell>
-                                        <TableCell className="text-right font-extrabold text-green-600 text-base">
-                                            {performanceData.reduce((sum, item) => sum + item.unitsAdded, 0)}
-                                        </TableCell>
                                     </TableRow>
                                 </TableFooter>
                             )}
@@ -372,5 +360,3 @@ export default function PerformancePage() {
         </div>
     );
 }
-
-
