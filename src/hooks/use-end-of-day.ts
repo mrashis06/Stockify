@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from 'react';
@@ -13,32 +14,30 @@ export function useEndOfDay() {
   const [isEndingDay, setIsEndingDay] = useState(false);
 
   /**
-   * Processes the end of day for the Off-Counter inventory.
-   * Its ONLY responsibility is to update the master inventory's `prevStock` 
-   * with today's final `closing` stock to prepare for the next day.
-   * It no longer writes a summary to the daily log, allowing edits to persist.
-   * @param finalInventoryState The array of inventory items with the final `closing` stock values.
+   * This function's ONLY responsibility is to update the master inventory's `prevStock` 
+   * with the final `closing` stock to prepare for the next day.
+   * It is a non-destructive action regarding the current day's logs, allowing
+   * sales to be edited even after it has been run.
+   * @param finalInventoryState The complete, final state of the inventory for the day.
    */
   const endOfDayProcess = async (finalInventoryState: InventoryItem[]) => {
     setIsEndingDay(true);
 
     try {
       if (!finalInventoryState || finalInventoryState.length === 0) {
-        console.log("No Off-Counter inventory data provided to process.");
+        console.log("No inventory data provided to process EOD.");
         return;
       }
 
       const batch = writeBatch(db);
 
       finalInventoryState.forEach((item) => {
-        // Only process items that were active in the shop
-        if ((item.opening ?? 0) > 0 || (item.sales ?? 0) > 0 || (item.added ?? 0) > 0) {
-            const inventoryUpdateRef = doc(db, 'inventory', item.id);
-            const finalClosingStock = item.closing ?? 0;
-            
-            // Update master inventory's prevStock for the start of the next day.
-            batch.update(inventoryUpdateRef, { prevStock: finalClosingStock < 0 ? 0 : finalClosingStock });
-        }
+        // We only need to update the master record.
+        const inventoryUpdateRef = doc(db, 'inventory', item.id);
+        const finalClosingStock = item.closing ?? 0;
+        
+        // Update master inventory's prevStock for the start of the next day.
+        batch.update(inventoryUpdateRef, { prevStock: finalClosingStock < 0 ? 0 : finalClosingStock });
       });
 
       await batch.commit();
@@ -53,3 +52,5 @@ export function useEndOfDay() {
 
   return { isEndingDay, endOfDayProcess };
 }
+
+    

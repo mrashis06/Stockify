@@ -139,59 +139,62 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     initListeners: () => {
         const today = format(new Date(), 'yyyy-MM-dd');
         
-        const invSub = onSnapshot(query(collection(db, "inventory")), (snapshot) => {
+        // This is the main combined listener. It watches the master inventory
+        // and the daily log simultaneously to keep data perfectly in sync.
+        const invSub = onSnapshot(query(collection(db, "inventory")), (inventorySnapshot) => {
             const masterInventory = new Map<string, any>();
-            snapshot.forEach(doc => {
+            inventorySnapshot.forEach(doc => {
                 masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
             });
             
+            // Now listen to the daily log and combine it with the fresh master data
             const dailyDocRef = doc(db, 'dailyInventory', today);
-            getDoc(dailyDocRef).then(dailySnap => {
+            const dailySub = onSnapshot(dailyDocRef, (dailySnap) => {
                 const dailyData = dailySnap.exists() ? dailySnap.data() : {};
                 const items: InventoryItem[] = [];
-                masterInventory.forEach((masterItem) => {
+                let onBarTotal = 0;
+                const onBarSales: DailyOnBarSale[] = [];
+
+                masterInventory.forEach((masterItem, id) => {
                     items.push({
                         ...masterItem,
                         prevStock: Number(masterItem.prevStock || 0),
-                        added: Number(dailyData[masterItem.id]?.added ?? 0),
-                        sales: Number(dailyData[masterItem.id]?.sales ?? 0),
+                        added: Number(dailyData[id]?.added ?? 0),
+                        sales: Number(dailyData[id]?.sales ?? 0),
                     });
                 });
-                set({ inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)), loading: false });
-            });
-        });
 
-        const dailySub = onSnapshot(doc(db, 'dailyInventory', today), (dailySnap) => {
-            const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-            let onBarTotal = 0;
-            const onBarSales: DailyOnBarSale[] = [];
-
-            for (const key in dailyData) {
-                if (key.startsWith('on-bar-')) {
-                    const saleData = dailyData[key];
-                    if(saleData.salesValue > 0) {
-                        onBarTotal += saleData.salesValue || 0;
-                        onBarSales.push({
-                            id: key,
-                            brand: saleData.brand,
-                            size: saleData.size,
-                            category: saleData.category,
-                            salesVolume: saleData.salesVolume,
-                            salesValue: saleData.salesValue,
-                        });
+                for (const key in dailyData) {
+                    if (key.startsWith('on-bar-')) {
+                        const saleData = dailyData[key];
+                        if(saleData.salesValue > 0) {
+                            onBarTotal += saleData.salesValue || 0;
+                            onBarSales.push({
+                                id: key,
+                                brand: saleData.brand,
+                                size: saleData.size,
+                                category: saleData.category,
+                                salesVolume: saleData.salesVolume,
+                                salesValue: saleData.salesValue,
+                            });
+                        }
                     }
                 }
-            }
+                
+                set({ 
+                    inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)),
+                    totalOnBarSales: onBarTotal,
+                    dailyOnBarSales: onBarSales,
+                    loading: false 
+                });
+            });
 
-            set(state => ({
-                inventory: state.inventory.map(item => ({
-                    ...item,
-                    added: Number(dailyData[item.id]?.added ?? 0),
-                    sales: Number(dailyData[item.id]?.sales ?? 0),
-                })),
-                totalOnBarSales: onBarTotal,
-                dailyOnBarSales: onBarSales,
-            }));
+             // Return the unsub function for the daily listener to be managed by the parent
+            return dailySub;
+
+        }, (error) => {
+            console.error("Error in master inventory listener:", error);
+            set({loading: false});
         });
         
         const unprocessedSub = onSnapshot(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')), (snapshot) => {
@@ -216,9 +219,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             set({ onBarInventory: items });
         });
 
+        // Return a function that unsubscribes from all listeners
         return () => {
             invSub();
-            dailySub();
             unprocessedSub();
             onBarSub();
         };
@@ -1010,3 +1013,5 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
+
+    

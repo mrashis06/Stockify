@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -389,6 +390,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                             <div className="flex items-center">
                                                 <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
                                                 <Input
+                                                    key={`${item.id}-price`}
                                                     type="number"
                                                     className="h-8 w-24 bg-card"
                                                     defaultValue={item.price}
@@ -400,6 +402,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                         <TableCell>{item.prevStock ?? 0}</TableCell>
                                         <TableCell>
                                             <Input
+                                                key={`${item.id}-added`}
                                                 type="number"
                                                 className="h-8 w-20 bg-card"
                                                 defaultValue={item.added || ''}
@@ -411,6 +414,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
                                         {showOpening && <TableCell>{item.opening}</TableCell>}
                                         <TableCell>
                                             <Input
+                                                key={`${item.id}-sales`}
                                                 type="number"
                                                 className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
                                                 defaultValue={item.sales || ''}
@@ -539,5 +543,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    
 
     
