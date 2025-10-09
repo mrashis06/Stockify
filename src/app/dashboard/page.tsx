@@ -58,44 +58,47 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
 
   useEffect(() => {
-    if (user?.role !== 'admin') return;
+    if (user?.role !== 'admin' || !user?.shopId) return;
 
     const today = formatDate(new Date(), 'yyyy-MM-dd');
     const yesterdayDateStr = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
+    let masterInventory: InventoryItem[] = [];
     
-    // Listener for today's data to keep sales figures live.
-    const dailyDocRef = doc(db, 'dailyInventory', today);
-    const unsubscribeDaily = onSnapshot(dailyDocRef, (dailySnap) => {
-        const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-        setTodaySalesData(dailyData);
-    });
-
-    const fetchDashboardData = async () => {
+    const fetchMasterAndDailyData = async () => {
         setLoading(true);
         try {
             // Fetch all master inventory items once
             const inventorySnapshot = await getDocs(collection(db, 'inventory'));
-            const masterInventory: InventoryItem[] = [];
+            masterInventory = [];
             inventorySnapshot.forEach(doc => {
                 masterInventory.push({ id: doc.id, ...doc.data() } as InventoryItem);
             });
-            
             setInventory(masterInventory);
+
+            // Fetch today's data and set listener
+            const todayDocRef = doc(db, 'dailyInventory', today);
+            const todayDocSnap = await getDoc(todayDocRef);
+            setTodaySalesData(todayDocSnap.exists() ? todayDocSnap.data() : {});
 
             // Fetch yesterday's data for sales comparison
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterdayDateStr);
             const yesterdayDocSnap = await getDoc(yesterdayDocRef);
-            const yesterdayData = yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {};
-            setYesterdaySalesData(yesterdayData);
+            setYesterdaySalesData(yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {});
 
         } catch (error) {
-            console.error("Error fetching dashboard data:", error);
+            console.error("Error fetching initial dashboard data:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    fetchDashboardData();
+    fetchMasterAndDailyData();
+
+    // Listener for today's data to keep sales figures live.
+    const dailyDocRef = doc(db, 'dailyInventory', today);
+    const unsubscribeDaily = onSnapshot(dailyDocRef, (dailySnap) => {
+        setTodaySalesData(dailySnap.exists() ? dailySnap.data() : {});
+    });
 
     // Cleanup the listener when the component unmounts
     return () => unsubscribeDaily();
@@ -129,16 +132,22 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     }, 0);
   }, [processedInventory]);
 
-  const calculateTotalSales = (salesData: any) => {
+  const calculateTotalSales = (salesData: any, masterInventory: InventoryItem[]) => {
     let total = 0;
+    const inventoryMap = new Map(masterInventory.map(item => [item.id, item]));
+
     for (const key in salesData) {
         if (Object.prototype.hasOwnProperty.call(salesData, key)) {
-            const item = salesData[key];
+            const itemLog = salesData[key];
             
-            if (item && item.salesValue) { // For On-Bar sales which store direct value
-                total += Number(item.salesValue);
-            } else if (item && item.sales > 0 && item.price > 0) { // For Off-Counter sales from a snapshot
-                 total += Number(item.sales) * Number(item.price);
+            if (itemLog && itemLog.salesValue) { // For On-Bar sales which store direct value
+                total += Number(itemLog.salesValue);
+            } else if (itemLog && itemLog.sales > 0) { // For Off-Counter sales from a snapshot
+                 const masterItem = inventoryMap.get(key);
+                 const price = itemLog.price || masterItem?.price || 0;
+                 if (price > 0) {
+                     total += Number(itemLog.sales) * Number(price);
+                 }
             }
         }
     }
@@ -146,27 +155,26 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   };
 
   const todaysSales = useMemo(() => {
-    return calculateTotalSales(todaySalesData);
-  }, [todaySalesData]);
+    return calculateTotalSales(todaySalesData, inventory);
+  }, [todaySalesData, inventory]);
   
   const yesterdaysSales = useMemo(() => {
-    return calculateTotalSales(yesterdaySalesData)
-  }, [yesterdaySalesData]);
+    return calculateTotalSales(yesterdaySalesData, inventory)
+  }, [yesterdaySalesData, inventory]);
 
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const low: InventoryItem[] = [];
     const out: InventoryItem[] = [];
 
     processedInventory.forEach(item => {
-      // "Out of Stock" means it started with 0 and nothing was added.
-      if (item.prevStock === 0 && item.added === 0) {
+      // "Out of Stock" means its closing stock is zero or less.
+       if (item.closing <= 0 && (item.opening > 0 || item.sales > 0)) {
           out.push(item);
       }
       
       // "Low Stock" means it has active stock, but the closing amount is low.
       const closingStock = item.closing ?? 0;
-      const openingStock = item.opening ?? 0;
-      if (openingStock > 0 && closingStock > 0 && closingStock < 10) {
+      if (closingStock > 0 && closingStock < 10) {
           low.push(item);
       }
     });
@@ -326,5 +334,3 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    

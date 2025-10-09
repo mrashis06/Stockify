@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package } from 'lucide-react';
 import { DateRange } from "react-day-picker";
-import { collection, doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -29,6 +29,8 @@ import { toast } from '@/hooks/use-toast';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useInventory, InventoryItem } from '@/hooks/use-inventory';
+
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -67,6 +69,7 @@ type OnBarSoldItem = {
 export default function ReportsPage() {
     const { formatDate } = useDateFormat();
     const searchParams = useSearchParams();
+    const { inventory: masterInventory } = useInventory();
 
     const [date, setDate] = useState<DateRange | undefined>(() => {
         const fromParam = searchParams.get('from');
@@ -129,6 +132,12 @@ export default function ReportsPage() {
     const handleFilter = () => {
         fetchReportData(date);
     };
+    
+    const masterInventoryMap = useMemo(() => {
+        const map = new Map<string, InventoryItem>();
+        masterInventory.forEach(item => map.set(item.id, item));
+        return map;
+    }, [masterInventory]);
 
     const { offCounterSalesData, onBarSalesData } = useMemo(() => {
         const offCounterMap = new Map<string, SoldItem>();
@@ -137,18 +146,27 @@ export default function ReportsPage() {
         reportData.forEach(entry => {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
-                // OffCounter items are now saved with price and have `sales > 0`
-                if (item && item.sales > 0 && item.price > 0 && !productId.startsWith('on-bar-')) { 
-                    const itemPrice = Number(item.price);
-                    const existing = offCounterMap.get(productId);
-                    if (existing) {
-                        existing.unitsSold += item.sales;
-                        existing.totalAmount += item.sales * itemPrice;
-                    } else {
-                        offCounterMap.set(productId, {
-                            productId, brand: item.brand, size: item.size, category: item.category,
-                            price: itemPrice, unitsSold: item.sales, totalAmount: item.sales * itemPrice,
-                        });
+                
+                if (item && item.sales > 0 && !productId.startsWith('on-bar-')) { 
+                    const masterItem = masterInventoryMap.get(productId);
+                    const itemPrice = item.price || masterItem?.price || 0; // Fallback to master price
+
+                    if (itemPrice > 0) {
+                        const existing = offCounterMap.get(productId);
+                        if (existing) {
+                            existing.unitsSold += item.sales;
+                            existing.totalAmount += item.sales * itemPrice;
+                        } else {
+                            offCounterMap.set(productId, {
+                                productId, 
+                                brand: item.brand, 
+                                size: item.size, 
+                                category: item.category,
+                                price: itemPrice, 
+                                unitsSold: item.sales, 
+                                totalAmount: item.sales * itemPrice,
+                            });
+                        }
                     }
                 } else if (item && item.salesValue > 0 && productId.startsWith('on-bar-')) { // OnBar
                      const existing = onBarMap.get(productId);
@@ -169,7 +187,7 @@ export default function ReportsPage() {
             offCounterSalesData: Array.from(offCounterMap.values()).sort((a, b) => a.brand.localeCompare(b.brand)),
             onBarSalesData: Array.from(onBarMap.values()).sort((a, b) => a.brand.localeCompare(b.brand)),
         };
-    }, [reportData]);
+    }, [reportData, masterInventoryMap]);
 
     const reportTotals = useMemo(() => {
         const data = reportType === 'offcounter' ? offCounterSalesData : onBarSalesData;
@@ -191,14 +209,17 @@ export default function ReportsPage() {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
                 const matchesReportType = isOffCounter 
-                    ? (item.sales > 0 && item.price > 0 && !productId.startsWith('on-bar-')) 
+                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
                     : (item.salesValue > 0 && productId.startsWith('on-bar-'));
+                
+                const masterItem = masterInventoryMap.get(productId);
+                const itemPrice = item.price || masterItem?.price || 0;
 
                 if (matchesReportType) {
                     if (isOffCounter) {
                          dailyRows.push([
                             entry.date, item.brand, item.size, item.category, 
-                            Number(item.price).toFixed(2), item.sales, (item.sales * Number(item.price)).toFixed(2)
+                            Number(itemPrice).toFixed(2), item.sales, (item.sales * Number(itemPrice)).toFixed(2)
                         ]);
                     } else {
                         const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
@@ -244,14 +265,19 @@ export default function ReportsPage() {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
                  const matchesReportType = isOffCounter 
-                    ? (item.sales > 0 && item.price > 0 && !productId.startsWith('on-bar-')) 
+                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
                     : (item.salesValue > 0 && productId.startsWith('on-bar-'));
                 
+                const masterItem = masterInventoryMap.get(productId);
+                const itemPrice = item.price || masterItem?.price || 0;
+
                 if (matchesReportType) {
                     if (isOffCounter) {
-                        tableRows.push([item.brand, item.size, item.category, Number(item.price).toFixed(2), item.sales, (item.sales * Number(item.price)).toFixed(2)]);
-                        dailyTotalUnits += item.sales;
-                        dailyTotalAmount += item.sales * Number(item.price);
+                        if (itemPrice > 0) {
+                            tableRows.push([item.brand, item.size, item.category, Number(itemPrice).toFixed(2), item.sales, (item.sales * Number(itemPrice)).toFixed(2)]);
+                            dailyTotalUnits += item.sales;
+                            dailyTotalAmount += item.sales * Number(itemPrice);
+                        }
                     } else {
                         const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
                         tableRows.push([item.brand, item.size, item.category, `${item.salesVolume} ${unitLabel}`, Number(item.salesValue).toFixed(2)]);
@@ -324,21 +350,26 @@ export default function ReportsPage() {
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
                 const matchesReportType = isOffCounter 
-                    ? (item.sales > 0 && item.price > 0 && !productId.startsWith('on-bar-')) 
+                    ? (item.sales > 0 && !productId.startsWith('on-bar-')) 
                     : (item.salesValue > 0 && productId.startsWith('on-bar-'));
+                
+                 const masterItem = masterInventoryMap.get(productId);
+                 const itemPrice = item.price || masterItem?.price || 0;
 
                 if (matchesReportType) {
                     let row;
                     if (isOffCounter) {
-                        row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, Number(item.price).toFixed(2), item.sales, (item.sales * Number(item.price)).toFixed(2)];
-                        dailyTotalUnits += item.sales;
-                        dailyTotalAmount += item.sales * Number(item.price);
+                        if (itemPrice > 0) {
+                            row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, Number(itemPrice).toFixed(2), item.sales, (item.sales * Number(itemPrice)).toFixed(2)];
+                            dailyTotalUnits += item.sales;
+                            dailyTotalAmount += item.sales * Number(itemPrice);
+                        }
                     } else {
                         const unitLabel = item.category === 'Beer' ? 'units' : 'ml';
                         row = [entry.date, `"${item.brand.replace(/"/g, '""')}"`, `"${item.size}"`, item.category, `"${item.salesVolume} ${unitLabel}"`, Number(item.salesValue).toFixed(2)];
                         dailyTotalAmount += item.salesValue;
                     }
-                    dailyRows.push(row);
+                    if (row) dailyRows.push(row);
                 }
             }
             
@@ -533,5 +564,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
