@@ -157,11 +157,12 @@ export default function ReportsPage() {
                             existing.unitsSold += item.sales;
                             existing.totalAmount += item.sales * itemPrice;
                         } else {
+                            const brand = item.brand || masterItem?.brand || 'Unknown';
                             offCounterMap.set(productId, {
                                 productId, 
-                                brand: item.brand, 
-                                size: item.size, 
-                                category: item.category,
+                                brand,
+                                size: item.size || masterItem?.size || '', 
+                                category: item.category || masterItem?.category || '',
                                 price: itemPrice, 
                                 unitsSold: item.sales, 
                                 totalAmount: item.sales * itemPrice,
@@ -174,18 +175,30 @@ export default function ReportsPage() {
                          existing.unitsSold += item.salesVolume;
                          existing.totalAmount += item.salesValue;
                      } else {
+                        const masterItem = masterInventoryMap.get(productId.replace('on-bar-', ''));
+                        const brand = item.brand || masterItem?.brand || 'Unknown';
                          onBarMap.set(productId, {
-                             productId, brand: item.brand, size: item.size, category: item.category,
-                             unitsSold: item.salesVolume, totalAmount: item.salesValue
+                             productId, 
+                             brand, 
+                             size: item.size || masterItem?.size || '', 
+                             category: item.category || masterItem?.category || '',
+                             unitsSold: item.salesVolume, 
+                             totalAmount: item.salesValue
                          });
                      }
                 }
             }
         });
+        
+        const safeSort = (a: { brand?: string }, b: { brand?: string }) => {
+            const brandA = a.brand || '';
+            const brandB = b.brand || '';
+            return brandA.localeCompare(brandB);
+        };
 
         return {
-            offCounterSalesData: Array.from(offCounterMap.values()).sort((a, b) => a.brand.localeCompare(b.brand)),
-            onBarSalesData: Array.from(onBarMap.values()).sort((a, b) => a.brand.localeCompare(b.brand)),
+            offCounterSalesData: Array.from(offCounterMap.values()).sort(safeSort),
+            onBarSalesData: Array.from(onBarMap.values()).sort(safeSort),
         };
     }, [reportData, masterInventoryMap]);
 
