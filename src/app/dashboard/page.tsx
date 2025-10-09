@@ -168,17 +168,15 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
     processedInventory.forEach(item => {
       const closingStock = item.closing ?? 0;
-      const openingStock = item.opening ?? 0;
       
-      // An item is out of stock if its closing stock is 0 or less,
-      // but only if it had stock to begin with or was active (i.e. had sales).
-      // This prevents brand new, unstocked items from appearing as "out of stock".
-      if (closingStock <= 0 && (openingStock > 0 || item.sales > 0)) {
+      // New Out of Stock Logic:
+      // Item is out of stock if it started with 0 and nothing was added.
+      if ((item.prevStock ?? 0) === 0 && item.added === 0) {
           out.push(item);
       }
       
-      // An item is low on stock if it's not out of stock, but the quantity is low.
-      if (closingStock > 0 && closingStock < 10) {
+      // Low stock: if it's not out of stock, but the quantity is low.
+      else if (closingStock > 0 && closingStock < 10) {
           low.push(item);
       }
     });
