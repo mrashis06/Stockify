@@ -233,21 +233,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </Link>
         </div>
 
-        <nav className="hidden flex-col gap-6 text-sm font-medium md:flex md:flex-row md:items-center md:gap-5 lg:gap-6">
-           {navItems.map(item => (
-              item.href === "#" ? (
-                 <Button key={item.pageName} variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
-                    <item.icon className="h-4 w-4" />
-                    <span className="sr-only">{item.pageName}</span>
-                 </Button>
-              ) : item.label ? (
-                <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                </NavLink>
-              ) : null
-            ))}
-        </nav>
+        <div className="hidden md:flex flex-1 min-w-0 justify-center">
+            <div className="overflow-x-auto overflow-y-hidden">
+                <nav className="flex items-center gap-5 lg:gap-6 text-sm font-medium whitespace-nowrap px-4">
+                {navItems.map(item => (
+                    item.href === "#" ? (
+                        <Button key={item.pageName} variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0">
+                            <item.icon className="h-4 w-4" />
+                            <span className="sr-only">{item.pageName}</span>
+                        </Button>
+                    ) : item.label ? (
+                        <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
+                            <item.icon className="h-4 w-4" />
+                            {item.label}
+                        </NavLink>
+                    ) : null
+                    ))}
+                </nav>
+            </div>
+        </div>
         
         <div className="flex items-center gap-2 sm:gap-4">
           <ThemeToggle />
@@ -342,3 +346,5 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+    
