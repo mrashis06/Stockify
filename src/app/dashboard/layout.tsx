@@ -234,7 +234,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="hidden md:flex flex-1 min-w-0 justify-center">
-            <div className="overflow-x-auto overflow-y-hidden">
+            <div className="overflow-x-auto overflow-y-hidden hide-scrollbar">
                 <nav className="flex items-center gap-5 lg:gap-6 text-sm font-medium whitespace-nowrap px-4">
                 {navItems.map(item => (
                     item.href === "#" ? (
@@ -346,5 +346,3 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
-    
