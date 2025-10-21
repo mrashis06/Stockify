@@ -319,6 +319,7 @@ export default function ReportsPage() {
                     startY: finalY + (index === 0 ? 2 : 17),
                     headStyles: { fillColor: [40, 40, 40] },
                     footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                    showFoot: 'lastPage',
                 });
 
                 grandTotalUnits += dailyTotalUnits;
@@ -336,6 +337,7 @@ export default function ReportsPage() {
                     : [['Grand Total', '', '', '', grandTotalAmount.toFixed(2)]],
                  footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
                  columnStyles: { 0: { halign: 'left' } },
+                 showFoot: 'lastPage'
             });
         }
         
@@ -577,5 +579,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    

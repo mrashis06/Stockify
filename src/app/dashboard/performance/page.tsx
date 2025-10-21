@@ -213,7 +213,8 @@ export default function PerformancePage() {
                      history.reduce((sum, item) => sum + item.unitsSold, 0),
                  ]],
                  headStyles: { fillColor: [40, 40, 40] },
-                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold' }
+                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold' },
+                 showFoot: 'lastPage'
              });
 
              doc.save(`history_${selectedProduct.brand}_${selectedProduct.size}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
@@ -235,7 +236,8 @@ export default function PerformancePage() {
                     performanceData.reduce((sum, item) => sum + item.unitsSold, 0),
                 ]],
                 headStyles: { fillColor: [40, 40, 40] },
-                footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold' }
+                footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold' },
+                showFoot: 'lastPage'
             });
             doc.save(`performance_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
         }
@@ -383,5 +385,3 @@ export default function PerformancePage() {
         </div>
     );
 }
-
-    
