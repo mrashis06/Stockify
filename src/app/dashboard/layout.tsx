@@ -3,7 +3,7 @@
 
 import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart, TrendingUp } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart, TrendingUp, MoreHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
@@ -43,6 +43,7 @@ import { useDateFormat } from '@/hooks/use-date-format';
 import NotificationDialog from '@/components/dashboard/notification-dialog';
 import { Separator } from '@/components/ui/separator';
 import ProfilePictureDialog from '@/components/dashboard/profile-picture-dialog';
+import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
@@ -116,8 +117,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
   
   const adminNavItems = [
-      { href: "#", pageName: 'Back', icon: ArrowLeft, label: ""},
-      { href: "/", pageName: 'Home', icon: Home, label: "Home" },
       { href: "/dashboard", pageName: 'Dashboard', icon: LayoutDashboard, label: "Dashboard" },
       { href: "/dashboard/sales", pageName: 'POS', icon: ShoppingCart, label: "POS" },
       { href: "/dashboard/inventory", pageName: 'OffCounter', icon: Warehouse, label: "OffCounter" },
@@ -140,6 +139,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   ];
   
   const navItems = isAdmin ? adminNavItems : staffNavItems;
+  const criticalNavItems = isAdmin ? adminNavItems.slice(0, 6) : staffNavItems;
+  const moreNavItems = isAdmin ? adminNavItems.slice(6) : [];
   
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -233,23 +234,33 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </Link>
         </div>
         
-        <div className="hidden md:flex flex-1 items-center justify-center gap-2 min-w-0">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Back</span>
-          </Button>
-          <div className="flex-1 overflow-x-auto overflow-y-hidden hide-scrollbar">
-              <nav className="flex items-center gap-5 lg:gap-6 text-sm font-medium whitespace-nowrap px-4">
-              {navItems.slice(1).map(item => (
-                  item.label ? (
-                      <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
-                          <item.icon className="h-4 w-4" />
-                          {item.label}
-                      </NavLink>
-                  ) : null
-                  ))}
-              </nav>
-          </div>
+         <div className="flex items-center gap-2">
+            <nav className="hidden md:flex items-center gap-5 text-sm font-medium">
+                {criticalNavItems.map(item => (
+                    <NavLink key={item.href} href={item.href} pageName={item.pageName} onNavigate={handleNav}>
+                        <item.icon className="h-4 w-4" />
+                        {item.label}
+                    </NavLink>
+                ))}
+                {moreNavItems.length > 0 && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="flex items-center gap-2 text-sm font-medium text-foreground/80 hover:text-primary">
+                                <MoreHorizontal className="h-4 w-4" />
+                                More
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            {moreNavItems.map(item => (
+                                <DropdownMenuItem key={item.href} onSelect={() => handleNav(item.href, item.pageName)} className="cursor-pointer">
+                                    <item.icon className="mr-2 h-4 w-4" />
+                                    <span>{item.label}</span>
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
+            </nav>
         </div>
         
         <div className="flex items-center gap-2 sm:gap-4">
@@ -284,9 +295,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 return (
                                 <DropdownMenuItem key={n.id} onSelect={() => handleNotificationClick(n)} className="flex items-start gap-2 cursor-pointer">
                                     {!isRead && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary" />}
-                                    <div className={isRead ? 'pl-4' : ''}>
+                                    <div className={cn('w-full', isRead ? 'pl-4' : '')}>
                                         <p className="font-semibold">{n.title}</p>
-                                        <p className="text-xs text-muted-foreground truncate">{n.description}</p>
+                                        <p className="text-xs text-muted-foreground line-clamp-2">{n.description}</p>
                                         {n.createdAt && (
                                             <p className="text-xs text-muted-foreground mt-1">{formatDate(n.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
                                         )}
