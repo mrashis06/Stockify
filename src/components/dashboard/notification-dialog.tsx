@@ -30,7 +30,7 @@ export default function NotificationDialog({ isOpen, onOpenChange, notification 
         <DialogHeader>
           <DialogTitle>{notification.title}</DialogTitle>
           <DialogDescription className="text-xs pt-1">
-            Sent by {notification.author || 'Admin'} on {formatDate(notification.createdAt.toDate(), 'PPP p')}
+            Sent by {notification.author || 'Admin'} on {notification.createdAt ? formatDate(notification.createdAt.toDate(), 'PPP p') : '...'}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">

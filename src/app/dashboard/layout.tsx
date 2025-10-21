@@ -97,13 +97,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (user?.uid && !notification.readBy.includes(user.uid)) {
         markAsRead(notification.id);
     }
-
-    if (notification.type === 'staff-broadcast') {
-        setSelectedNotification(notification);
-        setNotificationDialogOpen(true);
-    } else if (notification.link) {
-        router.push(notification.link);
-    }
+    setSelectedNotification(notification);
+    setNotificationDialogOpen(true);
   }
   
   const isAdmin = user?.role === 'admin';

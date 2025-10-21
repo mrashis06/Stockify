@@ -535,5 +535,3 @@ export default function StaffPage() {
         </main>
     );
 }
-
-    
