@@ -6,6 +6,7 @@ import { collection, query, where, onSnapshot, orderBy, limit, addDoc, serverTim
 import { db } from '@/lib/firebase';
 import { useAuth } from './use-auth';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from './use-toast';
 
 export type Notification = {
     id: string;
@@ -96,7 +97,34 @@ export function useNotifications() {
         }
     };
 
-    return { notifications, loading, markAsRead, markAllAsRead };
+    const clearReadNotifications = async () => {
+        if (!user || !user.shopId) return;
+
+        const readNotifications = notifications.filter(n => n.readBy.includes(user.uid!));
+        if (readNotifications.length === 0) {
+            toast({ title: "No read notifications to clear." });
+            return;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            readNotifications.forEach(n => {
+                const notifRef = doc(db, `shops/${user.shopId}/notifications`, n.id);
+                // For now, we are deleting the notification entirely.
+                // A better approach for multi-user apps might be to remove the user from a 'viewedBy' list
+                // but for this app's logic, deletion is simpler.
+                batch.delete(notifRef);
+            });
+            await batch.commit();
+            toast({ title: "Success", description: "Read notifications cleared." });
+        } catch (error) {
+            console.error("Error clearing read notifications:", error);
+            toast({ title: "Error", description: "Could not clear read notifications.", variant: 'destructive' });
+        }
+    };
+
+
+    return { notifications, loading, markAsRead, markAllAsRead, clearReadNotifications };
 }
 
 // Function for creating admin-targeted notifications

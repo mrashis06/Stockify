@@ -3,7 +3,7 @@
 
 import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart, TrendingUp, MoreHorizontal } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart, TrendingUp, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
@@ -47,7 +47,7 @@ import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
-  const { notifications, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, markAsRead, markAllAsRead, clearReadNotifications } = useNotifications();
   const { settings } = useNotificationSettings();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
@@ -63,6 +63,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     : notifications;
     
   const unreadCount = displayedNotifications.filter(n => !n.readBy.includes(user?.uid || '')).length;
+  const readCount = displayedNotifications.filter(n => n.readBy.includes(user?.uid || '')).length;
 
 
   useEffect(() => {
@@ -275,11 +276,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <DropdownMenuContent align="end" className="w-80">
                 <div className="flex items-center justify-between p-2">
                     <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
-                    {unreadCount > 0 && (
-                        <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => markAllAsRead()}>
-                            Mark all as read
-                        </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {unreadCount > 0 && (
+                            <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => markAllAsRead()}>
+                                Mark all as read
+                            </Button>
+                        )}
+                        {readCount > 0 && (
+                            <Button variant="link" size="sm" className="p-0 h-auto text-xs text-destructive" onClick={() => clearReadNotifications()}>
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Clear Read
+                            </Button>
+                        )}
+                    </div>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
