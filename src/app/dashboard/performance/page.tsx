@@ -270,7 +270,15 @@ export default function PerformancePage() {
                         <PopoverTrigger asChild>
                             <Button variant={"outline"} className={cn("w-full md:w-auto justify-start text-left font-normal", !date && "text-muted-foreground")}>
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {date?.from ? (date.to ? (<>{formatDate(date.from)} - {formatDate(date.to)}</>) : formatDate(date.from)) : <span>Pick a date range</span>}
+                                {date?.from ? (
+                                    date.to && !isSameDay(date.from, date.to) ? (
+                                        <>{formatDate(date.from)} - {formatDate(date.to)}</>
+                                    ) : (
+                                        formatDate(date.from)
+                                    )
+                                ) : (
+                                    <span>Pick a date range</span>
+                                )}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -375,3 +383,5 @@ export default function PerformancePage() {
         </div>
     );
 }
+
+    
