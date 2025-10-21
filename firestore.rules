@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function isShopAdmin(shopId) {
+      let user = getUserData(request.auth.uid);
+      return isSignedIn() && user.role == 'admin' && user.shopId == shopId;
+    }
+
+    function isShopStaff(shopId) {
+      let user = getUserData(request.auth.uid);
+      return isSignedIn() && (user.role == 'staff' || user.role == 'admin') && user.shopId == shopId;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Rules for 'users' collection
+    match /users/{userId} {
+      // Users can read their own data.
+      // Admins can read data of users in the same shop.
+      allow read: if isUser(userId) || (isShopAdmin(getUserData(userId).shopId));
+      
+      // Users can update their own profile data (name, dob, etc.)
+      allow update: if isUser(userId) && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'shopId', 'status']));
+      
+      // Admins can update status or remove a user from a shop.
+      allow update: if isShopAdmin(resource.data.shopId) && request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'shopId']);
+      
+      // Only new users can create their own document.
+      allow create: if isUser(userId);
+    }
+
+    // Rules for 'inventory' collection
+    match /inventory/{productId} {
+      // Only staff/admin of the correct shop can read/write.
+      allow read, write: if isShopStaff(get(/databases/$(database)/documents/shops/{shopId}).data.id);
+    }
+    
+    // Rules for `shops` collection and its subcollections
+    match /shops/{shopId} {
+      allow read: if isShopStaff(shopId);
+
+      match /notifications/{notificationId} {
+        allow read: if isShopStaff(shopId);
+        // Only admins can create/delete broadcast notifications
+        allow create, delete: if isShopAdmin(shopId);
+        // Users can "mark as read" by updating the readBy array.
+        allow update: if isShopStaff(shopId) && request.resource.data.readBy == resource.data.readBy.concat([request.auth.uid]);
+      }
+    }
+
+    // Rules for 'dailyInventory' collection
+    match /dailyInventory/{date} {
+       // Only staff/admin of the correct shop can read/write.
+       allow read, write: if isShopStaff(get(/databases/$(database)/documents/shops/{shopId}).data.id);
+    }
+    
+    // Rules for 'onBarInventory' collection
+    match /onBarInventory/{itemId} {
+       // Only staff/admin of the correct shop can read/write.
+       allow read, write: if isShopStaff(get(/databases/$(database)/documents/shops/{shopId}).data.id);
+    }
+
+    // Rules for 'invites' collection
+    match /invites/{inviteId} {
+      // Admins can read/create/delete invites.
+      allow read, delete: if isShopAdmin(get(/databases/$(database)/documents/invites/$(inviteId)).data.shopId);
+      allow create: if request.resource.data.ownerId == request.auth.uid;
+      
+      // Any signed-in user can accept an invite for themselves.
+      allow update: if isSignedIn() && request.resource.data.status == 'accepted' && request.resource.data.acceptedBy == request.auth.uid;
+    }
+    
+    // Rules for `unprocessed_deliveries`
+    match /unprocessed_deliveries/{deliveryId} {
+        allow read, write, delete: if isShopStaff(get(/databases/dabase)/documents/shops/{shopId}).data.id);
+    }
+    
+    // Rules for `processed_bills`
+    match /processed_bills/{billId} {
+        allow read, write: if isShopStaff(get(/databases/$(database)/documents/shops/{shopId}).data.id);
+    }
+  }
+}
