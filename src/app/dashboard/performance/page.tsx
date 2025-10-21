@@ -144,7 +144,7 @@ export default function PerformancePage() {
                     });
                 }
             }
-            setPerformanceData(formattedData.sort((a, b) => a.brand.localeCompare(b.brand)));
+            setPerformanceData(formattedData.sort((a, b) => b.unitsSold - a.unitsSold));
 
         } catch (error) {
             toast({ title: 'Error', description: 'Failed to fetch performance data.', variant: 'destructive' });
