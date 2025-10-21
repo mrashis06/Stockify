@@ -619,8 +619,14 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             }
             transaction.update(masterRef, updateData);
 
-            const itemDailyData = dailyData[productId] || { added: 0 };
+            const itemDailyData = dailyData[productId] || {};
             itemDailyData.added = (itemDailyData.added || 0) + quantityToTransfer;
+            
+            // Ensure full snapshot is saved
+            itemDailyData.brand = masterData.brand;
+            itemDailyData.size = masterData.size;
+            itemDailyData.category = masterData.category;
+            itemDailyData.price = price !== undefined ? Number(price) : masterData.price;
             
             transaction.set(dailyRef, { [productId]: itemDailyData }, { merge: true });
         });
@@ -720,23 +726,38 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         await runTransaction(db, async (transaction) => {
             const today = format(new Date(), 'yyyy-MM-dd');
             const dailyDocRef = doc(db, 'dailyInventory', today);
+            const masterRef = doc(db, 'inventory', id);
+
+            // Perform all reads first
+            const [dailyDoc, masterDoc] = await Promise.all([
+                transaction.get(dailyDocRef),
+                transaction.get(masterRef)
+            ]);
+
+            if (!masterDoc.exists()) throw new Error("Product not found in master inventory.");
+
+            const masterData = masterDoc.data() as InventoryItem;
+            let itemDailyData = (dailyDoc.exists() && dailyDoc.data()?.[id]) ? dailyDoc.data()?.[id] : {};
             
             const liveInventory = get().inventory;
             const liveItem = liveInventory.find(i => i.id === id);
             if (!liveItem) throw new Error("Live product data not found.");
 
-            const openingStock = Number(liveItem.prevStock || 0) + Number(liveItem.added || 0);
-            const currentSales = Number(liveItem.sales || 0);
+            const openingStock = Number(liveItem.prevStock || 0) + Number(itemDailyData.added || 0);
+            const currentSales = Number(itemDailyData.sales || 0);
 
             if (openingStock < currentSales + quantity) {
                 throw new Error(`Insufficient stock. Available: ${openingStock - currentSales}`);
             }
 
-            const dailyDoc = await transaction.get(dailyDocRef);
-            let itemDailyData = dailyDoc.exists() ? (dailyDoc.data()[id] || {}) : {};
-
+            // Calculations
             itemDailyData.sales = (itemDailyData.sales || 0) + quantity;
+            itemDailyData.brand = masterData.brand;
+            itemDailyData.size = masterData.size;
+            itemDailyData.category = masterData.category;
+            itemDailyData.price = salePrice; // Record the price at the time of sale
 
+            // Perform write
             transaction.set(dailyDocRef, { [id]: itemDailyData }, { merge: true });
         });
       } catch (error) {
@@ -763,13 +784,14 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const masterData = masterDoc.data() as InventoryItem;
             
             const currentItemDaily = dailyData[id] || {
-                brand: masterData.brand,
-                size: masterData.size,
-                category: masterData.category,
-                price: masterData.price,
                 added: 0,
                 sales: 0,
             };
+
+            // Always ensure the full snapshot is there
+            currentItemDaily.brand = masterData.brand;
+            currentItemDaily.size = masterData.size;
+            currentItemDaily.category = masterData.category;
 
             if (field === 'price') {
                 const newPrice = Number(value);
@@ -780,16 +802,19 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 const newValue = Number(value) || 0;
                 const difference = newValue - oldValue;
 
-                if (difference < 0) { // Returning stock to godown
+                if (difference < 0) {
                     const stockToReturn = -difference;
                     const newGodownStock = (masterData.stockInGodown || 0) + stockToReturn;
                     transaction.update(masterRef, { stockInGodown: newGodownStock });
                 }
-                // If stock is increased (difference > 0), we no longer check godown stock.
-                // This allows for manual additions from other sources.
                 currentItemDaily.added = newValue;
             } else {
                  currentItemDaily[field] = Number(value) || 0;
+            }
+            
+             // Ensure price is set, use master price as fallback if not already in daily log
+            if (currentItemDaily.price === undefined) {
+                currentItemDaily.price = masterData.price;
             }
             
             transaction.set(dailyRef, { [id]: currentItemDaily }, { merge: true });
@@ -1068,5 +1093,3 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
-
-    
