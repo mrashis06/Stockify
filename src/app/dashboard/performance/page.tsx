@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -7,7 +6,7 @@ import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firesto
 import { db } from '@/lib/firebase';
 import { eachDayOfInterval, startOfDay, subMonths, subDays, format, isSameDay } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { Calendar as CalendarIcon, Filter, Loader2, Download, PackagePlus, MinusCircle, TrendingUp } from 'lucide-react';
+import { Calendar as CalendarIcon, Filter, Loader2, Download, PackagePlus, MinusCircle, TrendingUp, ChevronsUpDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -62,6 +61,7 @@ export default function PerformancePage() {
     });
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [productFilter, setProductFilter] = useState('All Products');
+    const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
 
     usePageLoading(loading || inventoryLoading);
@@ -101,7 +101,7 @@ export default function PerformancePage() {
         setDate(range);
     };
     
-    const fetchPerformanceData = useCallback(async (range: DateRange | undefined, category: string, product: string) => {
+    const fetchPerformanceData = useCallback(async (range: DateRange | undefined, category: string, product: string, sort: 'desc' | 'asc') => {
         if (!range?.from) return;
         setLoading(true);
 
@@ -144,7 +144,10 @@ export default function PerformancePage() {
                     });
                 }
             }
-            setPerformanceData(formattedData.sort((a, b) => b.unitsSold - a.unitsSold));
+            const sortedData = formattedData.sort((a, b) => {
+                return sort === 'desc' ? b.unitsSold - a.unitsSold : a.unitsSold - b.unitsSold;
+            });
+            setPerformanceData(sortedData);
 
         } catch (error) {
             toast({ title: 'Error', description: 'Failed to fetch performance data.', variant: 'destructive' });
@@ -156,9 +159,9 @@ export default function PerformancePage() {
     
     useEffect(() => {
         if (masterInventory.length > 0) {
-            fetchPerformanceData(date, categoryFilter, productFilter);
+            fetchPerformanceData(date, categoryFilter, productFilter, sortOrder);
         }
-    }, [masterInventory, date, categoryFilter, productFilter, fetchPerformanceData]);
+    }, [masterInventory, date, categoryFilter, productFilter, sortOrder, fetchPerformanceData]);
     
     const fetchSingleProductHistory = useCallback(async (range: DateRange | undefined, productId: string): Promise<DailyRecord[]> => {
         if (!range?.from || !productId) return [];
@@ -293,6 +296,17 @@ export default function PerformancePage() {
                             {filteredProductsForDropdown.map(p => (
                                 <SelectItem key={p.id} value={p.id}>{p.brand} ({p.size})</SelectItem>
                             ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
+                        <SelectTrigger className="w-full md:w-[220px]">
+                            <ChevronsUpDown className="mr-2 h-4 w-4" />
+                            <SelectValue placeholder="Sort by..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="desc">Highest Units Sold</SelectItem>
+                            <SelectItem value="asc">Lowest Units Sold</SelectItem>
                         </SelectContent>
                     </Select>
                 </CardContent>
