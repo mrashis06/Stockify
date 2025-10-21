@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -348,7 +347,10 @@ export default function GodownPage() {
             </Card>
         )}
        
-        <h1 className="text-2xl font-bold tracking-tight mb-6">Godown Stock</h1>
+        <div className="mb-6">
+            <h1 className="text-2xl font-bold tracking-tight">Godown Stock</h1>
+            <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+        </div>
         <Card>
             <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
@@ -490,3 +492,5 @@ export default function GodownPage() {
     </main>
   );
 }
+
+    

@@ -201,7 +201,7 @@ export default function DailySalePage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Today's BL Sale Report</h1>
-                     <p className="text-muted-foreground">Generated on: {formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                     <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
                 </div>
                 <Button onClick={handleExportPDF} disabled={blReport.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
@@ -279,5 +279,7 @@ export default function DailySalePage() {
         </main>
     );
 }
+
+    
 
     

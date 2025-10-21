@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -49,9 +48,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { usePageLoading } from '@/hooks/use-loading';
 import { Separator } from '@/components/ui/separator';
+import { useDateFormat } from '@/hooks/use-date-format';
 
 
 export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+    const { formatDate } = useDateFormat();
     const { 
         inventory,
         dailyOnBarSales,
@@ -278,7 +279,10 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
             </AlertDialogContent>
         </AlertDialog>
 
-        <h1 className="text-2xl font-bold tracking-tight mb-6">Off-Counter Inventory</h1>
+        <div className="mb-6">
+            <h1 className="text-2xl font-bold tracking-tight">Off-Counter Inventory</h1>
+            <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+        </div>
         <Card>
             <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
@@ -543,3 +547,5 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    

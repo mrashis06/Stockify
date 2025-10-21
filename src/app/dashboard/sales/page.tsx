@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/use-auth';
 import { Barcode, HelpCircle, IndianRupee, Scan, X, CheckCircle } from 'lucide-react';
 import SharedScanner from '@/components/dashboard/shared-scanner';
+import { useDateFormat } from '@/hooks/use-date-format';
 
 export default function SalesPage() {
     const { inventory, recordSale, forceRefetch } = useInventory();
@@ -20,6 +21,7 @@ export default function SalesPage() {
     const { toast } = useToast();
     const router = useRouter();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+    const { formatDate } = useDateFormat();
 
     const [isClient, setIsClient] = useState(false);
     const [scannedItem, setScannedItem] = useState<InventoryItem | null>(null);
@@ -112,7 +114,10 @@ export default function SalesPage() {
 
     return (
         <main className="flex-1 p-4 md:p-8">
-            <h1 className="text-2xl font-bold tracking-tight mb-6">Point of Sale</h1>
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold tracking-tight">Point of Sale</h1>
+                <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+            </div>
 
             <Card className="max-w-2xl mx-auto">
                 <CardHeader>
@@ -216,3 +221,5 @@ export default function SalesPage() {
         </main>
     );
 }
+
+    

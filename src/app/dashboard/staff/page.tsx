@@ -272,6 +272,7 @@ export default function StaffPage() {
         return (
              <main className="flex-1 p-4 md:p-8">
                  <h1 className="text-3xl font-bold tracking-tight mb-6">Staff Management</h1>
+                 <p className="text-muted-foreground font-bold mb-6">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
                  <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-xl"><KeyRound className="h-5 w-5 text-primary"/> Create Your Shop</CardTitle>
@@ -337,7 +338,10 @@ export default function StaffPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            <h1 className="text-3xl font-bold tracking-tight mb-8">Staff Management</h1>
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
+                <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+            </div>
             <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
                 <div className="space-y-8">
                     <Card>
@@ -531,3 +535,5 @@ export default function StaffPage() {
         </main>
     );
 }
+
+    

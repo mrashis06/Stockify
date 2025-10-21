@@ -251,7 +251,7 @@ export default function PerformancePage() {
         <div className="flex flex-col gap-8">
             <header>
                 <h1 className="text-2xl font-bold tracking-tight">Product Performance</h1>
-                <p className="text-muted-foreground">Analyze product sales over time.</p>
+                <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
             </header>
 
             <Card>
@@ -385,3 +385,5 @@ export default function PerformancePage() {
         </div>
     );
 }
+
+    

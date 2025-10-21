@@ -20,6 +20,7 @@ import { useInventory, OnBarItem } from '@/hooks/use-inventory';
 import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
+import { useDateFormat } from '@/hooks/use-date-format';
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
@@ -37,6 +38,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     } = useInventory();
     
     const { toast } = useToast();
+    const { formatDate } = useDateFormat();
     
     usePageLoading(loading);
 
@@ -163,7 +165,10 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             </AlertDialog>
             
             <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
+                    <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                </div>
                 <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
                     <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
                         <Plus className="mr-2 h-4 w-4" /> Open a Bottle
@@ -286,3 +291,5 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
+
+    

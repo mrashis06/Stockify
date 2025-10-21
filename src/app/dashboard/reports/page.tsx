@@ -430,7 +430,7 @@ export default function ReportsPage() {
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sales Statement</h1>
-          <p className="text-muted-foreground">Detailed sales transaction reports</p>
+          <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button onClick={handleExportPDF} disabled={loading || activeData.length === 0} className="bg-red-600 hover:bg-red-700 text-white">
@@ -579,3 +579,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

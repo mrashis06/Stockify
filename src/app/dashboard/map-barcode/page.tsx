@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -14,11 +13,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Barcode, HelpCircle, Search, CheckCircle, Info, Scan, Link2 } from 'lucide-react';
 import SharedScanner from '@/components/dashboard/shared-scanner';
+import { useDateFormat } from '@/hooks/use-date-format';
 
 export default function MapBarcodePage() {
     const { inventory, updateBrand, forceRefetch, linkBarcodeToProduct } = useInventory();
     const { toast } = useToast();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+    const { formatDate } = useDateFormat();
 
     const [isClient, setIsClient] = useState(false);
     const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
@@ -133,7 +134,10 @@ export default function MapBarcodePage() {
                     onLink={handleLinkProduct}
                 />
             )}
-
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold tracking-tight">Map Product Barcodes</h1>
+                <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+            </div>
             <Card className="max-w-2xl mx-auto">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -335,3 +339,5 @@ function LinkProductDialog({ isOpen, onOpenChange, sourceProduct, onLink }: { is
         </Dialog>
     )
 }
+
+    
