@@ -132,29 +132,31 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   
   const adminNavItems = [
       { href: "/dashboard", pageName: 'Dashboard', icon: LayoutDashboard, label: "Dashboard" },
-      { href: "/dashboard/sales", pageName: 'POS', icon: ShoppingCart, label: "POS" },
       { href: "/dashboard/inventory", pageName: 'OffCounter', icon: Warehouse, label: "OffCounter" },
       { href: "/dashboard/godown", pageName: 'Godown', icon: Archive, label: "Godown" },
       { href: "/dashboard/onbar", pageName: 'OnBar', icon: GlassWater, label: "OnBar" },
       { href: "/dashboard/daily-sale", pageName: 'Daily Sale', icon: TrendingUp, label: "Daily Sale" },
+      { href: "/dashboard/reports", pageName: 'Reports', icon: FileText, label: "Reports" },
+      // Items for "More" dropdown
+      { href: "/dashboard/sales", pageName: 'POS', icon: ShoppingCart, label: "POS" },
       { href: "/dashboard/map-barcode", pageName: 'Map Barcodes', icon: Barcode, label: "Map Barcodes" },
       { href: "/dashboard/staff", pageName: 'Staff', icon: Users, label: "Staff" },
-      { href: "/dashboard/reports", pageName: 'Reports', icon: FileText, label: "Reports" },
       { href: "/dashboard/performance", pageName: 'Performance', icon: TrendingUp, label: "Performance" },
   ];
 
   const staffNavItems = [
-      { href: "/dashboard/sales", pageName: 'POS', icon: ShoppingCart, label: "POS" },
       { href: "/dashboard/inventory", pageName: 'OffCounter', icon: Warehouse, label: "OffCounter" },
       { href: "/dashboard/godown", pageName: 'Godown', icon: Archive, label: "Godown" },
       { href: "/dashboard/onbar", pageName: 'OnBar', icon: GlassWater, label: "OnBar" },
       { href: "/dashboard/daily-sale", pageName: 'Daily Sale', icon: TrendingUp, label: "Daily Sale" },
+       // Items for "More" dropdown
+      { href: "/dashboard/sales", pageName: 'POS', icon: ShoppingCart, label: "POS" },
       { href: "/dashboard/map-barcode", pageName: 'Map Barcodes', icon: Barcode, label: "Map Barcodes" },
   ];
   
   const navItems = isAdmin ? adminNavItems : staffNavItems;
-  const criticalNavItems = isAdmin ? adminNavItems.slice(0, 6) : staffNavItems;
-  const moreNavItems = isAdmin ? adminNavItems.slice(6) : [];
+  const criticalNavItems = isAdmin ? adminNavItems.slice(0, 6) : staffNavItems.slice(0, 4);
+  const moreNavItems = isAdmin ? adminNavItems.slice(6) : staffNavItems.slice(4);
   
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
