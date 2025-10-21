@@ -124,6 +124,55 @@ type InventoryState = {
 
 let listenersInitialized = false;
 
+// Simple string similarity function (Jaro-Winkler-like)
+const getSimilarity = (s1: string, s2: string): number => {
+    let longer = s1.toLowerCase();
+    let shorter = s2.toLowerCase();
+    if (s1.length < s2.length) {
+        longer = s2.toLowerCase();
+        shorter = s1.toLowerCase();
+    }
+    const longerLength = longer.length;
+    if (longerLength === 0) {
+        return 1.0;
+    }
+    const matchDistance = Math.floor(longerLength / 2) - 1;
+    const shorterMatches = new Array(shorter.length).fill(false);
+    const longerMatches = new Array(longer.length).fill(false);
+    let matches = 0;
+    for (let i = 0; i < shorter.length; i++) {
+        const start = Math.max(0, i - matchDistance);
+        const end = Math.min(i + matchDistance + 1, longer.length);
+        for (let j = start; j < end; j++) {
+            if (longerMatches[j]) continue;
+            if (shorter[i] !== longer[j]) continue;
+            shorterMatches[i] = true;
+            longerMatches[j] = true;
+            matches++;
+            break;
+        }
+    }
+    if (matches === 0) return 0;
+    let transpositions = 0;
+    let k = 0;
+    for (let i = 0; i < shorter.length; i++) {
+        if (!shorterMatches[i]) continue;
+        while (!longerMatches[k]) k++;
+        if (shorter[i] !== longer[k]) transpositions++;
+        k++;
+    }
+    const jaro = (matches / shorter.length + matches / longer.length + (matches - transpositions / 2) / matches) / 3;
+    
+    // Jaro-Winkler modification
+    let prefix = 0;
+    for (let i = 0; i < Math.min(longer.length, 4); i++) {
+        if (s1[i] === s2[i]) prefix++;
+        else break;
+    }
+    return jaro + prefix * 0.1 * (1 - jaro);
+};
+
+
 const useInventoryStore = create<InventoryState>((set, get) => ({
     inventory: [],
     unprocessedItems: [],
@@ -317,23 +366,33 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         await runTransaction(db, async (transaction) => {
             const normalizedBrand = data.brand.trim();
             const normalizedSize = data.size.trim();
-            const invQuery = query(
-                collection(db, 'inventory'), 
-                where('brand', '==', normalizedBrand), 
-                where('size', '==', normalizedSize)
-            );
-            const querySnapshot = await getDocs(invQuery);
 
-            if (!querySnapshot.empty) {
-                // Product exists, update its godown stock
-                const existingDoc = querySnapshot.docs[0];
+            const inventoryRef = collection(db, 'inventory');
+            const allInventorySnapshot = await getDocs(inventoryRef);
+            
+            let bestMatch: { doc: any; score: number } | null = null;
+            
+            allInventorySnapshot.forEach(doc => {
+                const item = doc.data() as InventoryItem;
+                if (item.size.toLowerCase() === normalizedSize.toLowerCase()) {
+                    const score = getSimilarity(item.brand, normalizedBrand);
+                    if (score > (bestMatch?.score || 0.85)) { // Use a threshold of 0.85
+                        bestMatch = { doc, score };
+                    }
+                }
+            });
+
+            if (bestMatch) {
+                // Matched an existing product, update its godown stock
+                const existingDoc = bestMatch.doc;
                 const currentStock = existingDoc.data().stockInGodown || 0;
                 transaction.update(existingDoc.ref, { 
                     stockInGodown: currentStock + data.quantity,
                     dateAddedToGodown: serverTimestamp(),
                  });
+                 toast({ title: 'Stock Updated', description: `Added ${data.quantity} units to existing product: ${existingDoc.data().brand}` });
             } else {
-                // New product, create it
+                // No good match found, create a new product
                 const newId = `manual_${uuidv4()}`;
                 const newProductRef = doc(db, 'inventory', newId);
                 transaction.set(newProductRef, {
@@ -346,6 +405,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     barcodeId: null,
                     dateAddedToGodown: serverTimestamp(),
                 });
+                toast({ title: 'New Product Added', description: `${data.brand} (${data.size}) created.` });
             }
         });
     } catch (e) {
