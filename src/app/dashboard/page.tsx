@@ -223,6 +223,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
        />
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Welcome, {user?.displayName || 'User'}!</h1>
+        <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-8">
