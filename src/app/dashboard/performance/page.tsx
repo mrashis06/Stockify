@@ -34,7 +34,6 @@ type PerformanceData = {
     size: string;
     category: string;
     unitsSold: number;
-    unitsAdded: number;
 };
 
 type DailyRecord = {
@@ -44,9 +43,10 @@ type DailyRecord = {
 }
 
 const dateRangeOptions = [
+    { label: 'Today', value: 'today' },
     { label: 'Last 30 Days', value: '30d' },
-    { label: 'Last 3 Months', value: '3m' },
-    { label: 'Last 6 Months', value: '6m' },
+    { label: 'Last 60 Days', value: '60d' },
+    { label: 'Last 90 Days', value: '90d' },
     { label: 'Custom Range', value: 'custom' },
 ];
 
@@ -55,9 +55,9 @@ export default function PerformancePage() {
     const { formatDate } = useDateFormat();
     const [loading, setLoading] = useState(true);
 
-    const [dateRangeOption, setDateRangeOption] = useState('30d');
+    const [dateRangeOption, setDateRangeOption] = useState('today');
     const [date, setDate] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 29),
+        from: new Date(),
         to: new Date(),
     });
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
@@ -83,12 +83,14 @@ export default function PerformancePage() {
     const handleDateRangeOptionChange = (value: string) => {
         setDateRangeOption(value);
         const now = new Date();
-        if (value === '30d') {
+        if (value === 'today') {
+            setDate({ from: now, to: now });
+        } else if (value === '30d') {
             setDate({ from: subDays(now, 29), to: now });
-        } else if (value === '3m') {
-            setDate({ from: subMonths(now, 3), to: now });
-        } else if (value === '6m') {
-            setDate({ from: subMonths(now, 6), to: now });
+        } else if (value === '60d') {
+            setDate({ from: subDays(now, 59), to: now });
+        } else if (value === '90d') {
+            setDate({ from: subDays(now, 89), to: now });
         } else {
             // For 'custom', we let the user pick, don't change the date here
         }
@@ -139,7 +141,6 @@ export default function PerformancePage() {
                         size: masterItem.size,
                         category: masterItem.category,
                         unitsSold: data.sold,
-                        unitsAdded: data.added,
                     });
                 }
             }
