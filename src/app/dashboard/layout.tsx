@@ -44,10 +44,11 @@ import NotificationDialog from '@/components/dashboard/notification-dialog';
 import { Separator } from '@/components/ui/separator';
 import ProfilePictureDialog from '@/components/dashboard/profile-picture-dialog';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
-  const { notifications, markAsRead, markAllAsRead, clearReadNotifications } = useNotifications();
+  const { notifications, markAsRead, markAllAsRead, deleteNotifications } = useNotifications();
   const { settings } = useNotificationSettings();
   const router = useRouter();
   const { showLoader, isLoading } = useLoading();
@@ -57,14 +58,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [isNotificationDialogOpen, setNotificationDialogOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [isProfilePicOpen, setIsProfilePicOpen] = useState(false);
+  const [selectedNotifIds, setSelectedNotifIds] = useState<Set<string>>(new Set());
 
   const displayedNotifications = user?.role === 'staff' && !settings.staffBroadcasts 
     ? [] 
     : notifications;
     
   const unreadCount = displayedNotifications.filter(n => !n.readBy.includes(user?.uid || '')).length;
-  const readCount = displayedNotifications.filter(n => n.readBy.includes(user?.uid || '')).length;
-
 
   useEffect(() => {
     if (!authLoading) {
@@ -101,6 +101,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     setSelectedNotification(notification);
     setNotificationDialogOpen(true);
   }
+
+  const toggleNotificationSelection = (id: string) => {
+    setSelectedNotifIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        return newSet;
+    });
+  };
+
+  const handleDeleteSelected = () => {
+      if (selectedNotifIds.size === 0) return;
+      deleteNotifications(Array.from(selectedNotifIds));
+      setSelectedNotifIds(new Set());
+  };
   
   const isAdmin = user?.role === 'admin';
 
@@ -261,7 +279,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         
         <div className="flex items-center gap-2 sm:gap-4">
           <ThemeToggle />
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={() => setSelectedNotifIds(new Set())}>
             <DropdownMenuTrigger asChild>
                  <Button variant="ghost" size="icon" className="rounded-full relative">
                     <Bell className="h-5 w-5" />
@@ -282,12 +300,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 Mark all as read
                             </Button>
                         )}
-                        {readCount > 0 && (
-                            <Button variant="link" size="sm" className="p-0 h-auto text-xs text-destructive" onClick={() => clearReadNotifications()}>
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Clear Read
-                            </Button>
-                        )}
+                        <Button variant="destructive" size="sm" className="p-0 h-auto text-xs" onClick={handleDeleteSelected} disabled={selectedNotifIds.size === 0}>
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete ({selectedNotifIds.size})
+                        </Button>
                     </div>
                 </div>
                 <DropdownMenuSeparator />
@@ -297,16 +313,32 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                             {displayedNotifications.map(n => {
                                 const isRead = n.readBy.includes(user?.uid || '');
                                 return (
-                                <DropdownMenuItem key={n.id} onSelect={() => handleNotificationClick(n)} className="flex items-start gap-2 cursor-pointer">
-                                    {!isRead && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary" />}
-                                    <div className={cn('w-full', isRead ? 'pl-4' : '')}>
-                                        <p className="font-semibold">{n.title}</p>
+                                <div key={n.id} className="flex items-start gap-3 p-2 text-sm rounded-md hover:bg-accent"
+                                    onClick={(e) => {
+                                        // Only open dialog if not clicking the checkbox
+                                        if (!(e.target instanceof HTMLInputElement)) {
+                                            handleNotificationClick(n)
+                                        }
+                                    }}
+                                >
+                                    <Checkbox
+                                        id={`notif-${n.id}`}
+                                        className="mt-1"
+                                        checked={selectedNotifIds.has(n.id)}
+                                        onCheckedChange={() => toggleNotificationSelection(n.id)}
+                                        onClick={(e) => e.stopPropagation()} // prevent dialog from opening
+                                    />
+                                    <div className="flex-1 cursor-pointer">
+                                        <div className="flex items-center gap-2">
+                                            {!isRead && <Circle className="h-2 w-2 fill-primary text-primary" />}
+                                            <p className={cn('font-semibold', isRead ? 'text-muted-foreground' : '')}>{n.title}</p>
+                                        </div>
                                         <p className="text-xs text-muted-foreground line-clamp-2">{n.description}</p>
                                         {n.createdAt && (
                                             <p className="text-xs text-muted-foreground mt-1">{formatDate(n.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
                                         )}
                                     </div>
-                                </DropdownMenuItem>
+                                </div>
                             )})}
                         </ScrollArea>
                     ) : (

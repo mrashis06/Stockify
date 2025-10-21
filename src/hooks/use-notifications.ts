@@ -97,34 +97,35 @@ export function useNotifications() {
         }
     };
 
-    const clearReadNotifications = async () => {
-        if (!user || !user.shopId) return;
-
-        const readNotifications = notifications.filter(n => n.readBy.includes(user.uid!));
-        if (readNotifications.length === 0) {
-            toast({ title: "No read notifications to clear." });
-            return;
-        }
+    const deleteNotifications = async (ids: string[]) => {
+        if (!user || !user.shopId || ids.length === 0) return;
 
         try {
             const batch = writeBatch(db);
-            readNotifications.forEach(n => {
-                const notifRef = doc(db, `shops/${user.shopId}/notifications`, n.id);
-                // For now, we are deleting the notification entirely.
-                // A better approach for multi-user apps might be to remove the user from a 'viewedBy' list
-                // but for this app's logic, deletion is simpler.
+            ids.forEach(id => {
+                const notifRef = doc(db, `shops/${user.shopId}/notifications`, id);
                 batch.delete(notifRef);
             });
             await batch.commit();
-            toast({ title: "Success", description: "Read notifications cleared." });
+            toast({ title: "Success", description: `${ids.length} notification(s) deleted.` });
         } catch (error) {
-            console.error("Error clearing read notifications:", error);
-            toast({ title: "Error", description: "Could not clear read notifications.", variant: 'destructive' });
+            console.error("Error deleting notifications:", error);
+            toast({ title: "Error", description: "Could not delete notifications.", variant: 'destructive' });
+        }
+    };
+    
+    const clearReadNotifications = async () => {
+        if (!user || !user.shopId) return;
+        const readIds = notifications.filter(n => n.readBy.includes(user.uid!)).map(n => n.id);
+        if (readIds.length > 0) {
+            await deleteNotifications(readIds);
+        } else {
+             toast({ title: "No read notifications to clear." });
         }
     };
 
 
-    return { notifications, loading, markAsRead, markAllAsRead, clearReadNotifications };
+    return { notifications, loading, markAsRead, markAllAsRead, clearReadNotifications, deleteNotifications };
 }
 
 // Function for creating admin-targeted notifications
