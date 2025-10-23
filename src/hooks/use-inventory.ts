@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { create } from 'zustand';
@@ -23,7 +22,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { extractItemsFromBill, BillExtractionOutput } from '@/ai/flows/extract-bill-flow';
 import type { ExtractedItem } from '@/ai/flows/extract-bill-flow';
@@ -187,18 +186,34 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
     initListeners: () => {
         const today = format(new Date(), 'yyyy-MM-dd');
-        let initialLoad = true;
+        const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
         let masterInventoryState: Map<string, any> = new Map();
+        let stableOpeningStock: Map<string, number> = new Map();
+        let listeners: (()=>void)[] = [];
 
-        const invSub = onSnapshot(query(collection(db, "inventory")), (inventorySnapshot) => {
-            const tempMasterInventory = new Map<string, any>();
-            inventorySnapshot.forEach(doc => {
-                tempMasterInventory.set(doc.id, { id: doc.id, ...doc.data() });
+        const setupListeners = async () => {
+            get()._setLoading(true);
+
+            // Fetch yesterday's closing stock to establish today's stable opening stock.
+            const yesterdayDailyRef = doc(db, 'dailyInventory', yesterday);
+            const yesterdayDoc = await getDoc(yesterdayDailyRef);
+            const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
+            
+            const invSnapshot = await getDocs(query(collection(db, "inventory")));
+            invSnapshot.forEach(doc => {
+                const item = doc.data();
+                const opening = yesterdayData[doc.id]?.closing ?? item.prevStock ?? 0;
+                stableOpeningStock.set(doc.id, Number(opening));
+                masterInventoryState.set(doc.id, { id: doc.id, ...item });
             });
 
-            if (initialLoad) {
-                masterInventoryState = tempMasterInventory;
-            }
+
+            const invSub = onSnapshot(query(collection(db, "inventory")), (inventorySnapshot) => {
+                 inventorySnapshot.docs.forEach(doc => {
+                    masterInventoryState.set(doc.id, { id: doc.id, ...doc.data() });
+                });
+            });
+            listeners.push(invSub);
 
             const dailyDocRef = doc(db, 'dailyInventory', today);
             const dailySub = onSnapshot(dailyDocRef, (dailySnap) => {
@@ -208,16 +223,10 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 const onBarSales: DailyOnBarSale[] = [];
 
                 masterInventoryState.forEach((masterItem, id) => {
-                    const latestMasterData = tempMasterInventory.get(id);
                     items.push({
                         ...masterItem,
-                        // Use latest data for dynamic fields, but keep original day's prevStock for UI consistency
-                        price: latestMasterData?.price ?? masterItem.price,
-                        stockInGodown: latestMasterData?.stockInGodown ?? masterItem.stockInGodown,
-                        barcodeId: latestMasterData?.barcodeId ?? masterItem.barcodeId,
-                        lastTransferred: latestMasterData?.lastTransferred ?? masterItem.lastTransferred,
-
-                        prevStock: Number(masterItem.prevStock || 0),
+                        // Use the stable opening stock for prevStock
+                        prevStock: stableOpeningStock.get(id) ?? 0,
                         added: Number(dailyData[id]?.added ?? 0),
                         sales: Number(dailyData[id]?.sales ?? 0),
                     });
@@ -246,93 +255,45 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     dailyOnBarSales: onBarSales,
                     loading: false 
                 });
-                initialLoad = false; // Initial load is complete
             });
-
-            return dailySub; // This is managed by the invSub's lifecycle
-        }, (error) => {
-            console.error("Error in master inventory listener:", error);
-            set({ loading: false });
-        });
+            listeners.push(dailySub);
         
-        const unprocessedSub = onSnapshot(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')), (snapshot) => {
-            const unprocessed: UnprocessedItem[] = [];
-            snapshot.forEach(doc => {
-                unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
+            const unprocessedSub = onSnapshot(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')), (snapshot) => {
+                const unprocessed: UnprocessedItem[] = [];
+                snapshot.forEach(doc => {
+                    unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
+                });
+                set({ 
+                    unprocessedItems: unprocessed.sort((a, b) => {
+                        const timeA = a.createdAt?.toMillis() || 0;
+                        const timeB = b.createdAt?.toMillis() || 0;
+                        return timeB - timeA;
+                    })
+                });
             });
-            set({ 
-                unprocessedItems: unprocessed.sort((a, b) => {
-                    const timeA = a.createdAt?.toMillis() || 0;
-                    const timeB = b.createdAt?.toMillis() || 0;
-                    return timeB - timeA;
-                })
+            listeners.push(unprocessedSub);
+            
+            const onBarSub = onSnapshot(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')), (snapshot) => {
+                const items: OnBarItem[] = [];
+                snapshot.forEach((doc) => {
+                    items.push({ id: doc.id, ...doc.data() } as OnBarItem);
+                });
+                set({ onBarInventory: items });
             });
-        });
-        
-        const onBarSub = onSnapshot(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')), (snapshot) => {
-            const items: OnBarItem[] = [];
-            snapshot.forEach((doc) => {
-                items.push({ id: doc.id, ...doc.data() } as OnBarItem);
-            });
-            set({ onBarInventory: items });
-        });
+            listeners.push(onBarSub);
+        }
 
-        return () => {
-            invSub();
-            unprocessedSub();
-            onBarSub();
-        };
+        setupListeners();
+        
+        return () => listeners.forEach(unsub => unsub());
     },
     
     forceRefetch: async () => {
-        get()._setLoading(true);
-        // This function will now re-trigger a fetch similar to the initial one
-        const today = format(new Date(), 'yyyy-MM-dd');
-        
-        try {
-            const inventorySnapshot = await getDocs(query(collection(db, "inventory")));
-            const masterInventory = new Map<string, any>();
-            inventorySnapshot.forEach(doc => {
-                masterInventory.set(doc.id, { id: doc.id, ...doc.data() });
-            });
-
-            const dailyDocRef = doc(db, 'dailyInventory', today);
-            const dailySnap = await getDoc(dailyDocRef);
-            
-            const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-            const items: InventoryItem[] = [];
-            let onBarTotal = 0;
-            const onBarSales: DailyOnBarSale[] = [];
-
-            masterInventory.forEach((masterItem, id) => {
-                items.push({
-                    ...masterItem,
-                    prevStock: Number(masterItem.prevStock || 0),
-                    added: Number(dailyData[id]?.added ?? 0),
-                    sales: Number(dailyData[id]?.sales ?? 0),
-                });
-            });
-            
-             for (const key in dailyData) {
-                if (key.startsWith('on-bar-')) {
-                    const saleData = dailyData[key];
-                    if(saleData.salesValue > 0) {
-                        onBarTotal += saleData.salesValue || 0;
-                        onBarSales.push({
-                            id: key, brand: saleData.brand, size: saleData.size,
-                            category: saleData.category, salesVolume: saleData.salesVolume,
-                            salesValue: saleData.salesValue,
-                        });
-                    }
-                }
-            }
-            set({ inventory: items.sort((a,b)=>a.brand.localeCompare(b.brand)), totalOnBarSales: onBarTotal, dailyOnBarSales: onBarSales });
-
-        } catch (error) {
-            console.error("Force refetch failed:", error);
-        } finally {
-            get()._setLoading(false);
-        }
+        // The new listener model makes forceRefetch less critical for UI updates,
+        // but it can be used to re-establish listeners if needed.
+        // For simplicity, this can be a no-op if the listeners are robust.
+        // Or it can re-trigger init.
+        return Promise.resolve();
     },
   
   addBrand: async (newItemData) => {
@@ -340,6 +301,8 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     try {
         const id = `manual_${uuidv4()}`;
         const docRef = doc(db, 'inventory', id);
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const dailyRef = doc(db, 'dailyInventory', today);
 
         const masterItemData = {
             brand: newItemData.brand,
@@ -348,10 +311,25 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             category: newItemData.category,
             stockInGodown: 0,
             barcodeId: null,
-            prevStock: Number(newItemData.prevStock)
+            prevStock: 0 // Master prev stock should be considered carefully. Let's start it at 0.
         };
         
-        await setDoc(docRef, masterItemData);
+        const dailyItemData = {
+            brand: newItemData.brand,
+            size: newItemData.size,
+            price: Number(newItemData.price),
+            category: newItemData.category,
+            prevStock: Number(newItemData.prevStock),
+            added: 0,
+            sales: 0
+        }
+
+        const batch = writeBatch(db);
+        batch.set(docRef, masterItemData);
+        batch.set(dailyRef, { [id]: dailyItemData }, { merge: true });
+
+        await batch.commit();
+
     } catch (error) {
         console.error('Error adding brand:', error);
         throw error;
@@ -563,10 +541,10 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             }
             
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-            const sourceDaily = dailyData[sourceProductId] || { added: 0, sales: 0 };
-            const destDaily = dailyData[destinationProductId] || { added: 0, sales: 0 };
+            const sourceDaily = dailyData[sourceProductId] || { added: 0, sales: 0, prevStock: 0 };
+            const destDaily = dailyData[destinationProductId] || { added: 0, sales: 0, prevStock: 0 };
             
-            const totalStockToMerge = (sourceData.prevStock || 0) + (sourceDaily.added || 0);
+            const totalStockToMerge = (sourceDaily.prevStock || 0) + (sourceDaily.added || 0);
 
             // Update destination product
             transaction.update(destRef, {
@@ -582,7 +560,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     size: destData.size,
                     category: destData.category,
                     price: destData.price,
-                    added: (destDaily.added || 0) + totalStockToMerge,
+                    prevStock: (destDaily.prevStock || 0) + totalStockToMerge,
                     sales: (destDaily.sales || 0) + (sourceDaily.sales || 0)
                 }
             }, { merge: true });
@@ -591,7 +569,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             transaction.delete(sourceRef);
             
             // Nullify the old daily record entry for the source product
-            transaction.set(dailyRef, { [sourceProductId]: null }, { merge: true });
+            const dailyUpdate: { [key: string]: any } = {};
+            dailyUpdate[sourceProductId] = deleteDoc;
+            transaction.update(dailyRef, dailyUpdate);
         });
     } catch (error) {
         console.error("Error linking barcode: ", error);
@@ -674,7 +654,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     destination: 'shop',
                  }
             };
-            if (price) {
+            if (price !== undefined) {
                 updateData.price = Number(price);
             }
             transaction.update(masterRef, updateData);
@@ -687,6 +667,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             itemDailyData.size = masterData.size;
             itemDailyData.category = masterData.category;
             itemDailyData.price = price !== undefined ? Number(price) : masterData.price;
+            if (itemDailyData.prevStock === undefined) {
+                const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+                const yesterdayDailyRef = doc(db, 'dailyInventory', yesterday);
+                const yesterdayDoc = await getDoc(yesterdayDailyRef);
+                itemDailyData.prevStock = yesterdayDoc.exists() ? (yesterdayDoc.data()?.[productId]?.closing ?? 0) : 0;
+            }
             
             transaction.set(dailyRef, { [productId]: itemDailyData }, { merge: true });
         });

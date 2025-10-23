@@ -80,7 +80,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
 
-    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing'>) => {
+    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'added'> & {prevStock: number}) => {
         try {
             await addBrand(newItemData);
             toast({ title: 'Success', description: 'New brand added successfully.' });
@@ -196,7 +196,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const filteredInventory = useMemo(() => {
         return processedInventory.filter(item => {
-            if (item.opening <= 0) return false;
+            if (item.opening <= 0 && item.closing <= 0 && item.sales <= 0) return false;
 
             const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
@@ -547,5 +547,3 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
