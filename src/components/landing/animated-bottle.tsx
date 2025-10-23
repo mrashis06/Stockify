@@ -105,7 +105,7 @@ const AnimatedBottle = () => {
                 <svg width="0" height="0">
                     <defs>
                         <clipPath id="bottleMask" clipPathUnits="objectBoundingBox">
-                            <path d="M0.41,0.99V0.38C0.41,0.3,0.36,0.22,0.5,0.22H0.5C0.64,0.22,0.59,0.3,0.59,0.38V0.99H0.41Z M0.5,0.22V0.08H0.5V0.22Z" />
+                            <path d="M0.35,1 V0.4 C0.35,0.3 0.3,0.2 0.4,0.15 L0.45,0.1 L0.45,0.05 L0.55,0.05 L0.55,0.1 L0.6,0.15 C0.7,0.2 0.65,0.3 0.65,0.4 V1 H0.35 Z" />
                         </clipPath>
                     </defs>
                 </svg>

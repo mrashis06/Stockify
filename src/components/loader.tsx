@@ -12,7 +12,7 @@ const BottleIcon = ({ progress, pageName, dynamicText }: { progress: number; pag
         liquidColorClass = 'fill-rose-400'; // Rosé
     }
 
-    const liquidHeight = 2.4 * progress; // Adjusted for new viewbox height
+    const liquidHeight = 2.8 * progress; // Adjusted for new viewbox height
 
     return (
         <svg
@@ -24,13 +24,13 @@ const BottleIcon = ({ progress, pageName, dynamicText }: { progress: number; pag
             className="drop-shadow-lg"
         >
             {/* Bottle Glass Outline - with slight transparency */}
-            <path 
-                d="M40,295 L40,80 C40,65 35,50 50,50 L70,50 C85,50 80,65 80,80 L80,295 L40,295 Z" 
+             <path 
+                d="M35,295 V120 C35,100 30,80 50,75 L70,75 C90,80 85,100 85,120 V295 H35 Z"
                 className="fill-current text-muted-foreground/10"
             />
             {/* Neck */}
             <path
-                d="M50 50 L50 20 L70 20 L70 50 Z"
+                d="M50 75 V20 H70 V75"
                 className="fill-current text-muted-foreground/10"
             />
             {/* Cork */}
@@ -41,9 +41,8 @@ const BottleIcon = ({ progress, pageName, dynamicText }: { progress: number; pag
 
             {/* Liquid - This part is clipped by the bottle shape */}
             <defs>
-                <clipPath id="bottleClip">
-                    {/* This path is slightly smaller than the bottle to contain the liquid */}
-                    <path d="M42,293 L42,80 C42,67 37,52 52,52 L68,52 C83,52 78,67 78,80 L78,293 L42,293 Z" />
+                <clipPath id="bottleClipLoader">
+                     <path d="M37,293 V120 C37,102 32,82 52,77 L68,77 C88,82 83,102 83,120 V293 H37 Z" />
                 </clipPath>
                  <style>
                     {`
@@ -57,12 +56,12 @@ const BottleIcon = ({ progress, pageName, dynamicText }: { progress: number; pag
             </defs>
 
             {/* The liquid that fills up */}
-            <g clipPath="url(#bottleClip)">
+            <g clipPath="url(#bottleClipLoader)">
                  <g className="animate-[wave_4s_ease-in-out_infinite]">
                     <rect
-                        x="32"
+                        x="27"
                         y={293 - liquidHeight}
-                        width="56"
+                        width="66"
                         height={liquidHeight}
                         className={`transition-all duration-700 ease-in-out ${liquidColorClass}`}
                     />
@@ -70,8 +69,8 @@ const BottleIcon = ({ progress, pageName, dynamicText }: { progress: number; pag
             </g>
 
             {/* Label Area to display percentage */}
-            <rect x="43" y="130" width="34" height="40" className="fill-background/30 backdrop-blur-sm rounded-sm" />
-            <text x="60" y="150" textAnchor="middle" dominantBaseline="middle" className="font-bold text-lg fill-current text-foreground">
+            <rect x="43" y="150" width="34" height="40" className="fill-background/30 backdrop-blur-sm rounded-sm" />
+            <text x="60" y="170" textAnchor="middle" dominantBaseline="middle" className="font-bold text-lg fill-current text-foreground">
                 {Math.round(progress)}%
             </text>
         </svg>
