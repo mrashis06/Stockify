@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO, isValid } from 'date-fns';
+import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO, isValid, format } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
@@ -137,7 +137,7 @@ export default function ReportsPage() {
         } finally {
             setLoading(false);
         }
-    }, [formatDate]);
+    }, []);
     
     useEffect(() => {
        fetchReportData(date);
