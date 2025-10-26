@@ -197,20 +197,21 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
         let masterInv: InventoryItem[] = [];
         let dailyData: any = {};
-        let yesterdayData: any = {};
+        let initialOpeningStocks = new Map<string, number>();
         let onBarInv: OnBarItem[] = [];
         let unprocessed: UnprocessedItem[] = [];
 
         const combineAndSetState = () => {
-            const items: InventoryItem[] = [];
-            masterInv.forEach(masterItem => {
-                const openingStock = yesterdayData[masterItem.id]?.closing ?? masterItem.prevStock ?? 0;
-                items.push({
+             if (initialOpeningStocks.size === 0) return; // Don't run until we have opening stocks
+
+            const items: InventoryItem[] = masterInv.map(masterItem => {
+                const openingStock = initialOpeningStocks.get(masterItem.id) ?? 0;
+                return {
                     ...masterItem,
                     prevStock: Number(openingStock),
                     added: Number(dailyData[masterItem.id]?.added ?? 0),
                     sales: Number(dailyData[masterItem.id]?.sales ?? 0),
-                });
+                };
             });
 
             let onBarTotal = 0;
@@ -244,7 +245,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
         const invSub = onSnapshot(query(collection(db, "inventory")), (snapshot) => {
             masterInv = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
-            combineAndSetState();
+            if (initialOpeningStocks.size > 0) {
+                combineAndSetState();
+            }
         });
 
         const dailySub = onSnapshot(doc(db, 'dailyInventory', today), (doc) => {
@@ -261,12 +264,36 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             onBarInv = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OnBarItem));
             combineAndSetState();
         });
+        
+        // Fetch opening stock data ONCE.
+        const fetchInitialData = async () => {
+            try {
+                // First get all master inventory items.
+                const inventorySnapshot = await getDocs(collection(db, 'inventory'));
+                masterInv = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
 
-        // Fetch yesterday's data once, it won't change
-        getDoc(doc(db, 'dailyInventory', yesterday)).then(doc => {
-            yesterdayData = doc.exists() ? doc.data() : {};
-            combineAndSetState();
-        });
+                // Then fetch yesterday's closing data.
+                const yesterdayDoc = await getDoc(doc(db, 'dailyInventory', yesterday));
+                const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
+
+                // Create a stable map of opening stocks for today.
+                const openingStocksMap = new Map<string, number>();
+                masterInv.forEach(item => {
+                    // Logic: Today's opening is yesterday's closing, OR the master prevStock (from EOD).
+                    const opening = yesterdayData[item.id]?.closing ?? item.prevStock ?? 0;
+                    openingStocksMap.set(item.id, opening);
+                });
+                initialOpeningStocks = openingStocksMap;
+
+                // Now that we have the stable opening stock, combine state.
+                combineAndSetState();
+            } catch (error) {
+                console.error("Error fetching initial stock data:", error);
+                set({ loading: false });
+            }
+        };
+
+        fetchInitialData();
         
         listeners.push(invSub, dailySub, unprocessedSub, onBarSub);
 
@@ -1119,5 +1146,3 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
-
-    
