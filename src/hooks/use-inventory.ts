@@ -20,6 +20,7 @@ import {
   Timestamp,
   orderBy,
   limit,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { format, subDays } from 'date-fns';
@@ -122,6 +123,7 @@ type InventoryState = {
 };
 
 let listenersInitialized = false;
+let listeners: (()=>void)[] = [];
 
 // Simple string similarity function (Jaro-Winkler-like)
 const getSimilarity = (s1: string, s2: string): number => {
@@ -171,6 +173,69 @@ const getSimilarity = (s1: string, s2: string): number => {
     return jaro + prefix * 0.1 * (1 - jaro);
 };
 
+const fetchFullState = async () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+
+    const inventorySnapshot = await getDocs(query(collection(db, "inventory")));
+    const dailyDoc = await getDoc(doc(db, 'dailyInventory', today));
+    const yesterdayDailyDoc = await getDoc(doc(db, 'dailyInventory', yesterday));
+    const onBarSnapshot = await getDocs(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')));
+    const unprocessedSnapshot = await getDocs(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')));
+
+    const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+    const yesterdayData = yesterdayDailyDoc.exists() ? yesterdayDailyDoc.data() : {};
+
+    const items: InventoryItem[] = [];
+    inventorySnapshot.forEach(doc => {
+        const masterItem = { id: doc.id, ...doc.data() } as InventoryItem;
+        const openingStock = yesterdayData[doc.id]?.closing ?? masterItem.prevStock ?? 0;
+        
+        items.push({
+            ...masterItem,
+            prevStock: Number(openingStock),
+            added: Number(dailyData[doc.id]?.added ?? 0),
+            sales: Number(dailyData[doc.id]?.sales ?? 0),
+        });
+    });
+
+    let onBarTotal = 0;
+    const onBarSales: DailyOnBarSale[] = [];
+    for (const key in dailyData) {
+        if (key.startsWith('on-bar-')) {
+            const saleData = dailyData[key];
+            if(saleData.salesValue > 0) {
+                onBarTotal += saleData.salesValue || 0;
+                onBarSales.push({
+                    id: key,
+                    brand: saleData.brand,
+                    size: saleData.size,
+                    category: saleData.category,
+                    salesVolume: saleData.salesVolume,
+                    salesValue: saleData.salesValue,
+                });
+            }
+        }
+    }
+
+    const onBarItems: OnBarItem[] = [];
+    onBarSnapshot.forEach((doc) => {
+        onBarItems.push({ id: doc.id, ...doc.data() } as OnBarItem);
+    });
+
+    const unprocessedItems: UnprocessedItem[] = [];
+    unprocessedSnapshot.forEach(doc => {
+        unprocessedItems.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
+    });
+
+    return {
+        inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)),
+        unprocessedItems: unprocessedItems.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)),
+        onBarInventory: onBarItems,
+        dailyOnBarSales: onBarSales,
+        totalOnBarSales: onBarTotal,
+    };
+};
 
 const useInventoryStore = create<InventoryState>((set, get) => ({
     inventory: [],
@@ -185,115 +250,34 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     _setSaving: (isSaving) => set({ saving: isSaving }),
 
     initListeners: () => {
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-        let masterInventoryState: Map<string, any> = new Map();
-        let stableOpeningStock: Map<string, number> = new Map();
-        let listeners: (()=>void)[] = [];
+        get()._setLoading(true);
+        fetchFullState().then(fullState => {
+            set({ ...fullState, loading: false });
+        });
 
-        const setupListeners = async () => {
-            get()._setLoading(true);
+        // Clear previous listeners
+        listeners.forEach(unsub => unsub());
+        listeners = [];
 
-            // Fetch yesterday's closing stock to establish today's stable opening stock.
-            const yesterdayDailyRef = doc(db, 'dailyInventory', yesterday);
-            const yesterdayDoc = await getDoc(yesterdayDailyRef);
-            const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
-            
-            const invSnapshot = await getDocs(query(collection(db, "inventory")));
-            invSnapshot.forEach(doc => {
-                const item = doc.data();
-                const opening = yesterdayData[doc.id]?.closing ?? item.prevStock ?? 0;
-                stableOpeningStock.set(doc.id, Number(opening));
-                masterInventoryState.set(doc.id, { id: doc.id, ...item });
-            });
-
-
-            const invSub = onSnapshot(query(collection(db, "inventory")), (inventorySnapshot) => {
-                 inventorySnapshot.docs.forEach(doc => {
-                    masterInventoryState.set(doc.id, { id: doc.id, ...doc.data() });
-                });
-            });
-            listeners.push(invSub);
-
-            const dailyDocRef = doc(db, 'dailyInventory', today);
-            const dailySub = onSnapshot(dailyDocRef, (dailySnap) => {
-                const dailyData = dailySnap.exists() ? dailySnap.data() : {};
-                const items: InventoryItem[] = [];
-                let onBarTotal = 0;
-                const onBarSales: DailyOnBarSale[] = [];
-
-                masterInventoryState.forEach((masterItem, id) => {
-                    items.push({
-                        ...masterItem,
-                        // Use the stable opening stock for prevStock
-                        prevStock: stableOpeningStock.get(id) ?? 0,
-                        added: Number(dailyData[id]?.added ?? 0),
-                        sales: Number(dailyData[id]?.sales ?? 0),
-                    });
-                });
-                
-                for (const key in dailyData) {
-                    if (key.startsWith('on-bar-')) {
-                        const saleData = dailyData[key];
-                        if(saleData.salesValue > 0) {
-                            onBarTotal += saleData.salesValue || 0;
-                            onBarSales.push({
-                                id: key,
-                                brand: saleData.brand,
-                                size: saleData.size,
-                                category: saleData.category,
-                                salesVolume: saleData.salesVolume,
-                                salesValue: saleData.salesValue,
-                            });
-                        }
-                    }
-                }
-                
-                set({ 
-                    inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)),
-                    totalOnBarSales: onBarTotal,
-                    dailyOnBarSales: onBarSales,
-                    loading: false 
-                });
-            });
-            listeners.push(dailySub);
+        const invSub = onSnapshot(collection(db, "inventory"), () => get().forceRefetch());
+        const dailySub = onSnapshot(doc(db, 'dailyInventory', format(new Date(), 'yyyy-MM-dd')), () => get().forceRefetch());
+        const unprocessedSub = onSnapshot(collection(db, "unprocessed_deliveries"), () => get().forceRefetch());
+        const onBarSub = onSnapshot(collection(db, "onBarInventory"), () => get().forceRefetch());
         
-            const unprocessedSub = onSnapshot(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')), (snapshot) => {
-                const unprocessed: UnprocessedItem[] = [];
-                snapshot.forEach(doc => {
-                    unprocessed.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
-                });
-                set({ 
-                    unprocessedItems: unprocessed.sort((a, b) => {
-                        const timeA = a.createdAt?.toMillis() || 0;
-                        const timeB = b.createdAt?.toMillis() || 0;
-                        return timeB - timeA;
-                    })
-                });
-            });
-            listeners.push(unprocessedSub);
-            
-            const onBarSub = onSnapshot(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')), (snapshot) => {
-                const items: OnBarItem[] = [];
-                snapshot.forEach((doc) => {
-                    items.push({ id: doc.id, ...doc.data() } as OnBarItem);
-                });
-                set({ onBarInventory: items });
-            });
-            listeners.push(onBarSub);
-        }
+        listeners.push(invSub, dailySub, unprocessedSub, onBarSub);
 
-        setupListeners();
-        
         return () => listeners.forEach(unsub => unsub());
     },
     
     forceRefetch: async () => {
-        // The new listener model makes forceRefetch less critical for UI updates,
-        // but it can be used to re-establish listeners if needed.
-        // For simplicity, this can be a no-op if the listeners are robust.
-        // Or it can re-trigger init.
-        return Promise.resolve();
+        get()._setLoading(true);
+        try {
+            const fullState = await fetchFullState();
+            set({ ...fullState, loading: false });
+        } catch (error) {
+            console.error("Error during force refetch:", error);
+            set({ loading: false });
+        }
     },
   
   addBrand: async (newItemData) => {
@@ -505,6 +489,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         if (data.price) {
           updateData.price = Number(data.price);
         }
+        if (data.stockInGodown !== undefined && data.stockInGodown === 0) {
+            updateData.lastTransferred = deleteField() as any;
+        }
         await updateDoc(docRef, updateData);
     } catch (error) {
       console.error("Error updating brand: ", error);
@@ -570,7 +557,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             
             // Nullify the old daily record entry for the source product
             const dailyUpdate: { [key: string]: any } = {};
-            dailyUpdate[sourceProductId] = deleteDoc;
+            dailyUpdate[sourceProductId] = deleteField();
             transaction.update(dailyRef, dailyUpdate);
         });
     } catch (error) {

@@ -102,6 +102,7 @@ export default function GodownPage() {
     const handleAddGodownItem = async (data: AddGodownItemFormValues) => {
         try {
             await addGodownItem(data);
+            forceRefetch();
         } catch (error) {
             console.error('Error adding item to godown:', error);
             const errorMessage = (error as Error).message || 'Failed to add item.';
@@ -157,6 +158,7 @@ export default function GodownPage() {
             await deleteUnprocessedItems(Array.from(selectedUnprocessedRows));
             toast({ title: 'Success', description: 'Selected unprocessed items removed.' });
             setSelectedUnprocessedRows(new Set());
+            forceRefetch();
         } catch (error) {
              toast({ title: 'Error', description: (error as Error).message || 'Failed to remove items.', variant: 'destructive' });
         }
@@ -174,6 +176,7 @@ export default function GodownPage() {
         try {
             await updateGodownStock(id, newStock);
             toast({ title: 'Success', description: `Godown stock updated.` });
+            forceRefetch();
         } catch (error) {
             console.error(`Error updating godown stock:`, error);
             const errorMessage = (error as Error).message || `Failed to update stock.`;
@@ -254,7 +257,10 @@ export default function GodownPage() {
                 isOpen={isProcessDeliveryOpen}
                 onOpenChange={setIsProcessDeliveryOpen}
                 unprocessedItem={processingItem}
-                onProcess={processScannedDelivery}
+                onProcess={async (...args) => {
+                    await processScannedDelivery(...args);
+                    forceRefetch();
+                }}
             />
         )}
         <ScanBillDialog 
@@ -492,5 +498,3 @@ export default function GodownPage() {
     </main>
   );
 }
-
-    

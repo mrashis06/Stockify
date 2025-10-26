@@ -20,7 +20,7 @@ type ProcessDeliveryDialogProps = {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     unprocessedItem: UnprocessedItem;
-    onProcess: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => void;
+    onProcess: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
 };
 
 const formSchema = z.object({
@@ -59,7 +59,7 @@ export default function ProcessDeliveryDialog({ isOpen, onOpenChange, unprocesse
         if (mappedItem) {
             setExistingProduct(mappedItem);
             // If the item exists, we can process it right away.
-            onProcess(unprocessedItem.id, decodedText, {
+            await onProcess(unprocessedItem.id, decodedText, {
                 price: mappedItem.price,
                 quantity: unprocessedItem.quantity,
                 brand: unprocessedItem.brand,
@@ -78,9 +78,9 @@ export default function ProcessDeliveryDialog({ isOpen, onOpenChange, unprocesse
         form.reset();
     };
     
-    const handleSubmitNewProduct = (data: FormValues) => {
+    const handleSubmitNewProduct = async (data: FormValues) => {
         if (!scannedBarcode) return;
-        onProcess(unprocessedItem.id, scannedBarcode, {
+        await onProcess(unprocessedItem.id, scannedBarcode, {
             price: data.price,
             quantity: unprocessedItem.quantity,
             brand: unprocessedItem.brand,
@@ -154,6 +154,3 @@ export default function ProcessDeliveryDialog({ isOpen, onOpenChange, unprocesse
         </Dialog>
     );
 }
-
-
-    
