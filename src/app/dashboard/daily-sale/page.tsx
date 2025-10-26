@@ -12,7 +12,7 @@ import { usePageLoading } from '@/hooks/use-loading';
 import { Button } from '@/components/ui/button';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { subDays, format }s from 'date-fns';
+import { subDays, format } from 'date-fns';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
