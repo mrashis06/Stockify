@@ -60,6 +60,10 @@ export default function PerformancePage() {
         from: new Date(),
         to: new Date(),
     });
+    
+    // State for the raw input strings
+    const [dateInputs, setDateInputs] = useState<{ from: string; to: string }>({ from: '', to: '' });
+
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [productFilter, setProductFilter] = useState('All Products');
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
@@ -67,6 +71,14 @@ export default function PerformancePage() {
 
     usePageLoading(loading || inventoryLoading);
     
+    // Effect to sync main date state to input strings
+    useEffect(() => {
+        setDateInputs({
+            from: date?.from ? formatDate(date.from) : '',
+            to: date?.to ? formatDate(date.to) : '',
+        });
+    }, [date, formatDate]);
+
     const allCategories = useMemo(() => {
         const cats = new Set(masterInventory.map(i => i.category).filter(Boolean));
         return ['All Categories', ...Array.from(cats).sort()];
@@ -92,9 +104,8 @@ export default function PerformancePage() {
             setDate({ from: subDays(now, 59), to: now });
         } else if (value === '90d') {
             setDate({ from: subDays(now, 89), to: now });
-        } else {
-            // For 'custom', we let the user pick, don't change the date here
         }
+        // For 'custom', we let the user pick, don't change the date here
     };
 
     const handleDateSelect = (range: DateRange | undefined) => {
@@ -103,13 +114,14 @@ export default function PerformancePage() {
     };
 
     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
-        const parsedDate = parse(e.target.value, dateFormat, new Date());
+        const value = e.target.value;
+        setDateInputs(prev => ({ ...prev, [field]: value }));
+        
+        const parsedDate = parse(value, dateFormat, new Date());
         if (isValid(parsedDate)) {
             setDate(prev => ({ ...prev, [field]: parsedDate }));
-        } else {
-            setDate(prev => ({...prev, [field]: undefined}));
         }
-    }
+    };
     
     const fetchPerformanceData = useCallback(async (range: DateRange | undefined, category: string, product: string, sort: 'desc' | 'asc') => {
         if (!range?.from) return;
@@ -289,7 +301,7 @@ export default function PerformancePage() {
                         <Input
                             type="text"
                             placeholder="From Date"
-                            value={date?.from ? formatDate(date.from) : ''}
+                            value={dateInputs.from}
                             onChange={(e) => handleDateInputChange(e, 'from')}
                             className="w-full md:w-36"
                         />
@@ -297,7 +309,7 @@ export default function PerformancePage() {
                          <Input
                             type="text"
                             placeholder="To Date"
-                            value={date?.to ? formatDate(date.to) : ''}
+                            value={dateInputs.to}
                             onChange={(e) => handleDateInputChange(e, 'to')}
                             className="w-full md:w-36"
                         />

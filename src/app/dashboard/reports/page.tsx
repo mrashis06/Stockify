@@ -87,25 +87,35 @@ export default function ReportsPage() {
         }
         return { from: new Date(), to: new Date() };
     });
+    
+    const [dateInputs, setDateInputs] = useState<{ from: string; to: string }>({ from: '', to: '' });
 
     const [reportType, setReportType] = useState<'offcounter' | 'onbar'>('offcounter');
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
     usePageLoading(loading);
+    
+    useEffect(() => {
+        setDateInputs({
+            from: date?.from ? formatDate(date.from) : '',
+            to: date?.to ? formatDate(date.to) : '',
+        });
+    }, [date, formatDate]);
 
     const handleDateSelect = (range: DateRange | undefined) => {
         setDate(range);
     };
 
     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
-        const parsedDate = parse(e.target.value, dateFormat, new Date());
+        const value = e.target.value;
+        setDateInputs(prev => ({ ...prev, [field]: value }));
+        
+        const parsedDate = parse(value, dateFormat, new Date());
         if (isValid(parsedDate)) {
             setDate(prev => ({ ...prev, [field]: parsedDate }));
-        } else {
-             setDate(prev => ({ ...prev, [field]: undefined }));
         }
-    }
+    };
 
     const fetchReportData = useCallback(async (range: DateRange | undefined) => {
         if (!range?.from) {
@@ -480,7 +490,7 @@ export default function ReportsPage() {
                         <Input
                             type="text"
                             placeholder="From Date"
-                            value={date?.from ? formatDate(date.from) : ''}
+                            value={dateInputs.from}
                             onChange={(e) => handleDateInputChange(e, 'from')}
                             className="w-full md:w-36"
                         />
@@ -488,7 +498,7 @@ export default function ReportsPage() {
                          <Input
                             type="text"
                             placeholder="To Date"
-                            value={date?.to ? formatDate(date.to) : ''}
+                            value={dateInputs.to}
                             onChange={(e) => handleDateInputChange(e, 'to')}
                             className="w-full md:w-36"
                         />
