@@ -97,23 +97,28 @@ export default function ReportsPage() {
     usePageLoading(loading);
     
     useEffect(() => {
-        setDateInputs({
-            from: date?.from ? formatDate(date.from) : '',
-            to: date?.to ? formatDate(date.to) : '',
-        });
+        if (date?.from) setDateInputs(prev => ({...prev, from: formatDate(date.from)}));
+        if (date?.to) setDateInputs(prev => ({...prev, to: formatDate(date.to)}));
     }, [date, formatDate]);
+
 
     const handleDateSelect = (range: DateRange | undefined) => {
         setDate(range);
     };
 
     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
-        const value = e.target.value;
-        setDateInputs(prev => ({ ...prev, [field]: value }));
+        setDateInputs(prev => ({ ...prev, [field]: e.target.value }));
+    };
+
+    const handleDateInputBlur = (field: 'from' | 'to') => {
+        const dateStr = dateInputs[field];
+        if (!dateStr) return; // Ignore empty input
         
-        const parsedDate = parse(value, dateFormat, new Date());
+        const parsedDate = parse(dateStr, dateFormat, new Date());
         if (isValid(parsedDate)) {
             setDate(prev => ({ ...prev, [field]: parsedDate }));
+        } else {
+            toast({ title: "Invalid Date", description: `The date format for '${field}' is not correct. Please use ${dateFormat}.`, variant: "destructive" });
         }
     };
 
@@ -492,6 +497,7 @@ export default function ReportsPage() {
                             placeholder="From Date"
                             value={dateInputs.from}
                             onChange={(e) => handleDateInputChange(e, 'from')}
+                            onBlur={() => handleDateInputBlur('from')}
                             className="w-full md:w-36"
                         />
                          <span className="text-muted-foreground">-</span>
@@ -500,6 +506,7 @@ export default function ReportsPage() {
                             placeholder="To Date"
                             value={dateInputs.to}
                             onChange={(e) => handleDateInputChange(e, 'to')}
+                            onBlur={() => handleDateInputBlur('to')}
                             className="w-full md:w-36"
                         />
                     </div>

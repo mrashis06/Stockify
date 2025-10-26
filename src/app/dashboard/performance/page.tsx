@@ -61,7 +61,6 @@ export default function PerformancePage() {
         to: new Date(),
     });
     
-    // State for the raw input strings
     const [dateInputs, setDateInputs] = useState<{ from: string; to: string }>({ from: '', to: '' });
 
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
@@ -71,12 +70,9 @@ export default function PerformancePage() {
 
     usePageLoading(loading || inventoryLoading);
     
-    // Effect to sync main date state to input strings
     useEffect(() => {
-        setDateInputs({
-            from: date?.from ? formatDate(date.from) : '',
-            to: date?.to ? formatDate(date.to) : '',
-        });
+        if (date?.from) setDateInputs(prev => ({ ...prev, from: formatDate(date.from) }));
+        if (date?.to) setDateInputs(prev => ({ ...prev, to: formatDate(date.to) }));
     }, [date, formatDate]);
 
     const allCategories = useMemo(() => {
@@ -105,24 +101,30 @@ export default function PerformancePage() {
         } else if (value === '90d') {
             setDate({ from: subDays(now, 89), to: now });
         }
-        // For 'custom', we let the user pick, don't change the date here
     };
 
     const handleDateSelect = (range: DateRange | undefined) => {
         setDateRangeOption('custom');
         setDate(range);
     };
-
+    
     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
-        const value = e.target.value;
-        setDateInputs(prev => ({ ...prev, [field]: value }));
+        setDateInputs(prev => ({ ...prev, [field]: e.target.value }));
+    };
+
+    const handleDateInputBlur = (field: 'from' | 'to') => {
+        const dateStr = dateInputs[field];
+        if (!dateStr) return;
         
-        const parsedDate = parse(value, dateFormat, new Date());
+        const parsedDate = parse(dateStr, dateFormat, new Date());
         if (isValid(parsedDate)) {
             setDate(prev => ({ ...prev, [field]: parsedDate }));
+            setDateRangeOption('custom');
+        } else {
+            toast({ title: "Invalid Date", description: `The date format for '${field}' is not correct. Please use ${dateFormat}.`, variant: "destructive" });
         }
     };
-    
+
     const fetchPerformanceData = useCallback(async (range: DateRange | undefined, category: string, product: string, sort: 'desc' | 'asc') => {
         if (!range?.from) return;
         setLoading(true);
@@ -303,6 +305,7 @@ export default function PerformancePage() {
                             placeholder="From Date"
                             value={dateInputs.from}
                             onChange={(e) => handleDateInputChange(e, 'from')}
+                            onBlur={() => handleDateInputBlur('from')}
                             className="w-full md:w-36"
                         />
                          <span className="text-muted-foreground">-</span>
@@ -311,6 +314,7 @@ export default function PerformancePage() {
                             placeholder="To Date"
                             value={dateInputs.to}
                             onChange={(e) => handleDateInputChange(e, 'to')}
+                            onBlur={() => handleDateInputBlur('to')}
                             className="w-full md:w-36"
                         />
                     </div>
