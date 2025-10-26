@@ -13,12 +13,14 @@ import { Button } from '@/components/ui/button';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { subDays, format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
 
 export default function DailySalePage() {
+    const { toast } = useToast();
     const { formatDate } = useDateFormat();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
@@ -107,6 +109,11 @@ export default function DailySalePage() {
         doc.text(totalString, doc.internal.pageSize.width - 22, yPos + 4, { align: 'right' });
 
         doc.save(`BL_Sale_Report_${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
+        
+        toast({
+            title: "Export Successful",
+            description: "Your BL Sale Report has been downloaded.",
+        });
     };
 
 

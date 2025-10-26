@@ -400,6 +400,11 @@ export default function ReportsPage() {
         
         const fileDate = date?.from ? formatDate(date.from, 'yyyy-MM-dd') : 'report';
         doc.save(`${reportType}_sales_report_${fileDate}.pdf`);
+
+        toast({
+            title: "Export Successful",
+            description: "Your Sales Statement has been downloaded.",
+        });
     };
 
     const handleExportCSV = () => {
@@ -476,6 +481,11 @@ export default function ReportsPage() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+
+        toast({
+            title: "Export Successful",
+            description: "Your Sales Statement has been downloaded as a CSV file.",
+        });
     };
 
   if (loading) {

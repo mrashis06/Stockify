@@ -267,6 +267,11 @@ export default function PerformancePage() {
             });
             doc.save(`performance_report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
         }
+        
+        toast({
+            title: "Export Successful",
+            description: "Your Performance Report has been downloaded.",
+        });
     };
 
     if (loading || inventoryLoading) {
