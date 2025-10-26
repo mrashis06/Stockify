@@ -16,7 +16,7 @@ import SharedScanner from '@/components/dashboard/shared-scanner';
 import { useDateFormat } from '@/hooks/use-date-format';
 
 export default function MapBarcodePage() {
-    const { inventory, updateBrand, forceRefetch, linkBarcodeToProduct } = useInventory();
+    const { inventory, updateBrand, linkBarcodeToProduct } = useInventory();
     const { toast } = useToast();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
     const { formatDate } = useDateFormat();
@@ -40,8 +40,8 @@ export default function MapBarcodePage() {
         setIsScannerPaused(true);
         setScannedBarcode(decodedText);
         
-        await forceRefetch(); // Ensure we have the latest inventory before checking
-        const mappedItem = inventory.find(item => item.barcodeId === decodedText);
+        const updatedInventory = useInventory.getState().inventory;
+        const mappedItem = updatedInventory.find(item => item.barcodeId === decodedText);
 
         if (mappedItem) {
             setAlreadyMappedItem(mappedItem);
@@ -339,5 +339,7 @@ function LinkProductDialog({ isOpen, onOpenChange, sourceProduct, onLink }: { is
         </Dialog>
     )
 }
+
+    
 
     

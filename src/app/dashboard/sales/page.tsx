@@ -16,7 +16,7 @@ import SharedScanner from '@/components/dashboard/shared-scanner';
 import { useDateFormat } from '@/hooks/use-date-format';
 
 export default function SalesPage() {
-    const { inventory, recordSale, forceRefetch } = useInventory();
+    const { inventory, recordSale } = useInventory();
     const { user } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
@@ -37,11 +37,7 @@ export default function SalesPage() {
 
     const handleScanSuccess = async (decodedText: string) => {
         if (isScannerPaused) return;
-
-        // Ensure we have the latest inventory before processing the scan
-        await forceRefetch();
         
-        // Use the freshly fetched inventory state from the hook
         const updatedInventory = useInventory.getState().inventory;
         const itemData = updatedInventory.find(item => item.barcodeId === decodedText);
 
@@ -77,11 +73,6 @@ export default function SalesPage() {
 
         // Perform database operations in the background
         recordSale(scannedItem.id, quantityNum, editedPrice, user.uid)
-            .then(() => {
-                // The sale was successful in the backend. We can optionally
-                // re-fetch data in the background if needed, but the UI is already updated.
-                forceRefetch(); // This now happens silently.
-            })
             .catch((error) => {
                 // Revert UI on failure
                 setSaleCompleted(false); 

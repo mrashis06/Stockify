@@ -61,7 +61,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
         deleteBrand: deleteProduct,
         updateBrand,
         updateItemField,
-        forceRefetch,
         totalOnBarSales,
     } = useInventory();
     
@@ -115,7 +114,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
              processedValue = Number(value);
              if (isNaN(processedValue) || processedValue < 0) {
                  toast({ title: 'Invalid Input', description: 'Please enter a valid non-negative number.', variant: 'destructive'});
-                 forceRefetch(); // Re-fetch to reset the view to the correct value
                  return;
              }
         }
@@ -127,7 +125,6 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
             console.error(`Error updating ${field}:`, error);
             const errorMessage = (error as Error).message || `Failed to update ${field}.`;
             toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
-            forceRefetch(); // Re-fetch to reset the view to the correct value on error
         }
     };
 
@@ -547,3 +544,5 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    

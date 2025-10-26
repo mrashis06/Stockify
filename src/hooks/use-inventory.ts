@@ -95,7 +95,6 @@ type InventoryState = {
   
   // Actions
   initListeners: () => () => void;
-  forceRefetch: () => Promise<void>;
   addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {prevStock: number}) => Promise<void>;
   addGodownItem: (data: AddGodownItemFormValues) => Promise<void>;
   processScannedBill: (billDataUri: string, fileName: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
@@ -173,69 +172,6 @@ const getSimilarity = (s1: string, s2: string): number => {
     return jaro + prefix * 0.1 * (1 - jaro);
 };
 
-const fetchFullState = async () => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-
-    const inventorySnapshot = await getDocs(query(collection(db, "inventory")));
-    const dailyDoc = await getDoc(doc(db, 'dailyInventory', today));
-    const yesterdayDailyDoc = await getDoc(doc(db, 'dailyInventory', yesterday));
-    const onBarSnapshot = await getDocs(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')));
-    const unprocessedSnapshot = await getDocs(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')));
-
-    const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
-    const yesterdayData = yesterdayDailyDoc.exists() ? yesterdayDailyDoc.data() : {};
-
-    const items: InventoryItem[] = [];
-    inventorySnapshot.forEach(doc => {
-        const masterItem = { id: doc.id, ...doc.data() } as InventoryItem;
-        const openingStock = yesterdayData[doc.id]?.closing ?? masterItem.prevStock ?? 0;
-        
-        items.push({
-            ...masterItem,
-            prevStock: Number(openingStock),
-            added: Number(dailyData[doc.id]?.added ?? 0),
-            sales: Number(dailyData[doc.id]?.sales ?? 0),
-        });
-    });
-
-    let onBarTotal = 0;
-    const onBarSales: DailyOnBarSale[] = [];
-    for (const key in dailyData) {
-        if (key.startsWith('on-bar-')) {
-            const saleData = dailyData[key];
-            if(saleData.salesValue > 0) {
-                onBarTotal += saleData.salesValue || 0;
-                onBarSales.push({
-                    id: key,
-                    brand: saleData.brand,
-                    size: saleData.size,
-                    category: saleData.category,
-                    salesVolume: saleData.salesVolume,
-                    salesValue: saleData.salesValue,
-                });
-            }
-        }
-    }
-
-    const onBarItems: OnBarItem[] = [];
-    onBarSnapshot.forEach((doc) => {
-        onBarItems.push({ id: doc.id, ...doc.data() } as OnBarItem);
-    });
-
-    const unprocessedItems: UnprocessedItem[] = [];
-    unprocessedSnapshot.forEach(doc => {
-        unprocessedItems.push({ id: doc.id, ...doc.data() } as UnprocessedItem);
-    });
-
-    return {
-        inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)),
-        unprocessedItems: unprocessedItems.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)),
-        onBarInventory: onBarItems,
-        dailyOnBarSales: onBarSales,
-        totalOnBarSales: onBarTotal,
-    };
-};
 
 const useInventoryStore = create<InventoryState>((set, get) => ({
     inventory: [],
@@ -251,33 +187,90 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
     initListeners: () => {
         get()._setLoading(true);
-        fetchFullState().then(fullState => {
-            set({ ...fullState, loading: false });
-        });
 
         // Clear previous listeners
         listeners.forEach(unsub => unsub());
         listeners = [];
 
-        const invSub = onSnapshot(collection(db, "inventory"), () => get().forceRefetch());
-        const dailySub = onSnapshot(doc(db, 'dailyInventory', format(new Date(), 'yyyy-MM-dd')), () => get().forceRefetch());
-        const unprocessedSub = onSnapshot(collection(db, "unprocessed_deliveries"), () => get().forceRefetch());
-        const onBarSub = onSnapshot(collection(db, "onBarInventory"), () => get().forceRefetch());
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+
+        let masterInv: InventoryItem[] = [];
+        let dailyData: any = {};
+        let yesterdayData: any = {};
+        let onBarInv: OnBarItem[] = [];
+        let unprocessed: UnprocessedItem[] = [];
+
+        const combineAndSetState = () => {
+            const items: InventoryItem[] = [];
+            masterInv.forEach(masterItem => {
+                const openingStock = yesterdayData[masterItem.id]?.closing ?? masterItem.prevStock ?? 0;
+                items.push({
+                    ...masterItem,
+                    prevStock: Number(openingStock),
+                    added: Number(dailyData[masterItem.id]?.added ?? 0),
+                    sales: Number(dailyData[masterItem.id]?.sales ?? 0),
+                });
+            });
+
+            let onBarTotal = 0;
+            const onBarSales: DailyOnBarSale[] = [];
+             for (const key in dailyData) {
+                if (key.startsWith('on-bar-')) {
+                    const saleData = dailyData[key];
+                    if(saleData.salesValue > 0) {
+                        onBarTotal += saleData.salesValue || 0;
+                        onBarSales.push({
+                            id: key,
+                            brand: saleData.brand,
+                            size: saleData.size,
+                            category: saleData.category,
+                            salesVolume: saleData.salesVolume,
+                            salesValue: saleData.salesValue,
+                        });
+                    }
+                }
+            }
+
+            set({
+                inventory: items.sort((a, b) => a.brand.localeCompare(b.brand)),
+                unprocessedItems: unprocessed.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)),
+                onBarInventory: onBarInv.sort((a, b) => (b.openedAt?.toMillis() || 0) - (a.openedAt?.toMillis() || 0)),
+                dailyOnBarSales: onBarSales,
+                totalOnBarSales: onBarTotal,
+                loading: false
+            });
+        };
+
+        const invSub = onSnapshot(query(collection(db, "inventory")), (snapshot) => {
+            masterInv = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
+            combineAndSetState();
+        });
+
+        const dailySub = onSnapshot(doc(db, 'dailyInventory', today), (doc) => {
+            dailyData = doc.exists() ? doc.data() : {};
+            combineAndSetState();
+        });
+
+        const unprocessedSub = onSnapshot(query(collection(db, "unprocessed_deliveries"), orderBy('createdAt', 'desc')), (snapshot) => {
+            unprocessed = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UnprocessedItem));
+            combineAndSetState();
+        });
+
+        const onBarSub = onSnapshot(query(collection(db, "onBarInventory"), orderBy('openedAt', 'desc')), (snapshot) => {
+            onBarInv = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OnBarItem));
+            combineAndSetState();
+        });
+
+        // Fetch yesterday's data once, it won't change
+        getDoc(doc(db, 'dailyInventory', yesterday)).then(doc => {
+            yesterdayData = doc.exists() ? doc.data() : {};
+            combineAndSetState();
+        });
         
         listeners.push(invSub, dailySub, unprocessedSub, onBarSub);
 
         return () => listeners.forEach(unsub => unsub());
-    },
-    
-    forceRefetch: async () => {
-        get()._setLoading(true);
-        try {
-            const fullState = await fetchFullState();
-            set({ ...fullState, loading: false });
-        } catch (error) {
-            console.error("Error during force refetch:", error);
-            set({ loading: false });
-        }
     },
   
   addBrand: async (newItemData) => {
@@ -1126,3 +1119,5 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
+
+    

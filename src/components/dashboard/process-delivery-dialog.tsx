@@ -55,7 +55,9 @@ export default function ProcessDeliveryDialog({ isOpen, onOpenChange, unprocesse
         setIsScannerPaused(true);
         setScannedBarcode(decodedText);
         
-        const mappedItem = inventory.find(item => item.barcodeId === decodedText);
+        const updatedInventory = useInventory.getState().inventory;
+        const mappedItem = updatedInventory.find(item => item.barcodeId === decodedText);
+
         if (mappedItem) {
             setExistingProduct(mappedItem);
             // If the item exists, we can process it right away.
@@ -154,3 +156,5 @@ export default function ProcessDeliveryDialog({ isOpen, onOpenChange, unprocesse
         </Dialog>
     );
 }
+
+    

@@ -61,7 +61,6 @@ export default function GodownPage() {
         deleteUnprocessedItems,
         transferToShop,
         transferToOnBar,
-        forceRefetch,
         updateBrand,
         updateGodownStock,
         addGodownItem,
@@ -102,7 +101,6 @@ export default function GodownPage() {
     const handleAddGodownItem = async (data: AddGodownItemFormValues) => {
         try {
             await addGodownItem(data);
-            forceRefetch();
         } catch (error) {
             console.error('Error adding item to godown:', error);
             const errorMessage = (error as Error).message || 'Failed to add item.';
@@ -115,7 +113,6 @@ export default function GodownPage() {
             await transferToShop(productId, quantity, price);
             toast({ title: 'Success', description: `${quantity} units transferred to shop.` });
             setIsTransferShopOpen(false);
-            forceRefetch();
         } catch (error) {
             console.error('Error transferring to shop:', error);
             const errorMessage = (error as Error).message || 'Failed to transfer stock.';
@@ -129,7 +126,6 @@ export default function GodownPage() {
             const item = inventory.find(i => i.id === productId);
             toast({ title: 'Success', description: `${item?.brand} transferred to On-Bar.` });
             setIsTransferOnBarOpen(false);
-            forceRefetch();
         } catch (error) {
             console.error('Error transferring to on-bar:', error);
             const errorMessage = (error as Error).message || 'Failed to transfer stock.';
@@ -145,7 +141,6 @@ export default function GodownPage() {
             await Promise.all(promises);
             toast({ title: 'Success', description: 'Selected products removed from Godown.' });
             setSelectedRows(new Set());
-            forceRefetch();
         } catch (error) {
             console.error('Error removing products from Godown:', error);
             toast({ title: 'Error', description: (error as Error).message || 'Failed to remove selected products.', variant: 'destructive' });
@@ -158,7 +153,6 @@ export default function GodownPage() {
             await deleteUnprocessedItems(Array.from(selectedUnprocessedRows));
             toast({ title: 'Success', description: 'Selected unprocessed items removed.' });
             setSelectedUnprocessedRows(new Set());
-            forceRefetch();
         } catch (error) {
              toast({ title: 'Error', description: (error as Error).message || 'Failed to remove items.', variant: 'destructive' });
         }
@@ -168,15 +162,12 @@ export default function GodownPage() {
         const newStock = Number(value);
         if (isNaN(newStock) || newStock < 0) {
             toast({ title: 'Invalid Input', description: 'Please enter a valid non-negative number.', variant: 'destructive' });
-            // Re-render will reset to original value from state
-            forceRefetch();
             return;
         }
 
         try {
             await updateGodownStock(id, newStock);
             toast({ title: 'Success', description: `Godown stock updated.` });
-            forceRefetch();
         } catch (error) {
             console.error(`Error updating godown stock:`, error);
             const errorMessage = (error as Error).message || `Failed to update stock.`;
@@ -257,10 +248,7 @@ export default function GodownPage() {
                 isOpen={isProcessDeliveryOpen}
                 onOpenChange={setIsProcessDeliveryOpen}
                 unprocessedItem={processingItem}
-                onProcess={async (...args) => {
-                    await processScannedDelivery(...args);
-                    forceRefetch();
-                }}
+                onProcess={processScannedDelivery}
             />
         )}
         <ScanBillDialog 
@@ -498,3 +486,5 @@ export default function GodownPage() {
     </main>
   );
 }
+
+    
