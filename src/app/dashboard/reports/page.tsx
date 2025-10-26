@@ -102,10 +102,6 @@ export default function ReportsPage() {
     }, [date, formatDate]);
 
 
-    const handleDateSelect = (range: DateRange | undefined) => {
-        setDate(range);
-    };
-
     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
         setDateInputs(prev => ({ ...prev, [field]: e.target.value }));
     };
@@ -510,23 +506,6 @@ export default function ReportsPage() {
                             className="w-full md:w-36"
                         />
                     </div>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button
-                            variant={"outline"}
-                            size="icon"
-                            className={cn("w-10", !date && "text-muted-foreground")}
-                        >
-                            <CalendarIcon className="h-4 w-4" />
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                            initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={handleDateSelect}
-                            numberOfMonths={1} disabled={{ after: new Date() }}
-                        />
-                        </PopoverContent>
-                    </Popover>
                     <Button onClick={handleFilter} disabled={loading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                         {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
                         Generate
