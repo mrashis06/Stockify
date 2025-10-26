@@ -21,6 +21,7 @@ interface jsPDFWithAutoTable extends jsPDF {
 export default function DailySalePage() {
     const { formatDate } = useDateFormat();
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
 
     const { blReport, totalSalesValue, loading, getCategory } = useDailySaleReport(selectedDate);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -30,6 +31,7 @@ export default function DailySalePage() {
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
         setSelectedDate(newDate);
+        setDateOption(value);
     };
 
     const toggleRowExpansion = (key: string) => {
@@ -120,7 +122,7 @@ export default function DailySalePage() {
                      <p className="text-muted-foreground font-bold">{formatDate(selectedDate, 'dd/MM/yyyy')}</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                    <Select onValueChange={handleDateChange} defaultValue="today">
+                    <Select onValueChange={handleDateChange} value={dateOption}>
                         <SelectTrigger className="w-full sm:w-[180px]">
                             <SelectValue placeholder="Select Date" />
                         </SelectTrigger>
