@@ -4,36 +4,33 @@
 import React, { useMemo, useState } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { useInventory } from '@/hooks/use-inventory';
+import { useDailySaleReport } from '@/hooks/use-daily-sale-report';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { IndianRupee, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { usePageLoading } from '@/hooks/use-loading';
 import { Button } from '@/components/ui/button';
 import { useDateFormat } from '@/hooks/use-date-format';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { subDays, format }s from 'date-fns';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
 
-type AggregatedSale = {
-    unitsSold: number;
-    size: number;
-    category: 'FL' | 'IML' | 'BEER';
-    breakdown: number[];
-};
-
-const IML_CATEGORIES = ['iml'];
-const FL_CATEGORIES = ['whiskey', 'whisky', 'rum', 'vodka', 'wine', 'gin', 'tequila'];
-const BEER_CATEGORIES = ['beer'];
-
-
 export default function DailySalePage() {
-    const { inventory, dailyOnBarSales, totalOnBarSales, loading } = useInventory();
     const { formatDate } = useDateFormat();
+    const [selectedDate, setSelectedDate] = useState(new Date());
+
+    const { blReport, totalSalesValue, loading, getCategory } = useDailySaleReport(selectedDate);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     
     usePageLoading(loading);
+
+    const handleDateChange = (value: 'today' | 'yesterday') => {
+        const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
+        setSelectedDate(newDate);
+    };
 
     const toggleRowExpansion = (key: string) => {
         const newSet = new Set(expandedRows);
@@ -45,90 +42,9 @@ export default function DailySalePage() {
         setExpandedRows(newSet);
     };
     
-    const getCategory = (itemCategory: string): AggregatedSale['category'] | null => {
-        if (!itemCategory) return null;
-        const lowerCategory = itemCategory.toLowerCase();
-        if (FL_CATEGORIES.includes(lowerCategory)) return 'FL';
-        if (IML_CATEGORIES.includes(lowerCategory)) return 'IML';
-        if (BEER_CATEGORIES.includes(lowerCategory)) return 'BEER';
-        return null;
-    };
-
-
-    const { blReport, totalSalesValue } = useMemo(() => {
-        const salesMap = new Map<string, AggregatedSale>();
-
-        // 1. Process Off-Counter Sales
-        inventory.forEach(item => {
-            if (item.sales > 0) {
-                const sizeMatch = item.size.match(/(\d+)/);
-                const sizeMl = sizeMatch ? parseInt(sizeMatch[0], 10) : 0;
-                
-                const category = getCategory(item.category);
-
-                if (category && sizeMl > 0) {
-                    const key = `${category}-${sizeMl}`;
-                    const existing = salesMap.get(key) || { unitsSold: 0, size: sizeMl, category, breakdown: [] };
-                    existing.unitsSold += item.sales;
-                    existing.breakdown.push(item.sales);
-                    salesMap.set(key, existing);
-                }
-            }
-        });
-        
-        // 2. Process On-Bar Sales from daily log
-        dailyOnBarSales.forEach(item => {
-            if (item.salesVolume > 0) {
-                const category = getCategory(item.category);
-                
-                if (category === 'BEER') {
-                    const sizeMatch = item.size.match(/(\d+)/);
-                    const sizeMl = sizeMatch ? parseInt(sizeMatch[0], 10) : 0;
-                     if (sizeMl > 0) {
-                         const key = `${category}-${sizeMl}`;
-                         const existing = salesMap.get(key) || { unitsSold: 0, size: sizeMl, category, breakdown: [] };
-                         existing.unitsSold += item.salesVolume; // salesVolume for beer is in units
-                         existing.breakdown.push(item.salesVolume);
-                         salesMap.set(key, existing);
-                     }
-                } else if (category === 'FL' || category === 'IML') {
-                    // For liquor, daily sales are logged per bottle. We need to find the master inventory item
-                    // to figure out how many "units" (bottles) were sold based on ml.
-                    const masterItem = inventory.find(inv => inv.id === item.id.replace('on-bar-', ''));
-                    const bottleSize = masterItem ? parseInt(masterItem.size.match(/(\d+)/)?.[0] || '0') : 0;
-
-                    if (bottleSize > 0) {
-                       const unitsSold = item.salesVolume / bottleSize;
-                       const key = `${category}-${bottleSize}`;
-                       const existing = salesMap.get(key) || { unitsSold: 0, size: bottleSize, category, breakdown: [] };
-                       existing.unitsSold += unitsSold;
-                       existing.breakdown.push(unitsSold);
-                       salesMap.set(key, existing);
-                    }
-                }
-            }
-        });
-
-        // 3. Calculate Bulk Liters and total sales value
-        const blReport = Array.from(salesMap.values()).map(sale => ({
-            ...sale,
-            bulkLiters: (sale.unitsSold * sale.size) / 1000,
-        })).sort((a,b) => {
-            if (a.category < b.category) return -1;
-            if (a.category > b.category) return 1;
-            return a.size - b.size;
-        });
-
-        const offCounterTotal = inventory.reduce((sum, item) => sum + (item.sales * item.price), 0);
-        const totalSalesValue = offCounterTotal + totalOnBarSales;
-
-        return { blReport, totalSalesValue };
-
-    }, [inventory, dailyOnBarSales, totalOnBarSales]);
-
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
-        const today = formatDate(new Date(), 'dd/MM/yyyy');
+        const reportDate = formatDate(selectedDate, 'dd/MM/yyyy');
         
         const totalsByCategory = blReport.reduce((acc, sale) => {
             if (!acc[sale.category]) {
@@ -145,7 +61,7 @@ export default function DailySalePage() {
         // Header
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
-        doc.text(`Date: ${today}`, doc.internal.pageSize.width - 14, 15, { align: 'right' });
+        doc.text(`Date: ${reportDate}`, doc.internal.pageSize.width - 14, 15, { align: 'right' });
         
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
@@ -188,7 +104,7 @@ export default function DailySalePage() {
         doc.text("Total Sale", 22, yPos + 4);
         doc.text(totalString, doc.internal.pageSize.width - 22, yPos + 4, { align: 'right' });
 
-        doc.save(`BL_Sale_Report_${formatDate(new Date(), 'yyyy-MM-dd')}.pdf`);
+        doc.save(`BL_Sale_Report_${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
     };
 
 
@@ -200,18 +116,29 @@ export default function DailySalePage() {
         <main className="flex-1 p-4 md:p-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Today's BL Sale Report</h1>
-                     <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                    <h1 className="text-2xl font-bold tracking-tight">BL Sale Report</h1>
+                     <p className="text-muted-foreground font-bold">{formatDate(selectedDate, 'dd/MM/yyyy')}</p>
                 </div>
-                <Button onClick={handleExportPDF} disabled={blReport.length === 0}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export to PDF
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    <Select onValueChange={handleDateChange} defaultValue="today">
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Select Date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="yesterday">Yesterday</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Button onClick={handleExportPDF} disabled={blReport.length === 0}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export to PDF
+                    </Button>
+                </div>
             </div>
             <Card>
                 <CardHeader>
                     <CardTitle>Daily Bulk Liter (BL) Sales Summary</CardTitle>
-                    <CardDescription>This report summarizes today's sales converted into bulk liters for excise purposes.</CardDescription>
+                    <CardDescription>This report summarizes sales for the selected day, converted into bulk liters for excise purposes.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -257,14 +184,14 @@ export default function DailySalePage() {
                             ) : (
                                 <TableRow>
                                     <TableCell colSpan={5} className="h-24 text-center">
-                                        No sales recorded for today yet.
+                                        No sales recorded for the selected day.
                                     </TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
                          <TableFooter>
                             <TableRow className="bg-muted/50 font-bold">
-                                <TableCell colSpan={4} className="text-right text-lg">Total Today's Sale Amount</TableCell>
+                                <TableCell colSpan={4} className="text-right text-lg">Total Sale Amount</TableCell>
                                 <TableCell className="text-right text-lg">
                                     <div className="flex items-center justify-end">
                                         <IndianRupee className="h-5 w-5 mr-1" />
@@ -279,7 +206,3 @@ export default function DailySalePage() {
         </main>
     );
 }
-
-    
-
-    
