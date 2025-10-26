@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO } from 'date-fns';
+import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO, isValid } from 'date-fns';
 import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
@@ -30,6 +30,7 @@ import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
+import { Input } from '@/components/ui/input';
 
 
 interface jsPDFWithAutoTable extends jsPDF {
@@ -67,7 +68,7 @@ type OnBarSoldItem = {
 
 
 export default function ReportsPage() {
-    const { formatDate } = useDateFormat();
+    const { formatDate, dateFormat } = useDateFormat();
     const searchParams = useSearchParams();
     const { inventory: masterInventory } = useInventory();
 
@@ -75,9 +76,13 @@ export default function ReportsPage() {
         const fromParam = searchParams.get('from');
         const toParam = searchParams.get('to');
         if (fromParam) {
-            return {
-                from: parseISO(fromParam),
-                to: toParam ? parseISO(toParam) : parseISO(fromParam)
+            const fromDate = parseISO(fromParam);
+            if (isValid(fromDate)) {
+                const toDate = toParam ? parseISO(toParam) : fromDate;
+                return {
+                    from: fromDate,
+                    to: isValid(toDate) ? toDate : fromDate
+                }
             }
         }
         return { from: new Date(), to: new Date() };
@@ -92,6 +97,15 @@ export default function ReportsPage() {
     const handleDateSelect = (range: DateRange | undefined) => {
         setDate(range);
     };
+
+    const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
+        const parsedDate = parse(e.target.value, dateFormat, new Date());
+        if (isValid(parsedDate)) {
+            setDate(prev => ({ ...prev, [field]: parsedDate }));
+        } else {
+             setDate(prev => ({ ...prev, [field]: undefined }));
+        }
+    }
 
     const fetchReportData = useCallback(async (range: DateRange | undefined) => {
         if (!range?.from) {
@@ -109,7 +123,7 @@ export default function ReportsPage() {
 
         try {
             for (const day of days) {
-                const dateStr = formatDate(day, 'yyyy-MM-dd');
+                const dateStr = format(day, 'yyyy-MM-dd');
                 const dailyDocRef = doc(db, 'dailyInventory', dateStr);
                 const docSnap = await getDoc(dailyDocRef);
                 if (docSnap.exists()) {
@@ -462,16 +476,31 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                     <div className="flex items-center gap-2">
+                        <Input
+                            type="text"
+                            placeholder="From Date"
+                            value={date?.from ? formatDate(date.from) : ''}
+                            onChange={(e) => handleDateInputChange(e, 'from')}
+                            className="w-full md:w-36"
+                        />
+                         <span className="text-muted-foreground">-</span>
+                         <Input
+                            type="text"
+                            placeholder="To Date"
+                            value={date?.to ? formatDate(date.to) : ''}
+                            onChange={(e) => handleDateInputChange(e, 'to')}
+                            className="w-full md:w-36"
+                        />
+                    </div>
                     <Popover>
                         <PopoverTrigger asChild>
                         <Button
                             variant={"outline"}
-                            className={cn("w-full sm:w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                            size="icon"
+                            className={cn("w-10", !date && "text-muted-foreground")}
                         >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {date?.from ? ( date.to && !isSameDay(date.from, date.to) ? (<>
-                                {formatDate(date.from)} - {formatDate(date.to)}</>
-                            ) : (formatDate(date.from))) : (<span>Pick a date</span>)}
+                            <CalendarIcon className="h-4 w-4" />
                         </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">

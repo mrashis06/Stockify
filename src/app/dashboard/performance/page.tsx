@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { eachDayOfInterval, startOfDay, subMonths, subDays, format, isSameDay } from 'date-fns';
+import { eachDayOfInterval, startOfDay, subMonths, subDays, format, isSameDay, parse, isValid } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { Calendar as CalendarIcon, Filter, Loader2, Download, PackagePlus, MinusCircle, TrendingUp, ChevronsUpDown } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -21,6 +21,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
 
 
 interface jsPDFWithAutoTable extends jsPDF {
@@ -51,7 +52,7 @@ const dateRangeOptions = [
 
 export default function PerformancePage() {
     const { inventory: masterInventory, loading: inventoryLoading } = useInventory();
-    const { formatDate } = useDateFormat();
+    const { formatDate, dateFormat } = useDateFormat();
     const [loading, setLoading] = useState(true);
 
     const [dateRangeOption, setDateRangeOption] = useState('today');
@@ -100,6 +101,15 @@ export default function PerformancePage() {
         setDateRangeOption('custom');
         setDate(range);
     };
+
+    const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
+        const parsedDate = parse(e.target.value, dateFormat, new Date());
+        if (isValid(parsedDate)) {
+            setDate(prev => ({ ...prev, [field]: parsedDate }));
+        } else {
+            setDate(prev => ({...prev, [field]: undefined}));
+        }
+    }
     
     const fetchPerformanceData = useCallback(async (range: DateRange | undefined, category: string, product: string, sort: 'desc' | 'asc') => {
         if (!range?.from) return;
@@ -267,7 +277,7 @@ export default function PerformancePage() {
                 </CardHeader>
                 <CardContent className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full flex-wrap">
                     <Select value={dateRangeOption} onValueChange={handleDateRangeOptionChange}>
-                         <SelectTrigger className="w-full md:w-[180px]">
+                         <SelectTrigger className="w-full md:w-auto">
                             <SelectValue placeholder="Select Date Range" />
                         </SelectTrigger>
                         <SelectContent>
@@ -275,19 +285,27 @@ export default function PerformancePage() {
                         </SelectContent>
                     </Select>
                     
+                    <div className="flex items-center gap-2">
+                        <Input
+                            type="text"
+                            placeholder="From Date"
+                            value={date?.from ? formatDate(date.from) : ''}
+                            onChange={(e) => handleDateInputChange(e, 'from')}
+                            className="w-full md:w-36"
+                        />
+                         <span className="text-muted-foreground">-</span>
+                         <Input
+                            type="text"
+                            placeholder="To Date"
+                            value={date?.to ? formatDate(date.to) : ''}
+                            onChange={(e) => handleDateInputChange(e, 'to')}
+                            className="w-full md:w-36"
+                        />
+                    </div>
                     <Popover>
                         <PopoverTrigger asChild>
-                            <Button variant={"outline"} className={cn("w-full md:w-auto justify-start text-left font-normal", !date && "text-muted-foreground")}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {date?.from ? (
-                                    date.to && !isSameDay(date.from, date.to) ? (
-                                        <>{formatDate(date.from)} - {formatDate(date.to)}</>
-                                    ) : (
-                                        formatDate(date.from)
-                                    )
-                                ) : (
-                                    <span>Pick a date range</span>
-                                )}
+                            <Button variant={"outline"} size="icon" className={cn("w-10", !date && "text-muted-foreground")}>
+                                <CalendarIcon className="h-4 w-4" />
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
