@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO, isValid, format } from 'date-fns';
-import { Calendar as CalendarIcon, Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package } from 'lucide-react';
+import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO, isValid, format, subDays } from 'date-fns';
+import { Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -13,8 +13,6 @@ import { useSearchParams } from 'next/navigation';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import {
     Table,
@@ -66,11 +64,20 @@ type OnBarSoldItem = {
     totalAmount: number;
 }
 
+const dateRangeOptions = [
+    { label: 'Today', value: 'today' },
+    { label: 'Last 30 Days', value: '30d' },
+    { label: 'Last 60 Days', value: '60d' },
+    { label: 'Last 90 Days', value: '90d' },
+    { label: 'Custom Range', value: 'custom' },
+];
+
 
 export default function ReportsPage() {
     const { formatDate, dateFormat } = useDateFormat();
     const searchParams = useSearchParams();
     const { inventory: masterInventory } = useInventory();
+    const [dateRangeOption, setDateRangeOption] = useState('today');
 
     const [date, setDate] = useState<DateRange | undefined>(() => {
         const fromParam = searchParams.get('from');
@@ -113,8 +120,23 @@ export default function ReportsPage() {
         const parsedDate = parse(dateStr, dateFormat, new Date());
         if (isValid(parsedDate)) {
             setDate(prev => ({ ...prev, [field]: parsedDate }));
+             setDateRangeOption('custom');
         } else {
             toast({ title: "Invalid Date", description: `The date format for '${field}' is not correct. Please use ${dateFormat}.`, variant: "destructive" });
+        }
+    };
+    
+    const handleDateRangeOptionChange = (value: string) => {
+        setDateRangeOption(value);
+        const now = new Date();
+        if (value === 'today') {
+            setDate({ from: now, to: now });
+        } else if (value === '30d') {
+            setDate({ from: subDays(now, 29), to: now });
+        } else if (value === '60d') {
+            setDate({ from: subDays(now, 59), to: now });
+        } else if (value === '90d') {
+            setDate({ from: subDays(now, 89), to: now });
         }
     };
 
@@ -487,6 +509,14 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                    <Select value={dateRangeOption} onValueChange={handleDateRangeOptionChange}>
+                         <SelectTrigger className="w-full md:w-auto">
+                            <SelectValue placeholder="Select Date Range" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {dateRangeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
                      <div className="flex items-center gap-2">
                         <Input
                             type="text"
@@ -506,10 +536,6 @@ export default function ReportsPage() {
                             className="w-full md:w-36"
                         />
                     </div>
-                    <Button onClick={handleFilter} disabled={loading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
-                        Generate
-                    </Button>
                 </div>
                  <div className="flex-grow md:flex-grow-0 md:ml-auto">
                     <Select value={reportType} onValueChange={(value) => setReportType(value as 'offcounter' | 'onbar')}>
