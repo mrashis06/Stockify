@@ -259,12 +259,22 @@ export default function ReportsPage() {
         const startDate = date?.from ? formatDate(date.from) : '';
         const endDate = date?.to ? formatDate(date.to) : startDate;
         const isSingleDay = !date?.to || isSameDay(date?.from || new Date(), date.to);
+        
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text("BHOLE BABA FL ON SHOP", doc.internal.pageSize.width / 2, 15, { align: 'center' });
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        const reportTitle = `${isOffCounter ? 'Off-Counter' : 'On-Bar'} Sales Statement`;
         const dateRangeStr = isSingleDay ? `for ${startDate}` : `from ${startDate} to ${endDate}`;
-        const reportTitle = `${isOffCounter ? 'Off-Counter' : 'On-Bar'} Sales Statement ${dateRangeStr}`;
 
-        doc.setFontSize(16);
-        doc.text(reportTitle, 14, 15);
-        let startY = 25;
+        doc.setFontSize(14);
+        doc.text(reportTitle, 14, 25);
+        doc.setFontSize(10);
+        doc.text(dateRangeStr, 14, 32);
+
+        let startY = 40;
         let grandTotalUnits = 0;
         let grandTotalAmount = 0;
         
@@ -351,7 +361,9 @@ export default function ReportsPage() {
             ? ["Date", "Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]
             : ["Date", "Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"];
         
-        let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "BHOLE BABA FL ON SHOP\n\n"; // Add shop name
+        csvContent += headers.join(",") + "\n";
         
         const sortedReportData = [...reportData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         let grandTotalUnits = 0;
@@ -579,5 +591,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    

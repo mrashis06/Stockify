@@ -193,19 +193,26 @@ export default function PerformancePage() {
         const from = date?.from ? formatDate(date.from) : 'N/A';
         const to = date?.to ? formatDate(date.to) : 'N/A';
 
+        // Add Shop Name Header
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text("BHOLE BABA FL ON SHOP", doc.internal.pageSize.width / 2, 15, { align: 'center' });
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+
         if (productFilter !== 'All Products') {
              const selectedProduct = masterInventory.find(p => p.id === productFilter);
              if (!selectedProduct) return;
 
              const history = await fetchSingleProductHistory(date, productFilter);
              
-             doc.setFontSize(16);
-             doc.text(`Sales History for ${selectedProduct.brand} (${selectedProduct.size})`, 14, 15);
+             doc.setFontSize(14);
+             doc.text(`Sales History for ${selectedProduct.brand} (${selectedProduct.size})`, 14, 25);
              doc.setFontSize(10);
-             doc.text(`Period: ${from} to ${to}`, 14, 22);
+             doc.text(`Period: ${from} to ${to}`, 14, 32);
 
              doc.autoTable({
-                 startY: 30,
+                 startY: 40,
                  head: [['Date', 'Units Sold']],
                  body: history.map(item => [formatDate(item.date), item.unitsSold]),
                  foot: [[
@@ -221,14 +228,14 @@ export default function PerformancePage() {
         
         } else {
             // Original summary export logic
-            doc.setFontSize(16);
-            doc.text('Product Performance Report', 14, 15);
+            doc.setFontSize(14);
+            doc.text('Product Performance Report', 14, 25);
             doc.setFontSize(10);
-            doc.text(`Period: ${from} to ${to}`, 14, 22);
-            doc.text(`Category: ${categoryFilter}`, 14, 28);
+            doc.text(`Period: ${from} to ${to}`, 14, 32);
+            doc.text(`Category: ${categoryFilter}`, 14, 38);
 
             doc.autoTable({
-                startY: 35,
+                startY: 45,
                 head: [['Brand', 'Size', 'Category', 'Units Sold']],
                 body: performanceData.map(item => [item.brand, item.size, item.category, item.unitsSold]),
                 foot: [[
@@ -385,5 +392,3 @@ export default function PerformancePage() {
         </div>
     );
 }
-
-    
