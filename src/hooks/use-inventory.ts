@@ -140,7 +140,7 @@ const getSimilarity = (s1: string, s2: string): number => {
     const shorterMatches = new Array(shorter.length).fill(false);
     const longerMatches = new Array(longer.length).fill(false);
     let matches = 0;
-    for (let i = 0; < shorter.length; i++) {
+    for (let i = 0; i < shorter.length; i++) {
         const start = Math.max(0, i - matchDistance);
         const end = Math.min(i + matchDistance + 1, longer.length);
         for (let j = start; j < end; j++) {
@@ -1151,5 +1151,3 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
-
-    
