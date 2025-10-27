@@ -62,25 +62,19 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
     const today = formatDate(new Date(), 'yyyy-MM-dd');
     const yesterdayDateStr = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
-    let masterInventory: InventoryItem[] = [];
     
     const fetchMasterAndDailyData = async () => {
         setLoading(true);
         try {
             // Fetch all master inventory items once
             const inventorySnapshot = await getDocs(collection(db, 'inventory'));
-            masterInventory = [];
+            const masterInventoryList: InventoryItem[] = [];
             inventorySnapshot.forEach(doc => {
-                masterInventory.push({ id: doc.id, ...doc.data() } as InventoryItem);
+                masterInventoryList.push({ id: doc.id, ...doc.data() } as InventoryItem);
             });
-            setInventory(masterInventory);
+            setInventory(masterInventoryList);
 
-            // Fetch today's data and set listener
-            const todayDocRef = doc(db, 'dailyInventory', today);
-            const todayDocSnap = await getDoc(todayDocRef);
-            setTodaySalesData(todayDocSnap.exists() ? todayDocSnap.data() : {});
-
-            // Fetch yesterday's data for sales comparison
+            // Fetch yesterday's data ONCE for stable opening stock calculation
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterdayDateStr);
             const yesterdayDocSnap = await getDoc(yesterdayDocRef);
             setYesterdaySalesData(yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {});
@@ -94,10 +88,12 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
     fetchMasterAndDailyData();
 
-    // Listener for today's data to keep sales figures live.
+    // Listener for ONLY today's data to keep sales figures live.
     const dailyDocRef = doc(db, 'dailyInventory', today);
     const unsubscribeDaily = onSnapshot(dailyDocRef, (dailySnap) => {
         setTodaySalesData(dailySnap.exists() ? dailySnap.data() : {});
+    }, (error) => {
+        console.error("Error setting up daily data listener:", error);
     });
 
     // Cleanup the listener when the component unmounts
@@ -105,30 +101,30 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   }, [user, formatDate]);
 
   const processedInventory = useMemo(() => {
+    // This calculation now creates a stable opening stock for the day.
     return inventory.map(item => {
-      const dailyItem = todaySalesData[item.id];
+      const dailyItem = todaySalesData[item.id] || {};
+      const yesterdayClosing = yesterdaySalesData[item.id]?.closing ?? item.prevStock ?? 0;
+      
       const added = Number(dailyItem?.added ?? 0);
       const sales = Number(dailyItem?.sales ?? 0);
-      
-      const opening = Number(item.prevStock ?? 0) + added;
+      const opening = yesterdayClosing + added;
       const closing = opening - sales;
+
       return {
         ...item,
+        prevStock: yesterdayClosing, // This is the stable opening stock for today
         added,
         sales,
         opening,
         closing,
       };
     });
-  }, [inventory, todaySalesData]);
+  }, [inventory, todaySalesData, yesterdaySalesData]);
   
   const currentTotalStock = useMemo(() => {
     return processedInventory.reduce((sum, item) => {
-        const opening = item.opening ?? 0;
-        if (opening > 0) {
-            return sum + (item.closing ?? 0);
-        }
-        return sum;
+        return sum + (item.closing ?? 0);
     }, 0);
   }, [processedInventory]);
 
@@ -169,12 +165,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     processedInventory.forEach(item => {
       const closingStock = item.closing ?? 0;
       
-      // New Out of Stock Logic:
-      // Item is out of stock if it started with 0 and nothing was added.
-      if ((item.prevStock ?? 0) === 0 && item.added === 0) {
+      // An item is out of stock if its closing stock is zero.
+      if (closingStock <= 0) {
           out.push(item);
       }
-      
       // Low stock: if it's not out of stock, but the quantity is low.
       else if (closingStock > 0 && closingStock < 10) {
           low.push(item);
