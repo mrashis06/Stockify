@@ -4,7 +4,7 @@
 import { IndianRupee, PackageCheck, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import Link from 'next/link';
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { PlaceHolderImages } from "@/lib/placeholder-images";
-import type { InventoryItem } from "@/hooks/use-inventory";
+import { useInventory, type InventoryItem } from "@/hooks/use-inventory";
 import { usePageLoading } from "@/hooks/use-loading";
 import LowStockDialog from "@/components/dashboard/low-stock-dialog";
 import { Button } from "@/components/ui/button";
@@ -39,14 +39,16 @@ const categories = [
 export default function DashboardPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const { user, shopId } = useAuth();
   const router = useRouter();
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [todaySalesData, setTodaySalesData] = useState<any>({});
+  
+  // Use the central inventory hook, which has the correct, stable logic
+  const { inventory: processedInventory, loading, totalOnBarSales } = useInventory();
+  
   const [yesterdaySalesData, setYesterdaySalesData] = useState<any>({});
+  const [isYesterdayLoading, setIsYesterdayLoading] = useState(true);
   const { formatDate } = useDateFormat();
   const [isLowStockDialogOpen, setIsLowStockDialogOpen] = useState(false);
   
-  usePageLoading(loading);
+  usePageLoading(loading || isYesterdayLoading);
   const yesterday = useMemo(() => subDays(new Date(), 1), []);
   const yesterdayString = useMemo(() => formatDate(yesterday, 'yyyy-MM-dd'), [yesterday, formatDate]);
 
@@ -58,69 +60,29 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
 
   useEffect(() => {
-    if (user?.role !== 'admin' || !user?.shopId) return;
-
-    const today = formatDate(new Date(), 'yyyy-MM-dd');
+    if (user?.role !== 'admin' || !user?.shopId) {
+        setIsYesterdayLoading(false);
+        return;
+    };
+    
     const yesterdayDateStr = formatDate(subDays(new Date(), 1), 'yyyy-MM-dd');
     
-    const fetchMasterAndDailyData = async () => {
-        setLoading(true);
+    const fetchYesterdayData = async () => {
+        setIsYesterdayLoading(true);
         try {
-            // Fetch all master inventory items once
-            const inventorySnapshot = await getDocs(collection(db, 'inventory'));
-            const masterInventoryList: InventoryItem[] = [];
-            inventorySnapshot.forEach(doc => {
-                masterInventoryList.push({ id: doc.id, ...doc.data() } as InventoryItem);
-            });
-            setInventory(masterInventoryList);
-
-            // Fetch yesterday's data ONCE for stable opening stock calculation
             const yesterdayDocRef = doc(db, 'dailyInventory', yesterdayDateStr);
             const yesterdayDocSnap = await getDoc(yesterdayDocRef);
             setYesterdaySalesData(yesterdayDocSnap.exists() ? yesterdayDocSnap.data() : {});
-
         } catch (error) {
-            console.error("Error fetching initial dashboard data:", error);
+            console.error("Error fetching yesterday's data:", error);
         } finally {
-            setLoading(false);
+            setIsYesterdayLoading(false);
         }
     };
 
-    fetchMasterAndDailyData();
+    fetchYesterdayData();
 
-    // Listener for ONLY today's data to keep sales figures live.
-    const dailyDocRef = doc(db, 'dailyInventory', today);
-    const unsubscribeDaily = onSnapshot(dailyDocRef, (dailySnap) => {
-        setTodaySalesData(dailySnap.exists() ? dailySnap.data() : {});
-    }, (error) => {
-        console.error("Error setting up daily data listener:", error);
-    });
-
-    // Cleanup the listener when the component unmounts
-    return () => unsubscribeDaily();
   }, [user, formatDate]);
-
-  const processedInventory = useMemo(() => {
-    // This calculation now creates a stable opening stock for the day.
-    return inventory.map(item => {
-      const dailyItem = todaySalesData[item.id] || {};
-      const yesterdayClosing = yesterdaySalesData[item.id]?.closing ?? item.prevStock ?? 0;
-      
-      const added = Number(dailyItem?.added ?? 0);
-      const sales = Number(dailyItem?.sales ?? 0);
-      const opening = yesterdayClosing + added;
-      const closing = opening - sales;
-
-      return {
-        ...item,
-        prevStock: yesterdayClosing, // This is the stable opening stock for today
-        added,
-        sales,
-        opening,
-        closing,
-      };
-    });
-  }, [inventory, todaySalesData, yesterdaySalesData]);
   
   const currentTotalStock = useMemo(() => {
     return processedInventory.reduce((sum, item) => {
@@ -128,6 +90,12 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     }, 0);
   }, [processedInventory]);
 
+  const todaysSales = useMemo(() => {
+      const offCounterTotal = processedInventory.reduce((total, item) => total + (Number(item.sales) || 0) * (Number(item.price) || 0), 0);
+      return offCounterTotal + totalOnBarSales;
+  }, [processedInventory, totalOnBarSales]);
+
+  
   const calculateTotalSales = (salesData: any, masterInventory: InventoryItem[]) => {
     let total = 0;
     const inventoryMap = new Map(masterInventory.map(item => [item.id, item]));
@@ -150,13 +118,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     return total;
   };
 
-  const todaysSales = useMemo(() => {
-    return calculateTotalSales(todaySalesData, inventory);
-  }, [todaySalesData, inventory]);
-  
   const yesterdaysSales = useMemo(() => {
-    return calculateTotalSales(yesterdaySalesData, inventory)
-  }, [yesterdaySalesData, inventory]);
+    // We pass the processedInventory as master inventory because it's the most complete list of items
+    return calculateTotalSales(yesterdaySalesData, processedInventory)
+  }, [yesterdaySalesData, processedInventory]);
 
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const low: InventoryItem[] = [];
@@ -166,7 +131,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       const closingStock = item.closing ?? 0;
       
       // An item is out of stock if its closing stock is zero.
-      if (closingStock <= 0) {
+      if (closingStock <= 0 && item.opening > 0) { // Only alert if it wasn't already empty
           out.push(item);
       }
       // Low stock: if it's not out of stock, but the quantity is low.
@@ -203,7 +168,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
   const totalAlerts = lowStockItems.length + outOfStockItems.length;
 
-  if (loading || user?.role !== 'admin') {
+  if (loading || isYesterdayLoading || user?.role !== 'admin') {
       return null;
   }
 
@@ -330,4 +295,5 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       </div>
     </main>
   );
-}
+
+    

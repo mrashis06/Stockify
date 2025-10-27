@@ -140,7 +140,7 @@ const getSimilarity = (s1: string, s2: string): number => {
     const shorterMatches = new Array(shorter.length).fill(false);
     const longerMatches = new Array(longer.length).fill(false);
     let matches = 0;
-    for (let i = 0; i < shorter.length; i++) {
+    for (let i = 0; < shorter.length; i++) {
         const start = Math.max(0, i - matchDistance);
         const end = Math.min(i + matchDistance + 1, longer.length);
         for (let j = start; j < end; j++) {
@@ -202,15 +202,20 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         let unprocessed: UnprocessedItem[] = [];
 
         const combineAndSetState = () => {
-             if (initialOpeningStocks.size === 0) return; // Don't run until we have opening stocks
+             if (initialOpeningStocks.size === 0 && masterInv.length > 0) return; // Don't run until we have opening stocks for the master list
 
             const items: InventoryItem[] = masterInv.map(masterItem => {
                 const openingStock = initialOpeningStocks.get(masterItem.id) ?? 0;
+                const added = Number(dailyData[masterItem.id]?.added ?? 0);
+                const sales = Number(dailyData[masterItem.id]?.sales ?? 0);
+                
                 return {
                     ...masterItem,
-                    prevStock: Number(openingStock),
-                    added: Number(dailyData[masterItem.id]?.added ?? 0),
-                    sales: Number(dailyData[masterItem.id]?.sales ?? 0),
+                    prevStock: openingStock, // prevStock now holds the stable opening stock for the day
+                    added,
+                    sales,
+                    opening: openingStock + added,
+                    closing: openingStock + added - sales,
                 };
             });
 
@@ -1146,3 +1151,5 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
+
+    
