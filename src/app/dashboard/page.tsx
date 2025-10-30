@@ -84,16 +84,22 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
   }, [user, formatDate]);
   
-  const currentTotalStock = useMemo(() => {
-    return processedInventory.reduce((sum, item) => {
-        return sum + (item.closing ?? 0);
-    }, 0);
+  const activeInventory = useMemo(() => {
+    return processedInventory.filter(item => {
+        return (item.opening ?? 0) > 0 || (item.closing ?? 0) > 0 || (item.sales ?? 0) > 0;
+    });
   }, [processedInventory]);
 
+  const currentTotalStock = useMemo(() => {
+    return activeInventory.reduce((sum, item) => {
+        return sum + (item.closing ?? 0);
+    }, 0);
+  }, [activeInventory]);
+
   const todaysSales = useMemo(() => {
-      const offCounterTotal = processedInventory.reduce((total, item) => total + (Number(item.sales) || 0) * (Number(item.price) || 0), 0);
+      const offCounterTotal = activeInventory.reduce((total, item) => total + (Number(item.sales) || 0) * (Number(item.price) || 0), 0);
       return offCounterTotal + totalOnBarSales;
-  }, [processedInventory, totalOnBarSales]);
+  }, [activeInventory, totalOnBarSales]);
 
   
   const calculateTotalSales = (salesData: any, masterInventory: InventoryItem[]) => {
@@ -132,10 +138,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       
       // An item is out of stock if its closing stock is zero or less.
       if (closingStock <= 0) {
-          // Only alert if it wasn't already empty at the start of the day
-          if (item.opening > 0) { 
-              out.push(item);
-          }
+          out.push(item);
       }
       // Low stock: if it's not out of stock, but the quantity is low.
       else if (closingStock > 0 && closingStock < 10) {
@@ -239,7 +242,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             <TriangleAlert className={`h-4 w-4 ${totalAlerts > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalAlerts > 0 ? 'text-destructive' : ''}`}>{totalAlerts} Items</div>
+            <div className={`text-2xl font-bold ${totalAlerts > 0 ? 'text-destructive' : ''}`}>{lowStockItems.length + outOfStockItems.length} Items</div>
             <div className="mt-2 text-xs space-y-1">
                 {lowStockItems.length > 0 && (
                     <div className="flex justify-between">

@@ -193,7 +193,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
 
     const filteredInventory = useMemo(() => {
         return processedInventory.filter(item => {
-            if (item.opening <= 0 && item.closing <= 0 && item.sales <= 0) return false;
+            if ((item.opening ?? 0) <= 0 && (item.closing ?? 0) <= 0 && (item.sales ?? 0) <= 0) return false;
 
             const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
