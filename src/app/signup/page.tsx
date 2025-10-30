@@ -32,10 +32,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { ADMIN_UIDS } from '@/lib/constants';
-import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck, RefreshCw, ChevronDown } from 'lucide-react';
 import { extractIdCardData } from '@/ai/flows/extract-id-card-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+type IdType = 'aadhaar' | 'pan' | 'dl';
+
+const idTypeOptions: { value: IdType, label: string }[] = [
+    { value: 'aadhaar', label: 'Aadhaar Card' },
+    { value: 'pan', label: 'PAN Card' },
+    { value: 'dl', label: 'Driving Licence' },
+];
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -50,7 +58,7 @@ const formSchema = z.object({
             return false;
         }
       }, 'You must be at least 20 years old to sign up.'),
-    aadhaar: z.string().length(12, 'Aadhaar number must be 12 digits'),
+    aadhaar: z.string().min(10, 'ID Number must be at least 10 characters.'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
@@ -65,11 +73,13 @@ const IdCardUpload = ({
   isProcessing,
   fileName,
   onRemove,
+  selectedIdTypeLabel,
 }: {
   onUpload: (file: File) => void;
   isProcessing: boolean;
   fileName: string | null;
   onRemove: () => void;
+  selectedIdTypeLabel: string;
 }) => {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -87,9 +97,6 @@ const IdCardUpload = ({
 
   return (
     <div className="space-y-2">
-      <FormLabel>
-        Aadhaar Card
-      </FormLabel>
       {fileName ? (
          <Alert variant={isProcessing ? "default" : "default"} className={isProcessing ? "bg-blue-50 dark:bg-blue-900/30 border-blue-500/50" : "bg-green-100 dark:bg-green-900/30 border-green-500/50"}>
           <div className="flex items-center justify-between gap-2">
@@ -113,7 +120,7 @@ const IdCardUpload = ({
           <input {...getInputProps()} />
           <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="mt-2 text-sm font-semibold">
-            {isDragActive ? `Drop the Aadhaar card here...` : `Upload Aadhaar Card`}
+            {isDragActive ? `Drop the ${selectedIdTypeLabel} here...` : `Upload ${selectedIdTypeLabel}`}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Drag & drop or click to select a file</p>
         </div>
@@ -130,8 +137,9 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
-  const [isProcessingAadhaar, setIsProcessingAadhaar] = useState(false);
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [selectedIdType, setSelectedIdType] = useState<IdType>('aadhaar');
+  const [isProcessingId, setIsProcessingId] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   
   const form = useForm<SignupFormValues>({
@@ -148,16 +156,16 @@ export default function SignupPage() {
   });
 
   const handleIdCardUpload = async (file: File) => {
-      setAadhaarFile(file);
-      setIsProcessingAadhaar(true);
+      setIdFile(file);
+      setIsProcessingId(true);
       setAiError(null);
 
       const reader = new FileReader();
       reader.onload = async (event) => {
           const dataUri = event.target?.result as string;
           try {
-              const result = await extractIdCardData({ idCardDataUri: dataUri });
-
+              const result = await extractIdCardData({ idCardDataUri: dataUri, cardType: selectedIdType });
+              
               if (result.name) form.setValue('name', result.name, { shouldValidate: true });
               if (result.dob) {
                   const [year, month, day] = result.dob.split('-');
@@ -165,19 +173,19 @@ export default function SignupPage() {
                      form.setValue('dob', `${day}/${month}/${year}`, { shouldValidate: true });
                   }
               }
-              if (result.aadhaar) form.setValue('aadhaar', result.aadhaar.replace(/\s/g, ''), { shouldValidate: true });
+              if (result.idNumber) form.setValue('aadhaar', result.idNumber.replace(/\s/g, ''), { shouldValidate: true });
 
           } catch (err) {
               setAiError(err instanceof Error ? err.message : "Failed to process the ID card.");
           } finally {
-              setIsProcessingAadhaar(false);
+              setIsProcessingId(false);
           }
       };
       reader.readAsDataURL(file);
   };
   
-  const handleRemoveAadhaar = () => {
-    setAadhaarFile(null);
+  const handleRemoveId = () => {
+    setIdFile(null);
     form.reset({
         ...form.getValues(),
         name: '',
@@ -226,6 +234,9 @@ export default function SignupPage() {
     }
   };
 
+  const selectedIdTypeLabel = idTypeOptions.find(opt => opt.value === selectedIdType)?.label || 'ID Card';
+  const idNumberLabel = selectedIdType === 'pan' ? 'PAN Number' : selectedIdType === 'dl' ? 'Driving Licence Number' : 'Aadhaar Number';
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-lg">
@@ -239,12 +250,30 @@ export default function SignupPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
               
-               <div className="grid grid-cols-1">
+               <div className="grid grid-cols-1 gap-4">
+                    <FormItem>
+                         <FormLabel>ID Type</FormLabel>
+                         <Select value={selectedIdType} onValueChange={(value: IdType) => {
+                             setSelectedIdType(value);
+                             handleRemoveId();
+                         }}>
+                            <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select ID Type" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                {idTypeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </FormItem>
+
                     <IdCardUpload
                         onUpload={handleIdCardUpload}
-                        isProcessing={isProcessingAadhaar}
-                        fileName={aadhaarFile?.name || null}
-                        onRemove={handleRemoveAadhaar}
+                        isProcessing={isProcessingId}
+                        fileName={idFile?.name || null}
+                        onRemove={handleRemoveId}
+                        selectedIdTypeLabel={selectedIdTypeLabel}
                     />
                </div>
                
@@ -252,7 +281,7 @@ export default function SignupPage() {
                   <ShieldCheck className="h-4 w-4" />
                   <AlertTitle>Your Data is Secure</AlertTitle>
                   <AlertDescription>
-                    Your Aadhaar image is used only for one-time data extraction and is never stored. Your personal information is encrypted and protected.
+                    Your ID image is used only for one-time data extraction and is never stored. Your personal information is encrypted and protected.
                   </AlertDescription>
                 </Alert>
 
@@ -279,7 +308,11 @@ export default function SignupPage() {
                 </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="aadhaar" render={({ field }) => (
-                        <FormItem><FormLabel>Aadhaar Number</FormLabel><FormControl><Input placeholder="XXXX XXXX XXXX" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                        <FormItem>
+                            <FormLabel>{idNumberLabel}</FormLabel>
+                            <FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
                     )} />
                     <FormField
                       control={form.control}
@@ -325,7 +358,7 @@ export default function SignupPage() {
                     </FormItem>
                 )} />
 
-              <Button type="submit" className="w-full" disabled={loading || isProcessingAadhaar}>
+              <Button type="submit" className="w-full" disabled={loading || isProcessingId}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign Up
               </Button>

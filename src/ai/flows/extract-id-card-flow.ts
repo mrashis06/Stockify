@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview An AI flow for extracting structured data from an Indian ID card (Aadhaar).
+ * @fileOverview An AI flow for extracting structured data from an Indian ID card.
  *
  * - extractIdCardData - A function that handles the ID card data extraction process.
  * - IdCardExtractionInput - The input type for the extractIdCardData function.
@@ -11,13 +11,16 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
 
+const idTypes = z.enum(['aadhaar', 'pan', 'dl']);
+
 // Define the input schema for the flow
 const IdCardExtractionInputSchema = z.object({
   idCardDataUri: z
     .string()
     .describe(
-      "An image of an Indian ID card (Aadhaar) as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
+      "An image of an Indian ID card as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
+  cardType: idTypes.describe("The type of card the user has selected to upload."),
 });
 export type IdCardExtractionInput = z.infer<typeof IdCardExtractionInputSchema>;
 
@@ -26,8 +29,8 @@ export type IdCardExtractionInput = z.infer<typeof IdCardExtractionInputSchema>;
 const IdCardExtractionOutputSchema = z.object({
   name: z.string().describe("The full name of the person as printed on the card."),
   dob: z.string().describe("The date of birth in strict YYYY-MM-DD format. Convert DD/MM/YYYY to YYYY-MM-DD."),
-  aadhaar: z.string().optional().describe("The 12-digit Aadhaar number."),
-  cardType: z.enum(['aadhaar', 'unknown']).describe("The type of card detected."),
+  idNumber: z.string().optional().describe("The 10-digit PAN, 12-digit Aadhaar, or Driving Licence number."),
+  cardType: idTypes.describe("The type of card detected from the image."),
 });
 export type IdCardExtractionOutput = z.infer<typeof IdCardExtractionOutputSchema>;
 
@@ -51,16 +54,19 @@ const idCardExtractionPrompt = ai.definePrompt({
     format: 'json'
   },
   prompt: `
-You are an expert data extraction agent for Indian identity documents. Your task is to extract information from the provided image of an Aadhaar card with extreme accuracy.
+You are an expert data extraction agent for Indian identity documents. The user has specified they are uploading a {{cardType}}. Your task is to extract information from the provided image with extreme accuracy.
 
 INSTRUCTIONS:
 
-1.  **Identify the Card Type:** Determine if the card is an Aadhaar card. Set the \`cardType\` field to 'aadhaar'. If you cannot determine the type, set it to 'unknown'.
+1.  **Identify the Card Type:** From the image, confirm the type of card. Set the \`cardType\` field in your output to 'aadhaar', 'pan', or 'dl'. If you cannot determine the type, use the user's provided type '{{cardType}}'.
 
 2.  **Extract Key Information:**
     *   **name:** Extract the person's full name exactly as it appears.
     *   **dob:** Find the Date of Birth. It is CRITICAL that you return this in **YYYY-MM-DD** format. If the card shows "DD/MM/YYYY", you MUST convert it.
-    *   **aadhaar:** Extract the 12-digit Aadhaar number. Do not include spaces.
+    *   **idNumber:** Extract the unique identification number.
+        *   For Aadhaar, this is the 12-digit number (do not include spaces).
+        *   For PAN card, this is the 10-character alphanumeric number.
+        *   For Driving Licence, extract the DL number.
 
 3.  **Handle Missing Data:** If a field is not present on the card, omit that field from the JSON output.
 
