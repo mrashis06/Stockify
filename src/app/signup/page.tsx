@@ -46,7 +46,6 @@ const formSchema = z.object({
         message: 'You must be at least 20 years old to sign up.',
       }),
     aadhaar: z.string().length(12, 'Aadhaar number must be 12 digits'),
-    pan: z.string().length(10, 'PAN number must be 10 characters').regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Invalid PAN format'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
@@ -60,12 +59,10 @@ const IdCardUpload = ({
   onUpload,
   isProcessing,
   fileName,
-  cardType,
 }: {
   onUpload: (file: File) => void;
   isProcessing: boolean;
   fileName: string | null;
-  cardType: string;
 }) => {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -82,7 +79,7 @@ const IdCardUpload = ({
   return (
     <div className="space-y-2">
       <FormLabel>
-        {cardType} Card
+        Aadhaar Card
       </FormLabel>
       {fileName ? (
         <Alert variant={isProcessing ? "default" : "default"} className={isProcessing ? "bg-blue-50" : "bg-green-50"}>
@@ -101,7 +98,7 @@ const IdCardUpload = ({
           <input {...getInputProps()} />
           <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="mt-2 text-sm font-semibold">
-            {isDragActive ? `Drop the ${cardType} here...` : `Upload ${cardType} Card`}
+            {isDragActive ? `Drop the Aadhaar card here...` : `Upload Aadhaar Card`}
           </p>
           <p className="text-xs text-muted-foreground mt-1">Drag & drop or click to select a file</p>
         </div>
@@ -119,9 +116,7 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
-  const [panFile, setPanFile] = useState<File | null>(null);
   const [isProcessingAadhaar, setIsProcessingAadhaar] = useState(false);
-  const [isProcessingPan, setIsProcessingPan] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   
   const form = useForm<SignupFormValues>({
@@ -131,46 +126,38 @@ export default function SignupPage() {
           email: '',
           phone: '',
           aadhaar: '',
-          pan: '',
           password: '',
           confirmPassword: '',
       }
   });
 
-  const handleIdCardUpload = async (file: File, cardType: 'aadhaar' | 'pan') => {
-    if (cardType === 'aadhaar') {
+  const handleIdCardUpload = async (file: File) => {
       setAadhaarFile(file);
       setIsProcessingAadhaar(true);
-    } else {
-      setPanFile(file);
-      setIsProcessingPan(true);
-    }
-    setAiError(null);
+      setAiError(null);
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-        const dataUri = event.target?.result as string;
-        try {
-            const result = await extractIdCardData({ idCardDataUri: dataUri });
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+          const dataUri = event.target?.result as string;
+          try {
+              const result = await extractIdCardData({ idCardDataUri: dataUri });
 
-            if (result.name) form.setValue('name', result.name, { shouldValidate: true });
-            if (result.dob) {
-                const parsedDate = parse(result.dob, 'yyyy-MM-dd', new Date());
-                if (!isNaN(parsedDate.getTime())) {
-                    form.setValue('dob', parsedDate, { shouldValidate: true });
-                }
-            }
-            if (result.aadhaar) form.setValue('aadhaar', result.aadhaar.replace(/\s/g, ''), { shouldValidate: true });
-            if (result.pan) form.setValue('pan', result.pan.toUpperCase(), { shouldValidate: true });
+              if (result.name) form.setValue('name', result.name, { shouldValidate: true });
+              if (result.dob) {
+                  const parsedDate = parse(result.dob, 'yyyy-MM-dd', new Date());
+                  if (!isNaN(parsedDate.getTime())) {
+                      form.setValue('dob', parsedDate, { shouldValidate: true });
+                  }
+              }
+              if (result.aadhaar) form.setValue('aadhaar', result.aadhaar.replace(/\s/g, ''), { shouldValidate: true });
 
-        } catch (err) {
-            setAiError(err instanceof Error ? err.message : "Failed to process the ID card.");
-        } finally {
-            if (cardType === 'aadhaar') setIsProcessingAadhaar(false);
-            else setIsProcessingPan(false);
-        }
-    };
-    reader.readAsDataURL(file);
+          } catch (err) {
+              setAiError(err instanceof Error ? err.message : "Failed to process the ID card.");
+          } finally {
+              setIsProcessingAadhaar(false);
+          }
+      };
+      reader.readAsDataURL(file);
   };
 
 
@@ -189,7 +176,7 @@ export default function SignupPage() {
         phone: data.phone,
         dob: data.dob.toISOString().split('T')[0],
         aadhaar: data.aadhaar,
-        pan: data.pan.toUpperCase(),
+        pan: null, // Set PAN to null
         role: role,
         status: 'active',
         shopId: null,
@@ -217,25 +204,18 @@ export default function SignupPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
           <CardDescription>
-            Upload your ID cards to auto-fill your details.
+            Upload your Aadhaar card to auto-fill your details.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
               
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+               <div className="grid grid-cols-1">
                     <IdCardUpload
-                        cardType="Aadhaar"
-                        onUpload={(file) => handleIdCardUpload(file, 'aadhaar')}
+                        onUpload={(file) => handleIdCardUpload(file)}
                         isProcessing={isProcessingAadhaar}
                         fileName={aadhaarFile?.name || null}
-                    />
-                    <IdCardUpload
-                        cardType="PAN"
-                        onUpload={(file) => handleIdCardUpload(file, 'pan')}
-                        isProcessing={isProcessingPan}
-                        fileName={panFile?.name || null}
                     />
                </div>
 
@@ -263,23 +243,20 @@ export default function SignupPage() {
                     <FormField control={form.control} name="aadhaar" render={({ field }) => (
                         <FormItem><FormLabel>Aadhaar Number</FormLabel><FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                     )} />
-                    <FormField control={form.control} name="pan" render={({ field }) => (
-                        <FormItem><FormLabel>PAN Number</FormLabel><FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
-                    )} />
+                    <FormField
+                      control={form.control}
+                      name="dob"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Date of Birth</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Auto-filled from card" value={field.value ? field.value.toLocaleDateString('en-CA') : ''} readOnly disabled={loading} />
+                              </FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                    />
                 </div>
-                 <FormField
-                    control={form.control}
-                    name="dob"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Date of Birth</FormLabel>
-                            <FormControl>
-                               <Input placeholder="Auto-filled from card" value={field.value ? field.value.toLocaleDateString('en-CA') : ''} readOnly disabled={loading} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                 />
 
                 <FormField control={form.control} name="password" render={({ field }) => (
                     <FormItem>
@@ -310,7 +287,7 @@ export default function SignupPage() {
                     </FormItem>
                 )} />
 
-              <Button type="submit" className="w-full" disabled={loading || isProcessingAadhaar || isProcessingPan}>
+              <Button type="submit" className="w-full" disabled={loading || isProcessingAadhaar}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign Up
               </Button>

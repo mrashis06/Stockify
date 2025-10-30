@@ -14,7 +14,7 @@ export type AppUser = User & {
     shopId?: string | null;
     status?: 'active' | 'blocked';
     aadhaar?: string;
-    pan?: string;
+    pan?: string | null; // PAN is now optional/nullable
     photoURL?: string | null;
     photoURL_large?: string | null;
 };

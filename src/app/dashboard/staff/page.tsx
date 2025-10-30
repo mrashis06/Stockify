@@ -33,7 +33,7 @@ type StaffMember = {
     phone: string;
     dob: string;
     aadhaar: string;
-    pan: string;
+    pan: string | null;
     status: 'active' | 'blocked';
 }
 
