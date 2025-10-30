@@ -24,7 +24,7 @@ type ScanBillDialogProps = {
 };
 
 export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogProps) {
-    const { processScannedBill, forceRefetch } = useInventory();
+    const { processScannedBill } = useInventory();
     const { toast } = useToast();
     const [file, setFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -85,7 +85,6 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                     title: "Bill Processed Successfully",
                     description: `${processResult.matchedCount} items auto-stocked, ${processResult.unmatchedCount} items need review.`,
                 });
-                forceRefetch();
                 handleClose(); // Automatically close dialog on success
             } catch (err) {
                 console.error("Extraction error:", err);
