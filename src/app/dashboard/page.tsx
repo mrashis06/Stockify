@@ -41,7 +41,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const router = useRouter();
   
   // Use the central inventory hook, which has the correct, stable logic
-  const { inventory: processedInventory, onBarInventory, loading, totalOnBarSales } = useInventory();
+  const { inventory, onBarInventory, loading, totalOnBarSales } = useInventory();
   
   const [yesterdaySalesData, setYesterdaySalesData] = useState<any>({});
   const [isYesterdayLoading, setIsYesterdayLoading] = useState(true);
@@ -84,6 +84,26 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
 
   }, [user, formatDate]);
   
+  const processedInventory = useMemo(() => {
+        return inventory.map(item => {
+            const added = Number(item.added || 0);
+            const sales = Number(item.sales || 0);
+            const prevStock = Number(item.prevStock || 0);
+
+            const opening = prevStock + added;
+            const closing = opening - sales;
+            
+            return {
+                ...item,
+                added,
+                sales,
+                prevStock,
+                opening,
+                closing,
+            };
+        });
+    }, [inventory]);
+
   const activeInventory = useMemo(() => {
     return processedInventory.filter(item => {
         return (item.opening ?? 0) > 0 || (item.closing ?? 0) > 0 || (item.sales ?? 0) > 0;
@@ -134,8 +154,12 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     const out: InventoryItem[] = [];
     const onBarMap = new Map(onBarInventory.map(item => [item.inventoryId, item]));
 
-    processedInventory.forEach(item => {
-      const shopStock = item.closing ?? 0;
+    // **THE FIX**: Loop over the complete master `inventory` list, not the filtered `processedInventory`.
+    inventory.forEach(item => {
+      // Find the corresponding processed item to get today's `closing` stock
+      const processedItem = processedInventory.find(p => p.id === item.id);
+      const shopStock = processedItem?.closing ?? 0;
+      
       const godownStock = item.stockInGodown || 0;
       const onBarItem = onBarMap.get(item.id);
       const onBarStock = onBarItem?.remainingVolume || 0;
@@ -145,12 +169,14 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       if (totalStock <= 0) {
         out.push(item);
       } else if (shopStock > 0 && shopStock < 10) {
-        low.push(item);
+        // Use `processedItem` for low stock alerts as it contains the correct `closing` value
+        if (processedItem) low.push(processedItem);
       }
     });
     
     return { lowStockItems: low, outOfStockItems: out };
-  }, [processedInventory, onBarInventory]);
+  }, [inventory, processedInventory, onBarInventory]);
+
 
   useEffect(() => {
     if (shopId && !loading) {
