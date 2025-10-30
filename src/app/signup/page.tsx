@@ -32,7 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { ADMIN_UIDS } from '@/lib/constants';
-import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 import { extractIdCardData } from '@/ai/flows/extract-id-card-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -41,10 +41,15 @@ const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email address'),
     phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number is too long'),
-    dob: z.date({ required_error: 'Date of birth is required.' })
-      .refine(date => differenceInYears(new Date(), date) >= 20, {
-        message: 'You must be at least 20 years old to sign up.',
-      }),
+    dob: z.string().refine((dob) => /^\d{2}\/\d{2}\/\d{4}$/.test(dob), "Date must be in DD/MM/YYYY format")
+      .refine((dob) => {
+        try {
+            const date = parse(dob, 'dd/MM/yyyy', new Date());
+            return differenceInYears(new Date(), date) >= 20;
+        } catch {
+            return false;
+        }
+      }, 'You must be at least 20 years old to sign up.'),
     aadhaar: z.string().length(12, 'Aadhaar number must be 12 digits'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string(),
@@ -59,10 +64,12 @@ const IdCardUpload = ({
   onUpload,
   isProcessing,
   fileName,
+  onRemove,
 }: {
   onUpload: (file: File) => void;
   isProcessing: boolean;
   fileName: string | null;
+  onRemove: () => void;
 }) => {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -70,10 +77,12 @@ const IdCardUpload = ({
     }
   }, [onUpload]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: { 'image/jpeg': [], 'image/png': [] },
     multiple: false,
+    noClick: true,
+    noKeyboard: true,
   });
 
   return (
@@ -82,15 +91,21 @@ const IdCardUpload = ({
         Aadhaar Card
       </FormLabel>
       {fileName ? (
-        <Alert variant={isProcessing ? "default" : "default"} className={isProcessing ? "bg-blue-50 dark:bg-blue-900/30 border-blue-500/50" : "bg-green-100 dark:bg-green-900/30 border-green-500/50"}>
-          <div className="flex items-center gap-2">
-             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" /> : <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
-             <span className="text-sm font-medium truncate">{fileName}</span>
+         <Alert variant={isProcessing ? "default" : "default"} className={isProcessing ? "bg-blue-50 dark:bg-blue-900/30 border-blue-500/50" : "bg-green-100 dark:bg-green-900/30 border-green-500/50"}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 overflow-hidden">
+                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" /> : <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
+                <span className="text-sm font-medium truncate">{fileName}</span>
+            </div>
+            <Button type="button" variant="link" size="sm" className="p-0 h-auto font-medium" onClick={onRemove}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Change
+            </Button>
           </div>
         </Alert>
       ) : (
         <div
           {...getRootProps()}
+          onClick={open}
           className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
             isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/50 hover:border-primary'
           }`}
@@ -125,6 +140,7 @@ export default function SignupPage() {
           name: '',
           email: '',
           phone: '',
+          dob: '',
           aadhaar: '',
           password: '',
           confirmPassword: '',
@@ -144,9 +160,9 @@ export default function SignupPage() {
 
               if (result.name) form.setValue('name', result.name, { shouldValidate: true });
               if (result.dob) {
-                  const parsedDate = parse(result.dob, 'yyyy-MM-dd', new Date());
-                  if (!isNaN(parsedDate.getTime())) {
-                      form.setValue('dob', parsedDate, { shouldValidate: true });
+                  const [year, month, day] = result.dob.split('-');
+                  if (day && month && year) {
+                     form.setValue('dob', `${day}/${month}/${year}`, { shouldValidate: true });
                   }
               }
               if (result.aadhaar) form.setValue('aadhaar', result.aadhaar.replace(/\s/g, ''), { shouldValidate: true });
@@ -159,6 +175,16 @@ export default function SignupPage() {
       };
       reader.readAsDataURL(file);
   };
+  
+  const handleRemoveAadhaar = () => {
+    setAadhaarFile(null);
+    form.reset({
+        ...form.getValues(),
+        name: '',
+        dob: '',
+        aadhaar: '',
+    });
+  }
 
 
   const onSubmit = async (data: SignupFormValues) => {
@@ -169,12 +195,14 @@ export default function SignupPage() {
       const user = userCredential.user;
       
       const role = ADMIN_UIDS.includes(user.uid) ? 'admin' : 'staff';
+      
+      const parsedDate = parse(data.dob, 'dd/MM/yyyy', new Date());
 
       await setDoc(doc(db, "users", user.uid), {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        dob: data.dob.toISOString().split('T')[0],
+        dob: parsedDate.toISOString().split('T')[0], // Store as YYYY-MM-DD
         aadhaar: data.aadhaar,
         pan: null, // Set PAN to null
         role: role,
@@ -204,7 +232,7 @@ export default function SignupPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
           <CardDescription>
-            Upload your Aadhaar card to auto-fill your details.
+            Upload your Aadhaar card to auto-fill your details, or fill them in manually.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -213,9 +241,10 @@ export default function SignupPage() {
               
                <div className="grid grid-cols-1">
                     <IdCardUpload
-                        onUpload={(file) => handleIdCardUpload(file)}
+                        onUpload={handleIdCardUpload}
                         isProcessing={isProcessingAadhaar}
                         fileName={aadhaarFile?.name || null}
+                        onRemove={handleRemoveAadhaar}
                     />
                </div>
                
@@ -259,7 +288,7 @@ export default function SignupPage() {
                           <FormItem>
                               <FormLabel>Date of Birth</FormLabel>
                               <FormControl>
-                                <Input placeholder="YYYY-MM-DD" value={field.value ? field.value.toLocaleDateString('en-CA') : ''} readOnly disabled={loading} />
+                                <Input placeholder="DD/MM/YYYY" {...field} disabled={loading} />
                               </FormControl>
                               <FormMessage />
                           </FormItem>
