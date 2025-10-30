@@ -137,7 +137,8 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     processedInventory.forEach(item => {
       const shopStock = item.closing ?? 0;
       const godownStock = item.stockInGodown || 0;
-      const onBarStock = onBarMap.get(item.id)?.remainingVolume || 0;
+      const onBarItem = onBarMap.get(item.id);
+      const onBarStock = onBarItem?.remainingVolume || 0;
 
       const totalStock = shopStock + godownStock + onBarStock;
 
