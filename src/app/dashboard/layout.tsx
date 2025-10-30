@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { ReactNode, useEffect, useState } from 'react';
@@ -119,6 +120,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       deleteNotifications(Array.from(selectedNotifIds));
       setSelectedNotifIds(new Set());
   };
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+        setSelectedNotifIds(new Set());
+    } else {
+        setSelectedNotifIds(new Set(displayedNotifications.map(n => n.id)));
+    }
+  };
+
+  const allSelected = displayedNotifications.length > 0 && selectedNotifIds.size === displayedNotifications.length;
   
   const isAdmin = user?.role === 'admin';
 
@@ -295,7 +306,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
                 <div className="flex items-center justify-between p-2">
-                    <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+                    <div className="flex items-center gap-2">
+                        <Checkbox
+                            id="select-all-notifs"
+                            checked={allSelected}
+                            onCheckedChange={handleSelectAll}
+                            aria-label="Select all notifications"
+                            disabled={displayedNotifications.length === 0}
+                        />
+                        <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+                    </div>
                     <div className="flex items-center gap-2">
                         {unreadCount > 0 && (
                             <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => markAllAsRead()}>
