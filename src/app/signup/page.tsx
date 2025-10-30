@@ -232,7 +232,7 @@ export default function SignupPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
           <CardDescription>
-            Upload your Aadhaar card to auto-fill your details, or fill them in manually.
+            Get started with smart inventory management
           </CardDescription>
         </CardHeader>
         <CardContent>
