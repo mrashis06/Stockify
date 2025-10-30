@@ -41,7 +41,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const router = useRouter();
   
   // Use the central inventory hook, which has the correct, stable logic
-  const { inventory: processedInventory, loading, totalOnBarSales } = useInventory();
+  const { inventory: processedInventory, onBarInventory, loading, totalOnBarSales } = useInventory();
   
   const [yesterdaySalesData, setYesterdaySalesData] = useState<any>({});
   const [isYesterdayLoading, setIsYesterdayLoading] = useState(true);
@@ -132,29 +132,31 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const low: InventoryItem[] = [];
     const out: InventoryItem[] = [];
+    const onBarMap = new Map(onBarInventory.map(item => [item.inventoryId, item]));
 
     processedInventory.forEach(item => {
-      const closingStock = item.closing ?? 0;
-      
-      // An item is out of stock if its closing stock is zero or less.
-      if (closingStock <= 0) {
-          out.push(item);
-      }
-      // Low stock: if it's not out of stock, but the quantity is low.
-      else if (closingStock > 0 && closingStock < 10) {
-          low.push(item);
+      const shopStock = item.closing ?? 0;
+      const godownStock = item.stockInGodown || 0;
+      const onBarStock = onBarMap.get(item.id)?.remainingVolume || 0;
+
+      const totalStock = shopStock + godownStock + onBarStock;
+
+      if (totalStock <= 0) {
+        out.push(item);
+      } else if (shopStock > 0 && shopStock < 10) {
+        low.push(item);
       }
     });
     
     return { lowStockItems: low, outOfStockItems: out };
-  }, [processedInventory]);
+  }, [processedInventory, onBarInventory]);
 
   useEffect(() => {
     if (shopId && !loading) {
         lowStockItems.forEach(item => {
             createSharedNotification(shopId, {
                 title: 'Low Stock Alert',
-                description: `${item.brand} (${item.size}) is low on stock. Remaining: ${item.closing} units.`,
+                description: `${item.brand} (${item.size}) is low on stock. Remaining in shop: ${item.closing} units.`,
                 type: 'low-stock',
                 productId: item.id,
                 link: '/dashboard/inventory'
@@ -163,10 +165,10 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
         outOfStockItems.forEach(item => {
             createSharedNotification(shopId, {
                 title: 'Out of Stock Alert',
-                description: `${item.brand} (${item.size}) is now out of stock.`,
+                description: `${item.brand} (${item.size}) is now out of stock across all locations.`,
                 type: 'low-stock',
                 productId: item.id,
-                link: '/dashboard/inventory'
+                link: '/dashboard/godown'
             });
         });
     }
@@ -246,13 +248,13 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             <div className="mt-2 text-xs space-y-1">
                 {lowStockItems.length > 0 && (
                     <div className="flex justify-between">
-                        <span>Low Stock</span>
+                        <span>Low Stock (Shop)</span>
                         <span className="font-semibold text-destructive">{lowStockItems.length} items</span>
                     </div>
                 )}
                  {outOfStockItems.length > 0 && (
                     <div className="flex justify-between">
-                        <span>Out of Stock</span>
+                        <span>Out of Stock (Global)</span>
                         <span className="font-semibold text-destructive">{outOfStockItems.length} items</span>
                     </div>
                 )}

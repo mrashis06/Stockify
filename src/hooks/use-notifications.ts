@@ -49,7 +49,15 @@ export function useNotifications() {
                 // Perform client-side filtering
                 const userRole = user.role;
                 const filteredNotifications = allNotifications.filter(n => {
-                    return n.target === 'all' || n.target === userRole;
+                    // Show if target is 'all' or if target matches user's role
+                    if (n.target === 'all' || n.target === userRole) {
+                        // For low-stock, only show if it hasn't been read by this user
+                        if (n.type === 'low-stock') {
+                            return !n.readBy.includes(user.uid);
+                        }
+                        return true;
+                    }
+                    return false;
                 });
 
                 setNotifications(filteredNotifications);

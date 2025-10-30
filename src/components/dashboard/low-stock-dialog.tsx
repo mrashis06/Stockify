@@ -26,14 +26,14 @@ type LowStockDialogProps = {
   outOfStockItems: InventoryItem[];
 };
 
-const StockListTable = ({ items }: { items: InventoryItem[] }) => (
+const StockListTable = ({ items, isOutOfStock }: { items: InventoryItem[], isOutOfStock?: boolean }) => (
     <ScrollArea className="h-72 w-full rounded-md border">
         <Table>
             <TableHeader className="sticky top-0 bg-muted">
                 <TableRow>
                     <TableHead className="font-bold text-foreground">Brand</TableHead>
                     <TableHead className="font-bold text-foreground">Size</TableHead>
-                    <TableHead className="font-bold text-foreground text-right">Remaining</TableHead>
+                    <TableHead className="font-bold text-foreground text-right">{isOutOfStock ? 'Total Stock' : 'Shop Stock'}</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -42,7 +42,7 @@ const StockListTable = ({ items }: { items: InventoryItem[] }) => (
                         <TableRow key={item.id}>
                             <TableCell className="font-medium">{item.brand}</TableCell>
                             <TableCell>{item.size}</TableCell>
-                            <TableCell className="text-right font-bold text-destructive">{item.closing}</TableCell>
+                            <TableCell className="text-right font-bold text-destructive">{isOutOfStock ? 0 : item.closing}</TableCell>
                         </TableRow>
                     ))
                 ) : (
@@ -76,17 +76,17 @@ export default function LowStockDialog({ isOpen, onOpenChange, lowStockItems, ou
             <Tabs defaultValue="low_stock" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="low_stock">
-                        Low Stock <Badge variant="destructive" className="ml-2">{lowStockItems.length}</Badge>
+                        Low Stock (Shop) <Badge variant="destructive" className="ml-2">{lowStockItems.length}</Badge>
                     </TabsTrigger>
                     <TabsTrigger value="out_of_stock">
-                        Out of Stock <Badge variant="destructive" className="ml-2">{outOfStockItems.length}</Badge>
+                        Out of Stock (Global) <Badge variant="destructive" className="ml-2">{outOfStockItems.length}</Badge>
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="low_stock" className="mt-4">
                     <StockListTable items={lowStockItems} />
                 </TabsContent>
                 <TabsContent value="out_of_stock" className="mt-4">
-                     <StockListTable items={outOfStockItems} />
+                     <StockListTable items={outOfStockItems} isOutOfStock={true} />
                 </TabsContent>
             </Tabs>
         </div>
