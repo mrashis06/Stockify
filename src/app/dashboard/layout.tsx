@@ -304,18 +304,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     <span className="sr-only">Toggle notifications</span>
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuContent align="end" className="w-80 md:w-96">
                 <div className="flex items-center justify-between p-2">
-                    <div className="flex items-center gap-2">
-                        <Checkbox
-                            id="select-all-notifs"
-                            checked={allSelected}
-                            onCheckedChange={handleSelectAll}
-                            aria-label="Select all notifications"
-                            disabled={displayedNotifications.length === 0}
-                        />
-                        <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
-                    </div>
+                    <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
                     <div className="flex items-center gap-2">
                         {unreadCount > 0 && (
                             <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => markAllAsRead()}>
@@ -330,27 +321,37 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
+                    {displayedNotifications.length > 0 && (
+                        <div className="flex items-center gap-2 px-2 pb-2 border-b">
+                            <Checkbox
+                                id="select-all-notifs"
+                                checked={allSelected}
+                                onCheckedChange={handleSelectAll}
+                                aria-label="Select all notifications"
+                            />
+                            <label htmlFor="select-all-notifs" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                Select All
+                            </label>
+                        </div>
+                    )}
                     {displayedNotifications.length > 0 ? (
                         <ScrollArea className="h-[300px]">
                             {displayedNotifications.map(n => {
                                 const isRead = n.readBy.includes(user?.uid || '');
                                 return (
-                                <div key={n.id} className="flex items-start gap-3 p-2 text-sm rounded-md hover:bg-accent"
-                                    onClick={(e) => {
-                                        // Only open dialog if not clicking the checkbox
-                                        if (!(e.target instanceof HTMLInputElement)) {
-                                            handleNotificationClick(n)
-                                        }
-                                    }}
+                                <div key={n.id} className={cn(
+                                        "flex items-start gap-3 p-2 text-sm rounded-md",
+                                        !isRead && "bg-primary/5"
+                                    )}
                                 >
                                     <Checkbox
                                         id={`notif-${n.id}`}
                                         className="mt-1"
                                         checked={selectedNotifIds.has(n.id)}
                                         onCheckedChange={() => toggleNotificationSelection(n.id)}
-                                        onClick={(e) => e.stopPropagation()} // prevent dialog from opening
+                                        onClick={(e) => e.stopPropagation()} 
                                     />
-                                    <div className="flex-1 cursor-pointer">
+                                    <div className="flex-1 cursor-pointer" onClick={() => handleNotificationClick(n)}>
                                         <div className="flex items-center gap-2">
                                             {!isRead && <Circle className="h-2 w-2 fill-primary text-primary" />}
                                             <p className={cn('font-semibold', isRead ? 'text-muted-foreground' : '')}>{n.title}</p>
