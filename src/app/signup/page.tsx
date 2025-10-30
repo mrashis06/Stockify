@@ -318,7 +318,7 @@ export default function SignupPage() {
                 {aiError && (
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>AI Processing Error</AlertTitle>
+                        <AlertTitle>Processing Error</AlertTitle>
                         <AlertDescription>{aiError}</AlertDescription>
                     </Alert>
                 )}
