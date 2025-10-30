@@ -130,9 +130,12 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     processedInventory.forEach(item => {
       const closingStock = item.closing ?? 0;
       
-      // An item is out of stock if its closing stock is zero.
-      if (closingStock <= 0 && item.opening > 0) { // Only alert if it wasn't already empty
-          out.push(item);
+      // An item is out of stock if its closing stock is zero or less.
+      if (closingStock <= 0) {
+          // Only alert if it wasn't already empty at the start of the day
+          if (item.opening > 0) { 
+              out.push(item);
+          }
       }
       // Low stock: if it's not out of stock, but the quantity is low.
       else if (closingStock > 0 && closingStock < 10) {
