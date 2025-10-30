@@ -82,9 +82,9 @@ const IdCardUpload = ({
         Aadhaar Card
       </FormLabel>
       {fileName ? (
-        <Alert variant={isProcessing ? "default" : "default"} className={isProcessing ? "bg-blue-50" : "bg-green-50"}>
+        <Alert variant={isProcessing ? "default" : "default"} className={isProcessing ? "bg-blue-50 dark:bg-blue-900/30 border-blue-500/50" : "bg-green-100 dark:bg-green-900/30 border-green-500/50"}>
           <div className="flex items-center gap-2">
-             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 text-green-600" />}
+             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" /> : <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />}
              <span className="text-sm font-medium truncate">{fileName}</span>
           </div>
         </Alert>
@@ -228,20 +228,20 @@ export default function SignupPage() {
                 )}
               
                 <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Full Name (as on card)" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                 )} />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <FormField control={form.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email address</FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Email address</FormLabel><FormControl><Input type="email" placeholder="e.g., mail@example.com" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                     )} />
                      <FormField control={form.control} name="phone" render={({ field }) => (
-                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="Your phone number" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g., 9876543210" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="aadhaar" render={({ field }) => (
-                        <FormItem><FormLabel>Aadhaar Number</FormLabel><FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Aadhaar Number</FormLabel><FormControl><Input placeholder="XXXX XXXX XXXX" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField
                       control={form.control}
@@ -250,7 +250,7 @@ export default function SignupPage() {
                           <FormItem>
                               <FormLabel>Date of Birth</FormLabel>
                               <FormControl>
-                                <Input placeholder="Auto-filled from card" value={field.value ? field.value.toLocaleDateString('en-CA') : ''} readOnly disabled={loading} />
+                                <Input placeholder="DD-MM-YYYY" value={field.value ? field.value.toLocaleDateString('en-CA') : ''} readOnly disabled={loading} />
                               </FormControl>
                               <FormMessage />
                           </FormItem>
