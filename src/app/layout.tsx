@@ -71,6 +71,19 @@ export default function RootLayout({
             </Script>
           </>
         )}
+         <Script id="unregister-service-worker" strategy="beforeInteractive">
+              {`
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                      registration.unregister();
+                    }
+                  }).catch(function(err) {
+                    console.log('Service Worker registration failed: ', err);
+                  });
+                }
+              `}
+        </Script>
       </head>
       <body className="font-body antialiased">
         <ThemeProvider
