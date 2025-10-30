@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation';
 import { createUserWithEmailAndPassword, AuthError } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { differenceInYears } from 'date-fns';
+import { differenceInYears, parse } from 'date-fns';
+import { useDropzone } from 'react-dropzone';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -30,12 +31,11 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { useDateFormat } from '@/hooks/use-date-format';
 import { ADMIN_UIDS } from '@/lib/constants';
-import { CalendarIcon, Loader2, Eye, EyeOff } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { Calendar } from '@/components/ui/calendar';
+import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle } from 'lucide-react';
+import { extractIdCardData } from '@/ai/flows/extract-id-card-flow';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
 
 const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -56,13 +56,73 @@ const formSchema = z.object({
 
 type SignupFormValues = z.infer<typeof formSchema>;
 
+const IdCardUpload = ({
+  onUpload,
+  isProcessing,
+  fileName,
+  cardType,
+}: {
+  onUpload: (file: File) => void;
+  isProcessing: boolean;
+  fileName: string | null;
+  cardType: string;
+}) => {
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      onUpload(acceptedFiles[0]);
+    }
+  }, [onUpload]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { 'image/jpeg': [], 'image/png': [] },
+    multiple: false,
+  });
+
+  return (
+    <div className="space-y-2">
+      <FormLabel>
+        {cardType} Card
+      </FormLabel>
+      {fileName ? (
+        <Alert variant={isProcessing ? "default" : "default"} className={isProcessing ? "bg-blue-50" : "bg-green-50"}>
+          <div className="flex items-center gap-2">
+             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 text-green-600" />}
+             <span className="text-sm font-medium truncate">{fileName}</span>
+          </div>
+        </Alert>
+      ) : (
+        <div
+          {...getRootProps()}
+          className={`p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
+            isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/50 hover:border-primary'
+          }`}
+        >
+          <input {...getInputProps()} />
+          <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
+          <p className="mt-2 text-sm font-semibold">
+            {isDragActive ? `Drop the ${cardType} here...` : `Upload ${cardType} Card`}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">Drag & drop or click to select a file</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { formatDate } = useDateFormat();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
+  const [panFile, setPanFile] = useState<File | null>(null);
+  const [isProcessingAadhaar, setIsProcessingAadhaar] = useState(false);
+  const [isProcessingPan, setIsProcessingPan] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   
   const form = useForm<SignupFormValues>({
       resolver: zodResolver(formSchema),
@@ -77,6 +137,43 @@ export default function SignupPage() {
       }
   });
 
+  const handleIdCardUpload = async (file: File, cardType: 'aadhaar' | 'pan') => {
+    if (cardType === 'aadhaar') {
+      setAadhaarFile(file);
+      setIsProcessingAadhaar(true);
+    } else {
+      setPanFile(file);
+      setIsProcessingPan(true);
+    }
+    setAiError(null);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const dataUri = event.target?.result as string;
+        try {
+            const result = await extractIdCardData({ idCardDataUri: dataUri });
+
+            if (result.name) form.setValue('name', result.name, { shouldValidate: true });
+            if (result.dob) {
+                const parsedDate = parse(result.dob, 'yyyy-MM-dd', new Date());
+                if (!isNaN(parsedDate.getTime())) {
+                    form.setValue('dob', parsedDate, { shouldValidate: true });
+                }
+            }
+            if (result.aadhaar) form.setValue('aadhaar', result.aadhaar.replace(/\s/g, ''), { shouldValidate: true });
+            if (result.pan) form.setValue('pan', result.pan.toUpperCase(), { shouldValidate: true });
+
+        } catch (err) {
+            setAiError(err instanceof Error ? err.message : "Failed to process the ID card.");
+        } finally {
+            if (cardType === 'aadhaar') setIsProcessingAadhaar(false);
+            else setIsProcessingPan(false);
+        }
+    };
+    reader.readAsDataURL(file);
+  };
+
+
   const onSubmit = async (data: SignupFormValues) => {
     setLoading(true);
     
@@ -86,7 +183,6 @@ export default function SignupPage() {
       
       const role = ADMIN_UIDS.includes(user.uid) ? 'admin' : 'staff';
 
-      // Create user document in Firestore
       await setDoc(doc(db, "users", user.uid), {
         name: data.name,
         email: data.email,
@@ -95,16 +191,12 @@ export default function SignupPage() {
         aadhaar: data.aadhaar,
         pan: data.pan.toUpperCase(),
         role: role,
-        status: 'active', // All new users are active by default
-        shopId: null, // Staff will set this in the next step
+        status: 'active',
+        shopId: null,
         createdAt: serverTimestamp(),
       });
       
-      if (role === 'staff' || !ADMIN_UIDS.includes(user.uid)) {
-          router.push('/join-shop');
-      } else {
-          router.push('/join-shop');
-      }
+      router.push('/join-shop');
 
     } catch (error) {
       console.error("Error signing up with email and password: ", error);
@@ -112,65 +204,83 @@ export default function SignupPage() {
       
       let description = "Failed to sign up. Please try again.";
       if (authError.code === 'auth/email-already-in-use') {
-        description = "This email is already registered. If this is you, please log in. If you were removed as staff, you cannot sign up again with this email.";
-      } else if (authError.code === 'auth/weak-password') {
-        description = "The password is too weak. Please choose a stronger password.";
+        description = "This email is already registered. If this is you, please log in.";
       }
-
-      toast({
-        title: "Signup Error",
-        description: description,
-        variant: "destructive",
-      });
+      toast({ title: "Signup Error", description, variant: "destructive" });
       setLoading(false);
     }
   };
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <Card className="mx-auto w-full max-w-md">
+      <Card className="mx-auto w-full max-w-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
           <CardDescription>
-            Get started with smart inventory management
+            Upload your ID cards to auto-fill your details.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
-               <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+              
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <IdCardUpload
+                        cardType="Aadhaar"
+                        onUpload={(file) => handleIdCardUpload(file, 'aadhaar')}
+                        isProcessing={isProcessingAadhaar}
+                        fileName={aadhaarFile?.name || null}
+                    />
+                    <IdCardUpload
+                        cardType="PAN"
+                        onUpload={(file) => handleIdCardUpload(file, 'pan')}
+                        isProcessing={isProcessingPan}
+                        fileName={panFile?.name || null}
+                    />
+               </div>
+
+                {aiError && (
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>AI Processing Error</AlertTitle>
+                        <AlertDescription>{aiError}</AlertDescription>
+                    </Alert>
+                )}
+              
+                <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email address</FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
-                )} />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="phone" render={({ field }) => (
-                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="Your phone number" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                     <FormField control={form.control} name="email" render={({ field }) => (
+                        <FormItem><FormLabel>Email address</FormLabel><FormControl><Input type="email" placeholder="m@example.com" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                     )} />
-                    <FormField control={form.control} name="dob" render={({ field }) => (
-                        <FormItem className="flex flex-col"><FormLabel>Date of birth</FormLabel>
-                            <Popover><PopoverTrigger asChild>
-                                <FormControl>
-                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                    {field.value ? formatDate(field.value) : <span>Pick a date</span>}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                                </FormControl>
-                            </PopoverTrigger><PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus captionLayout="dropdown-buttons" fromYear={1900} toYear={new Date().getFullYear() - 20}/>
-                            </PopoverContent></Popover>
-                        <FormMessage /></FormItem>
+                     <FormField control={form.control} name="phone" render={({ field }) => (
+                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="Your phone number" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="aadhaar" render={({ field }) => (
-                        <FormItem><FormLabel>Aadhaar Number</FormLabel><FormControl><Input placeholder="12-digit number" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Aadhaar Number</FormLabel><FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name="pan" render={({ field }) => (
-                        <FormItem><FormLabel>PAN Number</FormLabel><FormControl><Input placeholder="10-character PAN" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>PAN Number</FormLabel><FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
+                 <FormField
+                    control={form.control}
+                    name="dob"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Date of Birth</FormLabel>
+                            <FormControl>
+                               <Input placeholder="Auto-filled from card" value={field.value ? field.value.toLocaleDateString('en-CA') : ''} readOnly disabled={loading} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                 />
+
                 <FormField control={form.control} name="password" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Password</FormLabel>
@@ -178,15 +288,8 @@ export default function SignupPage() {
                              <FormControl>
                                 <Input type={showPassword ? 'text' : 'password'} {...field} disabled={loading} className="pr-10" />
                              </FormControl>
-                             <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
-                                onClick={() => setShowPassword(prev => !prev)}
-                            >
+                             <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={() => setShowPassword(p => !p)}>
                                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
                             </Button>
                         </div>
                         <FormMessage />
@@ -199,22 +302,15 @@ export default function SignupPage() {
                             <FormControl>
                                 <Input type={showConfirmPassword ? 'text' : 'password'} {...field} disabled={loading} className="pr-10" />
                             </FormControl>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:bg-transparent"
-                                onClick={() => setShowConfirmPassword(prev => !prev)}
-                            >
+                            <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={() => setShowConfirmPassword(p => !p)}>
                                 {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                <span className="sr-only">{showConfirmPassword ? 'Hide password' : 'Show password'}</span>
                             </Button>
                         </div>
                         <FormMessage />
                     </FormItem>
                 )} />
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading || isProcessingAadhaar || isProcessingPan}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign Up
               </Button>
