@@ -97,7 +97,7 @@ type InventoryState = {
   initListeners: () => () => void;
   addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {prevStock: number}) => Promise<void>;
   addGodownItem: (data: AddGodownItemFormValues) => Promise<void>;
-  processScannedBill: (billDataUri: string, fileName: string) => Promise<{ matchedCount: number; unmatchedCount: number; }>;
+  processScannedBill: (billDataUri: string, fileName: string, force?: boolean) => Promise<{ status: 'success' | 'already_processed'; matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
   updateBrand: (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => Promise<void>;
   linkBarcodeToProduct: (sourceProductId: string, destinationProductId: string) => Promise<void>;
@@ -284,7 +284,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 // Create a stable map of opening stocks for today.
                 const openingStocksMap = new Map<string, number>();
                 masterInv.forEach(item => {
-                    // Logic: Today's opening is yesterday's closing, OR the master prevStock (from EOD).
                     const opening = yesterdayData[item.id]?.closing ?? item.prevStock ?? 0;
                     openingStocksMap.set(item.id, opening);
                 });
@@ -403,68 +402,70 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
 },
 
-  processScannedBill: async (billDataUri, fileName) => {
-    get()._setSaving(true);
-    try {
-        const billId = fileName; // Use the filename as the unique ID
-        const processedBillRef = doc(db, 'processed_bills', billId);
-        const processedBillSnap = await getDoc(processedBillRef);
+    processScannedBill: async (billDataUri, fileName, force = false) => {
+        get()._setSaving(true);
+        try {
+            const billId = fileName;
+            const processedBillRef = doc(db, 'processed_bills', billId);
 
-        if (processedBillSnap.exists()) {
-            throw new Error(`Bill with name "${billId}" has already been processed.`);
-        }
-        
-        // Filter inventory to only include items with godown stock > 0
-        const inStockInventory = get().inventory.filter(item => (item.stockInGodown || 0) > 0);
-
-        const result: BillExtractionOutput = await extractItemsFromBill({
-            billDataUri,
-            existingInventory: inStockInventory.map(item => ({
-                id: item.id,
-                brand: item.brand,
-                size: item.size
-            })),
-        });
-
-        const batch = writeBatch(db);
-
-        if (result.matchedItems && result.matchedItems.length > 0) {
-            for (const item of result.matchedItems) {
-                const productRef = doc(db, 'inventory', item.productId);
-                const productSnap = await getDoc(productRef); 
-                if (productSnap.exists()) {
-                    const currentStock = productSnap.data().stockInGodown || 0;
-                    batch.update(productRef, { 
-                        stockInGodown: currentStock + item.quantity,
-                        dateAddedToGodown: serverTimestamp(),
-                    });
+            if (!force) {
+                const processedBillSnap = await getDoc(processedBillRef);
+                if (processedBillSnap.exists()) {
+                    return { status: 'already_processed', matchedCount: 0, unmatchedCount: 0 };
                 }
             }
-        }
+            
+            const inStockInventory = get().inventory.filter(item => (item.stockInGodown || 0) > 0);
 
-        if (result.unmatchedItems && result.unmatchedItems.length > 0) {
-            result.unmatchedItems.forEach(item => {
-                const docRef = doc(collection(db, 'unprocessed_deliveries'));
-                batch.set(docRef, { ...item, quantity: Number(item.quantity), createdAt: serverTimestamp() });
+            const result: BillExtractionOutput = await extractItemsFromBill({
+                billDataUri,
+                existingInventory: inStockInventory.map(item => ({
+                    id: item.id,
+                    brand: item.brand,
+                    size: item.size
+                })),
             });
+
+            const batch = writeBatch(db);
+
+            if (result.matchedItems && result.matchedItems.length > 0) {
+                for (const item of result.matchedItems) {
+                    const productRef = doc(db, 'inventory', item.productId);
+                    const productSnap = await getDoc(productRef); 
+                    if (productSnap.exists()) {
+                        const currentStock = productSnap.data().stockInGodown || 0;
+                        batch.update(productRef, { 
+                            stockInGodown: currentStock + item.quantity,
+                            dateAddedToGodown: serverTimestamp(),
+                        });
+                    }
+                }
+            }
+
+            if (result.unmatchedItems && result.unmatchedItems.length > 0) {
+                result.unmatchedItems.forEach(item => {
+                    const docRef = doc(collection(db, 'unprocessed_deliveries'));
+                    batch.set(docRef, { ...item, quantity: Number(item.quantity), createdAt: serverTimestamp() });
+                });
+            }
+            
+            batch.set(processedBillRef, { processedAt: serverTimestamp(), originalName: billId });
+
+            await batch.commit();
+            
+            return {
+                status: 'success',
+                matchedCount: result.matchedItems?.length || 0,
+                unmatchedCount: result.unmatchedItems?.length || 0,
+            };
+
+        } catch (e) {
+            console.error("Error processing scanned bill:", e);
+            throw e;
+        } finally {
+            get()._setSaving(false);
         }
-        
-        batch.set(processedBillRef, { processedAt: serverTimestamp(), originalName: billId });
-
-        await batch.commit();
-        
-        return {
-            matchedCount: result.matchedItems?.length || 0,
-            unmatchedCount: result.unmatchedItems?.length || 0,
-        };
-
-    } catch (e) {
-        console.error("Error processing scanned bill:", e);
-        throw e;
-    } finally {
-        get()._setSaving(false);
-    }
-  },
+    },
 
   processScannedDelivery: async (unprocessedItemId, barcode, details) => {
     get()._setSaving(true);

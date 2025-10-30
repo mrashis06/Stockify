@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useInventory } from '@/hooks/use-inventory';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UploadCloud, FileCheck2, AlertCircle, Trash2, CheckCircle, Package } from 'lucide-react';
+import { Loader2, UploadCloud, FileCheck2, AlertCircle, Trash2, CheckCircle, Package, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -30,6 +30,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<{ matchedCount: number; unmatchedCount: number; } | null>(null);
+    const [isDuplicate, setIsDuplicate] = useState(false);
 
     const handleClose = useCallback(() => {
         onOpenChange(false);
@@ -40,6 +41,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
         setIsLoading(false);
         setError(null);
         setResult(null);
+        setIsDuplicate(false);
     }, []);
 
     useEffect(() => {
@@ -55,7 +57,8 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
         if (acceptedFiles.length > 0) {
             setFile(acceptedFiles[0]);
             setError(null);
-            setResult(null); // Reset result when a new file is dropped
+            setResult(null); 
+            setIsDuplicate(false);
         }
     }, []);
 
@@ -69,23 +72,29 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
         multiple: false,
     });
 
-    const handleExtraction = async () => {
+    const handleExtraction = async (force = false) => {
         if (!file) return;
 
         setIsLoading(true);
         setError(null);
         setResult(null);
+        setIsDuplicate(false);
 
         const reader = new FileReader();
         reader.onload = async (event) => {
             const dataUri = event.target?.result as string;
             try {
-                const processResult = await processScannedBill(dataUri, file.name);
-                setResult(processResult); // Set the result instead of closing
-                toast({
-                    title: "Scan Complete",
-                    description: `Review the results and choose an option.`,
-                });
+                const processResult = await processScannedBill(dataUri, file.name, force);
+                
+                if (processResult.status === 'already_processed') {
+                    setIsDuplicate(true);
+                } else {
+                    setResult(processResult);
+                    toast({
+                        title: "Scan Complete",
+                        description: `Review the results and choose an option.`,
+                    });
+                }
             } catch (err) {
                 console.error("Extraction error:", err);
                 const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -112,6 +121,28 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                     <Loader2 className="h-12 w-12 animate-spin text-primary" />
                     <p className="text-muted-foreground">Analyzing your bill, please wait...</p>
                     <p className="text-xs text-muted-foreground">(This may take up to a minute)</p>
+                </div>
+            );
+        }
+
+        if (isDuplicate) {
+            return (
+                <div className="space-y-4">
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Duplicate Bill</AlertTitle>
+                        <AlertDescription>
+                            This bill appears to have been processed already. Re-processing may create duplicate stock entries. Do you want to continue?
+                        </AlertDescription>
+                    </Alert>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Button onClick={resetState} variant="outline">
+                            <Trash2 className="mr-2 h-4 w-4" /> Cancel & Discard
+                        </Button>
+                        <Button onClick={() => handleExtraction(true)}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Process Anyway
+                        </Button>
+                    </div>
                 </div>
             );
         }
@@ -160,7 +191,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                             <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                     </div>
-                    <Button onClick={handleExtraction} className="w-full" disabled={isLoading}>
+                    <Button onClick={() => handleExtraction(false)} className="w-full" disabled={isLoading}>
                         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
                         Process Bill
                     </Button>
@@ -200,7 +231,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                 </div>
 
                 <DialogFooter>
-                     {!result && (
+                     {!result && !isDuplicate && (
                         <Button variant="secondary" onClick={handleClose}>
                             Cancel
                         </Button>
