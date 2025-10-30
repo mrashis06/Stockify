@@ -55,6 +55,7 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
         if (acceptedFiles.length > 0) {
             setFile(acceptedFiles[0]);
             setError(null);
+            setResult(null); // Reset result when a new file is dropped
         }
     }, []);
 
@@ -80,19 +81,18 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
             const dataUri = event.target?.result as string;
             try {
                 const processResult = await processScannedBill(dataUri, file.name);
-                setResult(processResult);
+                setResult(processResult); // Set the result instead of closing
                 toast({
-                    title: "Bill Processed Successfully",
-                    description: `${processResult.matchedCount} items auto-stocked, ${processResult.unmatchedCount} items need review.`,
+                    title: "Scan Complete",
+                    description: `Review the results and choose an option.`,
                 });
-                handleClose(); // Automatically close dialog on success
             } catch (err) {
                 console.error("Extraction error:", err);
                 const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
                 if (errorMessage.includes("quota")) {
                     setError("Could not process bill. The AI service quota may be exceeded. Please check your API key billing status or try again later.");
                 } else {
-                    setError(errorMessage); // Display the specific error message from the hook
+                    setError(errorMessage);
                 }
             } finally {
                 setIsLoading(false);
@@ -124,7 +124,26 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                         <AlertTitle>Extraction Failed</AlertTitle>
                         <AlertDescription>{error}</AlertDescription>
                     </Alert>
-                    <Button onClick={() => { setError(null); setFile(null); }} className="w-full">Try Again</Button>
+                    <Button onClick={resetState} className="w-full">Try Again</Button>
+                </div>
+            );
+        }
+
+        if (result) {
+            return (
+                 <div className="space-y-4 text-center">
+                    <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-500/50">
+                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        <AlertTitle className="text-green-800 dark:text-green-300">Scan Successful</AlertTitle>
+                        <AlertDescription className="text-green-700 dark:text-green-400 text-left">
+                            <p><strong>{result.matchedCount}</strong> items were automatically matched and added to Godown.</p>
+                            <p><strong>{result.unmatchedCount}</strong> items need manual review in the "Unprocessed Deliveries" section.</p>
+                        </AlertDescription>
+                    </Alert>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Button onClick={resetState} variant="outline">Scan Again</Button>
+                        <Button onClick={handleClose}>Done</Button>
+                    </div>
                 </div>
             );
         }
@@ -181,9 +200,11 @@ export default function ScanBillDialog({ isOpen, onOpenChange }: ScanBillDialogP
                 </div>
 
                 <DialogFooter>
-                    <Button variant="secondary" onClick={handleClose}>
-                        Cancel
-                    </Button>
+                     {!result && (
+                        <Button variant="secondary" onClick={handleClose}>
+                            Cancel
+                        </Button>
+                     )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
