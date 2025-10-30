@@ -32,7 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { ADMIN_UIDS } from '@/lib/constants';
-import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 import { extractIdCardData } from '@/ai/flows/extract-id-card-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -218,6 +218,15 @@ export default function SignupPage() {
                         fileName={aadhaarFile?.name || null}
                     />
                </div>
+               
+                <Alert className="bg-blue-50 dark:bg-blue-900/30 border-blue-500/50 text-blue-800 dark:text-blue-300 [&>svg]:text-blue-600 dark:[&>svg]:text-blue-400">
+                  <ShieldCheck className="h-4 w-4" />
+                  <AlertTitle>Your Data is Secure</AlertTitle>
+                  <AlertDescription>
+                    Your Aadhaar image is used only for one-time data extraction and is never stored. Your personal information is encrypted and protected.
+                  </AlertDescription>
+                </Alert>
+
 
                 {aiError && (
                     <Alert variant="destructive">
@@ -228,7 +237,7 @@ export default function SignupPage() {
                 )}
               
                 <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Full Name (as on card)" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g., Suresh Kumar" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                 )} />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -250,7 +259,7 @@ export default function SignupPage() {
                           <FormItem>
                               <FormLabel>Date of Birth</FormLabel>
                               <FormControl>
-                                <Input placeholder="DD-MM-YYYY" value={field.value ? field.value.toLocaleDateString('en-CA') : ''} readOnly disabled={loading} />
+                                <Input placeholder="YYYY-MM-DD" value={field.value ? field.value.toLocaleDateString('en-CA') : ''} readOnly disabled={loading} />
                               </FormControl>
                               <FormMessage />
                           </FormItem>
