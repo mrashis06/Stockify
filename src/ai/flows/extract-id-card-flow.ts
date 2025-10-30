@@ -20,7 +20,7 @@ const IdCardExtractionInputSchema = z.object({
     .describe(
       "An image of an Indian ID card as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'"
     ),
-  cardType: idTypes.describe("The type of card the user has selected to upload."),
+  cardType: idTypes.describe("The type of card the user has selected to upload. This is for context only; your primary task is to identify the card from the image content."),
 });
 export type IdCardExtractionInput = z.infer<typeof IdCardExtractionInputSchema>;
 
@@ -30,7 +30,7 @@ const IdCardExtractionOutputSchema = z.object({
   name: z.string().describe("The full name of the person as printed on the card."),
   dob: z.string().describe("The date of birth in strict YYYY-MM-DD format. Convert DD/MM/YYYY to YYYY-MM-DD."),
   idNumber: z.string().optional().describe("The 10-digit PAN, 12-digit Aadhaar, or Driving Licence number."),
-  cardType: idTypes.describe("The type of card detected from the image."),
+  cardType: idTypes.describe("The type of card detected *from the image content*. This is the most critical field for validation. If the image is not a valid Aadhaar, PAN, or DL, this field MUST be set accurately to reflect that (e.g., if it's a passport, do not try to fit it into the enum). If you cannot determine the type, return what you think it is, but be precise."),
 });
 export type IdCardExtractionOutput = z.infer<typeof IdCardExtractionOutputSchema>;
 
@@ -54,11 +54,11 @@ const idCardExtractionPrompt = ai.definePrompt({
     format: 'json'
   },
   prompt: `
-You are an expert data extraction agent for Indian identity documents. The user has specified they are uploading a {{cardType}}. Your task is to extract information from the provided image with extreme accuracy.
+You are a highly precise data extraction agent specializing in Indian identity documents. Your primary and most critical task is to identify the card type directly from the image and extract its data. The user has indicated they *think* they are uploading a {{cardType}}, but you must verify this from the image.
 
-INSTRUCTIONS:
+CRITICAL INSTRUCTIONS:
 
-1.  **Identify the Card Type:** From the image, confirm the type of card. Set the \`cardType\` field in your output to 'aadhaar', 'pan', or 'dl'. If you cannot determine the type, use the user's provided type '{{cardType}}'.
+1.  **Identify the Card Type from Image:** Analyze the image to determine if it is an Aadhaar Card, a PAN Card, or a Driving Licence. Your identification from the image content is the source of truth. Set the \`cardType\` field in your output to 'aadhaar', 'pan', or 'dl'. If the image is not one of these three types (e.g., a photo of a person, a passport, a random document), you MUST NOT attempt to fit it into the schema. In such cases, if possible, identify what it is but do not return 'aadhaar', 'pan', or 'dl'.
 
 2.  **Extract Key Information:**
     *   **name:** Extract the person's full name exactly as it appears.
@@ -68,7 +68,7 @@ INSTRUCTIONS:
         *   For PAN card, this is the 10-character alphanumeric number.
         *   For Driving Licence, extract the DL number.
 
-3.  **Handle Missing Data:** If a field is not present on the card, omit that field from the JSON output.
+3.  **Handle Missing Data:** If a field is not present on the card, omit it from the JSON output.
 
 4.  **Format Output:** Return the final result as a valid JSON object matching the provided schema.
 

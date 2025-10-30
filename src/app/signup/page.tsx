@@ -32,7 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { ADMIN_UIDS } from '@/lib/constants';
-import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck, RefreshCw, ChevronDown } from 'lucide-react';
+import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 import { extractIdCardData } from '@/ai/flows/extract-id-card-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -165,6 +165,12 @@ export default function SignupPage() {
           const dataUri = event.target?.result as string;
           try {
               const result = await extractIdCardData({ idCardDataUri: dataUri, cardType: selectedIdType });
+
+              if (result.cardType !== selectedIdType) {
+                  const expectedLabel = idTypeOptions.find(o => o.value === selectedIdType)?.label;
+                  const detectedLabel = idTypeOptions.find(o => o.value === result.cardType)?.label || 'an unknown document type';
+                  throw new Error(`Validation Failed: You selected ${expectedLabel}, but uploaded ${detectedLabel}. Please upload the correct document.`);
+              }
               
               if (result.name) form.setValue('name', result.name, { shouldValidate: true });
               if (result.dob) {
@@ -176,7 +182,10 @@ export default function SignupPage() {
               if (result.idNumber) form.setValue('aadhaar', result.idNumber.replace(/\s/g, ''), { shouldValidate: true });
 
           } catch (err) {
-              setAiError(err instanceof Error ? err.message : "Failed to process the ID card.");
+              const errorMessage = err instanceof Error ? err.message : "Failed to process the ID card.";
+              setAiError(errorMessage);
+              // Clear the file so the user has to re-upload
+              setIdFile(null);
           } finally {
               setIsProcessingId(false);
           }
@@ -186,6 +195,7 @@ export default function SignupPage() {
   
   const handleRemoveId = () => {
     setIdFile(null);
+    setAiError(null);
     form.reset({
         ...form.getValues(),
         name: '',
@@ -206,18 +216,31 @@ export default function SignupPage() {
       
       const parsedDate = parse(data.dob, 'dd/MM/yyyy', new Date());
 
-      await setDoc(doc(db, "users", user.uid), {
+      const userDocData: any = {
         name: data.name,
         email: data.email,
         phone: data.phone,
         dob: parsedDate.toISOString().split('T')[0], // Store as YYYY-MM-DD
-        aadhaar: data.aadhaar,
-        pan: null, // Set PAN to null
         role: role,
         status: 'active',
         shopId: null,
         createdAt: serverTimestamp(),
-      });
+      };
+      
+      // Store the correct ID based on type
+      if (selectedIdType === 'aadhaar') {
+          userDocData.aadhaar = data.aadhaar;
+          userDocData.pan = null;
+      } else if (selectedIdType === 'pan') {
+          userDocData.pan = data.aadhaar; // The form field is named aadhaar but holds the PAN
+          userDocData.aadhaar = null;
+      } else { // Driving Licence
+           userDocData.dlNumber = data.aadhaar;
+           userDocData.aadhaar = null;
+           userDocData.pan = null;
+      }
+
+      await setDoc(doc(db, "users", user.uid), userDocData);
       
       router.push('/join-shop');
 
@@ -251,22 +274,28 @@ export default function SignupPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
               
                <div className="grid grid-cols-1 gap-4">
-                    <FormItem>
-                         <FormLabel>ID Type</FormLabel>
-                         <Select value={selectedIdType} onValueChange={(value: IdType) => {
-                             setSelectedIdType(value);
-                             handleRemoveId();
-                         }}>
-                            <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select ID Type" />
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                                {idTypeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </FormItem>
+                    <FormField
+                      control={form.control}
+                      name="aadhaar" // This is a dummy field for the Select, real value is selectedIdType
+                      render={({ field }) => (
+                         <FormItem>
+                             <FormLabel>ID Type</FormLabel>
+                             <Select value={selectedIdType} onValueChange={(value: IdType) => {
+                                 setSelectedIdType(value);
+                                 handleRemoveId();
+                             }}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select ID Type" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {idTypeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </FormItem>
+                      )}
+                    />
 
                     <IdCardUpload
                         onUpload={handleIdCardUpload}
@@ -295,7 +324,7 @@ export default function SignupPage() {
                 )}
               
                 <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g., Suresh Kumar" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="Auto-filled from card" {...field} disabled={loading} /></FormControl><FormMessage /></FormItem>
                 )} />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
