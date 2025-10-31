@@ -28,7 +28,7 @@ export default function SalesPage() {
     const [isScannerPaused, setIsScannerPaused] = useState(false);
     const [saleCompleted, setSaleCompleted] = useState(false);
     
-    const [saleQuantity, setSaleQuantity] = useState<number | ''>('');
+    const [unitsLeft, setUnitsLeft] = useState<number | ''>('');
     const [editedPrice, setEditedPrice] = useState<number | null>(null);
 
     useEffect(() => {
@@ -50,29 +50,37 @@ export default function SalesPage() {
         setIsScannerPaused(true);
         setScannedItem(itemData);
         setEditedPrice(itemData.price);
-        setSaleQuantity(''); // Start with an empty input
+        setUnitsLeft(''); // Start with an empty input
     };
     
     const handleSale = async () => {
-        if (!scannedItem || editedPrice === null || !user) return;
+        if (!scannedItem || editedPrice === null || !user || unitsLeft === '') return;
         
-        const quantityNum = Number(saleQuantity || 1); // Default to 1 if input is empty
-        if (isNaN(quantityNum) || quantityNum <= 0 || !Number.isInteger(quantityNum)) {
-            toast({ title: 'Invalid Quantity', description: 'Please enter a valid whole number greater than zero.', variant: 'destructive' });
+        const unitsLeftNum = Number(unitsLeft);
+        if (isNaN(unitsLeftNum) || unitsLeftNum < 0 || !Number.isInteger(unitsLeftNum)) {
+            toast({ title: 'Invalid Input', description: 'Please enter a valid whole number for units left.', variant: 'destructive' });
             return;
         }
 
-        if (quantityNum > availableStock) {
-            toast({ title: 'Error', description: `Cannot sell more than available stock (${availableStock}).`, variant: 'destructive' });
+        if (unitsLeftNum > availableStock) {
+            toast({ title: 'Error', description: `Units left cannot be greater than the available stock of ${availableStock}.`, variant: 'destructive' });
+            return;
+        }
+
+        const quantitySold = availableStock - unitsLeftNum;
+
+        if (quantitySold <= 0) {
+            toast({ title: 'No Sale Recorded', description: 'No change in stock. No sale was recorded.' });
+            setSaleCompleted(true); // Show completion state even if no sale
             return;
         }
         
         // Optimistic UI Update: Show success immediately
         setSaleCompleted(true);
-        toast({ title: 'Sale Recorded', description: `Sold ${quantityNum} of ${scannedItem.brand} at ₹${editedPrice} each.` });
+        toast({ title: 'Sale Recorded', description: `Sold ${quantitySold} of ${scannedItem.brand} at ₹${editedPrice} each.` });
 
         // Perform database operations in the background
-        recordSale(scannedItem.id, quantityNum, editedPrice, user.uid)
+        recordSale(scannedItem.id, quantitySold, editedPrice, user.uid)
             .catch((error) => {
                 // Revert UI on failure
                 setSaleCompleted(false); 
@@ -89,7 +97,7 @@ export default function SalesPage() {
 
     const resetScanState = () => {
         setScannedItem(null);
-        setSaleQuantity('');
+        setUnitsLeft('');
         setEditedPrice(null);
         setIsScannerPaused(false);
         setSaleCompleted(false);
@@ -116,7 +124,7 @@ export default function SalesPage() {
                         <Barcode /> Barcode Scanner
                     </CardTitle>
                     <CardDescription>
-                        Scan a product's barcode to add it to the sale.
+                        Scan a product's barcode to update its stock.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -148,9 +156,9 @@ export default function SalesPage() {
                                     <div className="space-y-4 text-center">
                                         <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-500/50">
                                             <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                            <AlertTitle className="text-green-800 dark:text-green-300">Sale Confirmed</AlertTitle>
+                                            <AlertTitle className="text-green-800 dark:text-green-300">Stock Updated</AlertTitle>
                                             <AlertDescription className="text-green-700 dark:text-green-400">
-                                                The sale has been successfully recorded.
+                                                The stock has been successfully updated.
                                             </AlertDescription>
                                         </Alert>
                                         <Button onClick={resetScanState} className="w-full">
@@ -185,21 +193,21 @@ export default function SalesPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label htmlFor="quantity" className="font-medium text-sm">Quantity to Sell</label>
+                                        <label htmlFor="unitsLeft" className="font-medium text-sm">Units Left</label>
                                         <Input
-                                            id="quantity"
+                                            id="unitsLeft"
                                             type="number"
-                                            value={saleQuantity}
-                                            onChange={(e) => setSaleQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                                            placeholder="Enter quantity (default: 1)"
-                                            min="1"
+                                            value={unitsLeft}
+                                            onChange={(e) => setUnitsLeft(e.target.value === '' ? '' : Number(e.target.value))}
+                                            placeholder="Enter stock left on shelf"
+                                            min="0"
                                             max={availableStock}
                                             className="max-w-[180px]"
                                             autoFocus
                                         />
                                     </div>
                                     <div className="flex gap-2 pt-4">
-                                        <Button onClick={handleSale} className="flex-1 bg-green-600 hover:bg-green-700">Confirm Sale</Button>
+                                        <Button onClick={handleSale} className="flex-1 bg-green-600 hover:bg-green-700">Confirm Update</Button>
                                         <Button onClick={resetScanState} variant="outline" className="flex-1">Cancel</Button>
                                     </div>
                                 </>
@@ -212,5 +220,3 @@ export default function SalesPage() {
         </main>
     );
 }
-
-    
