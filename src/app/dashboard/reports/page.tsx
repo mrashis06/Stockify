@@ -325,8 +325,8 @@ export default function ReportsPage() {
                 doc.text(`Date: ${formatDate(entry.date)}`, 14, finalY + 15);
                 finalY += 15;
 
-                const dailyOffCounter = [];
-                const dailyOnBar = [];
+                const dailyOffCounter: any[] = [];
+                const dailyOnBar: any[] = [];
                 let dayTotalOffCounter = { units: 0, amount: 0 };
                 let dayTotalOnBar = { amount: 0 };
 
@@ -359,9 +359,7 @@ export default function ReportsPage() {
                         startY: finalY + 10,
                         head: [["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]],
                         body: dailyOffCounter,
-                        foot: [['Day Total', '', '', '', dayTotalOffCounter.units, dayTotalOffCounter.amount.toFixed(2)]],
                         headStyles: { fillColor: [40, 40, 40] },
-                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
                     });
                     finalY = (doc as any).lastAutoTable.finalY;
                 }
@@ -374,14 +372,23 @@ export default function ReportsPage() {
                         startY: finalY + 10,
                         head: [["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"]],
                         body: dailyOnBar,
-                        foot: [['Day Total', '', '', '', dayTotalOnBar.amount.toFixed(2)]],
                         headStyles: { fillColor: [40, 40, 40] },
-                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
                     });
                     finalY = (doc as any).lastAutoTable.finalY;
                 }
 
-                if (dailyOffCounter.length === 0 && dailyOnBar.length === 0) {
+                if (dailyOffCounter.length > 0 || dailyOnBar.length > 0) {
+                     doc.autoTable({
+                        startY: finalY + 2,
+                        body: [], // Empty body
+                        foot: [['Day Total', '', '', '', (dayTotalOffCounter.amount + dayTotalOnBar.amount).toFixed(2)]],
+                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                        showFoot: 'lastPage',
+                        columnStyles: { 0: { halign: 'right' } }
+                    });
+                    finalY = (doc as any).lastAutoTable.finalY;
+                }
+                 else if (dailyOffCounter.length === 0 && dailyOnBar.length === 0) {
                     doc.setFontSize(10);
                     doc.setFont('helvetica', 'normal');
                     doc.text('No sales recorded for this day.', 14, finalY + 8);
@@ -393,39 +400,39 @@ export default function ReportsPage() {
             // Grand Total Summary Page
             doc.addPage();
             doc.setFontSize(18);
-            doc.text('Grand Total Summary', 14, 20);
+            doc.text('Grand Total Summary', doc.internal.pageSize.width / 2, 20, { align: 'center' });
             finalY = 25;
 
-             if (reportType === 'offcounter' || reportType === 'both') {
-                doc.autoTable({
-                    startY: finalY,
-                    head: [["", "Total Units", "Total Amount"]],
-                    body: [['Off-Counter Sales', grandTotalOffCounter.units, grandTotalOffCounter.amount.toFixed(2)]],
-                });
-                finalY = (doc as any).lastAutoTable.finalY;
+            const summaryBody = [];
+            if (reportType === 'offcounter' || reportType === 'both') {
+                summaryBody.push(['Off-Counter Sales', grandTotalOffCounter.units.toString(), `Rs. ${grandTotalOffCounter.amount.toFixed(2)}`]);
             }
              if (reportType === 'onbar' || reportType === 'both') {
-                 doc.autoTable({
-                    startY: finalY + 2,
-                    head: [["", "Total Amount"]],
-                    body: [['On-Bar Sales', grandTotalOnBar.amount.toFixed(2)]],
-                });
-                finalY = (doc as any).lastAutoTable.finalY;
+                summaryBody.push(['On-Bar Sales', 'N/A', `Rs. ${grandTotalOnBar.amount.toFixed(2)}`]);
             }
-             doc.autoTable({
-                startY: finalY + 5,
-                body: [],
-                foot: [['Grand Total', (grandTotalOffCounter.amount + grandTotalOnBar.amount).toFixed(2)]],
+
+            doc.autoTable({
+                startY: finalY + 10,
+                head: [["Category", "Total Units Sold", "Total Amount"]],
+                body: summaryBody,
+                foot: [['Grand Total', '', `Rs. ${(grandTotalOffCounter.amount + grandTotalOnBar.amount).toFixed(2)}`]],
+                headStyles: { fillColor: [40, 40, 40] },
                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
-                columnStyles: { 0: { halign: 'right' } },
+                theme: 'striped',
+                didDrawPage: (data) => {
+                    // Center the table
+                    const tableWidth = data.table.width ?? 0;
+                    const pageWidth = doc.internal.pageSize.width;
+                    data.cursor.x = (pageWidth - tableWidth) / 2;
+                }
             });
         }
         
-        if (reportType === 'both' && grandTotal > 0) {
+        if (isSingleDay && (reportType === 'both' && grandTotal > 0)) {
              doc.autoTable({
                 startY: finalY + 10,
                 body: [],
-                foot: [['Grand Total Sales', '', '', '', grandTotal.toFixed(2)]],
+                foot: [['Grand Total Sales', `Rs. ${grandTotal.toFixed(2)}`]],
                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
                 columnStyles: { 0: { halign: 'right' } },
                 showFoot: 'lastPage'
@@ -699,3 +706,4 @@ export default function ReportsPage() {
     </div>
   );
 }
+
