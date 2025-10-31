@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut, GlassWater } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -51,8 +52,10 @@ import { Separator } from '@/components/ui/separator';
 import { useDateFormat } from '@/hooks/use-date-format';
 
 
-export default function InventoryPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
+export default function InventoryPage() {
     const { formatDate } = useDateFormat();
+    const searchParams = useSearchParams();
+    
     const { 
         inventory,
         dailyOnBarSales,
@@ -68,7 +71,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState(() => searchParams?.category as string || 'All Categories');
+    const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
     const [isEditBrandOpen, setIsEditBrandOpen] = useState(false);
     const [editingBrand, setEditingBrand] = useState<InventoryItem | null>(null);
@@ -80,7 +83,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const { toast } = useToast();
     
     useEffect(() => {
-        const category = searchParams?.category as string;
+        const category = searchParams.get('category');
         if (category) {
             setCategoryFilter(decodeURIComponent(category));
         }
@@ -551,5 +554,3 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
