@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -281,53 +282,152 @@ export default function ReportsPage() {
 
         let finalY = 30;
 
-        const addSectionToPdf = (title: string, data: any[], columns: string[], isOffCounter: boolean) => {
-            if (data.length === 0) return;
-
-            doc.setFontSize(14);
-            doc.text(title, 14, finalY + 10);
-            
-            const body = data.map(item => isOffCounter ? [
-                item.brand, item.size, item.category, item.price.toFixed(2), item.unitsSold, item.totalAmount.toFixed(2)
-            ] : [
-                item.brand, item.size, item.category, `${item.unitsSold} ${item.category === 'Beer' ? 'units' : 'ml'}`, item.totalAmount.toFixed(2)
-            ]);
-
-            const totalAmount = data.reduce((sum, item) => sum + item.totalAmount, 0);
-            const foot = isOffCounter ? [
-                ['Total', '', '', '', data.reduce((sum, item) => sum + item.unitsSold, 0), totalAmount.toFixed(2)]
-            ] : [
-                ['Total', '', '', '', totalAmount.toFixed(2)]
-            ];
-
-            doc.autoTable({
-                head: [columns],
-                body,
-                foot,
-                startY: finalY + 15,
-                headStyles: { fillColor: [40, 40, 40] },
-                footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
-                didDrawPage: (data) => {
-                    finalY = data.cursor?.y || finalY;
+        if (isSingleDay) {
+            // Aggregated report for single day
+            if (reportType === 'offcounter' || reportType === 'both') {
+                if (offCounterSalesData.length > 0) {
+                    doc.setFontSize(14);
+                    doc.text('Off-Counter Sales', 14, finalY + 10);
+                    doc.autoTable({
+                        startY: finalY + 15,
+                        head: [["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]],
+                        body: offCounterSalesData.map(item => [item.brand, item.size, item.category, item.price.toFixed(2), item.unitsSold, item.totalAmount.toFixed(2)]),
+                        foot: [['Total', '', '', '', offCounterTotals.totalUnits, offCounterTotals.totalAmount.toFixed(2)]],
+                        headStyles: { fillColor: [40, 40, 40] },
+                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                    });
+                    finalY = (doc as any).lastAutoTable.finalY;
                 }
-            });
-            finalY = (doc as any).lastAutoTable.finalY;
-        };
+            }
+            if (reportType === 'onbar' || reportType === 'both') {
+                if (onBarSalesData.length > 0) {
+                    doc.setFontSize(14);
+                    doc.text('On-Bar Sales', 14, finalY + 10);
+                    doc.autoTable({
+                        startY: finalY + 15,
+                        head: [["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"]],
+                        body: onBarSalesData.map(item => [item.brand, item.size, item.category, `${item.unitsSold} ${item.category === 'Beer' ? 'units' : 'ml'}`, item.totalAmount.toFixed(2)]),
+                        foot: [['Total', '', '', '', onBarTotals.totalAmount.toFixed(2)]],
+                        headStyles: { fillColor: [40, 40, 40] },
+                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                    });
+                    finalY = (doc as any).lastAutoTable.finalY;
+                }
+            }
+        } else {
+            // Day-wise report for multi-day range
+            let grandTotalOffCounter = { units: 0, amount: 0 };
+            let grandTotalOnBar = { amount: 0 };
 
-        if (reportType === 'offcounter' || reportType === 'both') {
-            addSectionToPdf('Off-Counter Sales', offCounterSalesData, ["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"], true);
-        }
-        if (reportType === 'onbar' || reportType === 'both') {
-            addSectionToPdf('On-Bar Sales', onBarSalesData, ["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"], false);
+            reportData.forEach(entry => {
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`Date: ${formatDate(entry.date)}`, 14, finalY + 15);
+                finalY += 15;
+
+                const dailyOffCounter = [];
+                const dailyOnBar = [];
+                let dayTotalOffCounter = { units: 0, amount: 0 };
+                let dayTotalOnBar = { amount: 0 };
+
+                for (const productId in entry.log) {
+                    const item = entry.log[productId] as any;
+                    if (item && item.sales > 0 && !productId.startsWith('on-bar-')) {
+                        const masterItem = masterInventoryMap.get(productId);
+                        const price = Number(item.price || masterItem?.price || 0);
+                        if (price > 0) {
+                            const totalAmount = item.sales * price;
+                            dailyOffCounter.push([item.brand, item.size, item.category, price.toFixed(2), item.sales, totalAmount.toFixed(2)]);
+                            dayTotalOffCounter.units += item.sales;
+                            dayTotalOffCounter.amount += totalAmount;
+                        }
+                    } else if (item && item.salesValue > 0 && productId.startsWith('on-bar-')) {
+                        dailyOnBar.push([item.brand, item.size, item.category, `${item.salesVolume} ${item.category === 'Beer' ? 'units' : 'ml'}`, item.salesValue.toFixed(2)]);
+                        dayTotalOnBar.amount += item.salesValue;
+                    }
+                }
+                
+                grandTotalOffCounter.units += dayTotalOffCounter.units;
+                grandTotalOffCounter.amount += dayTotalOffCounter.amount;
+                grandTotalOnBar.amount += dayTotalOnBar.amount;
+
+                if ((reportType === 'offcounter' || reportType === 'both') && dailyOffCounter.length > 0) {
+                    doc.setFontSize(12);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Off-Counter Sales', 14, finalY + 8);
+                    doc.autoTable({
+                        startY: finalY + 10,
+                        head: [["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]],
+                        body: dailyOffCounter,
+                        foot: [['Day Total', '', '', '', dayTotalOffCounter.units, dayTotalOffCounter.amount.toFixed(2)]],
+                        headStyles: { fillColor: [40, 40, 40] },
+                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                    });
+                    finalY = (doc as any).lastAutoTable.finalY;
+                }
+
+                if ((reportType === 'onbar' || reportType === 'both') && dailyOnBar.length > 0) {
+                    doc.setFontSize(12);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('On-Bar Sales', 14, finalY + 8);
+                    doc.autoTable({
+                        startY: finalY + 10,
+                        head: [["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"]],
+                        body: dailyOnBar,
+                        foot: [['Day Total', '', '', '', dayTotalOnBar.amount.toFixed(2)]],
+                        headStyles: { fillColor: [40, 40, 40] },
+                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                    });
+                    finalY = (doc as any).lastAutoTable.finalY;
+                }
+
+                if (dailyOffCounter.length === 0 && dailyOnBar.length === 0) {
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('No sales recorded for this day.', 14, finalY + 8);
+                    finalY += 8;
+                }
+                 finalY += 5; // Space between days
+            });
+            
+            // Grand Total Summary Page
+            doc.addPage();
+            doc.setFontSize(18);
+            doc.text('Grand Total Summary', 14, 20);
+            finalY = 25;
+
+             if (reportType === 'offcounter' || reportType === 'both') {
+                doc.autoTable({
+                    startY: finalY,
+                    head: [["", "Total Units", "Total Amount"]],
+                    body: [['Off-Counter Sales', grandTotalOffCounter.units, grandTotalOffCounter.amount.toFixed(2)]],
+                });
+                finalY = (doc as any).lastAutoTable.finalY;
+            }
+             if (reportType === 'onbar' || reportType === 'both') {
+                 doc.autoTable({
+                    startY: finalY + 2,
+                    head: [["", "Total Amount"]],
+                    body: [['On-Bar Sales', grandTotalOnBar.amount.toFixed(2)]],
+                });
+                finalY = (doc as any).lastAutoTable.finalY;
+            }
+             doc.autoTable({
+                startY: finalY + 5,
+                body: [],
+                foot: [['Grand Total', (grandTotalOffCounter.amount + grandTotalOnBar.amount).toFixed(2)]],
+                footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
+                columnStyles: { 0: { halign: 'right' } },
+            });
         }
         
-        if (reportType === 'both' && offCounterSalesData.length > 0 && onBarSalesData.length > 0) {
+        if (reportType === 'both' && grandTotal > 0) {
              doc.autoTable({
                 startY: finalY + 10,
                 body: [],
-                foot: [['Grand Total', '', '', '', grandTotal.toFixed(2)]],
+                foot: [['Grand Total Sales', '', '', '', grandTotal.toFixed(2)]],
                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
-                columnStyles: { 0: { halign: isSameDay(date?.from!, date?.to!) ? 'right' : 'left' } },
+                columnStyles: { 0: { halign: 'right' } },
                 showFoot: 'lastPage'
             });
         }
