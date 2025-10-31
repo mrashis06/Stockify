@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Link from 'next/link';
@@ -204,6 +205,17 @@ export default function SignupPage() {
     });
   }
 
+  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+    let formattedValue = rawValue;
+
+    if (rawValue.length > 4) {
+      formattedValue = `${rawValue.slice(0, 2)}/${rawValue.slice(2, 4)}/${rawValue.slice(4, 8)}`;
+    } else if (rawValue.length > 2) {
+      formattedValue = `${rawValue.slice(0, 2)}/${rawValue.slice(2, 4)}`;
+    }
+    form.setValue('dob', formattedValue);
+  };
 
   const onSubmit = async (data: SignupFormValues) => {
     setLoading(true);
@@ -350,7 +362,13 @@ export default function SignupPage() {
                           <FormItem>
                               <FormLabel>Date of Birth</FormLabel>
                               <FormControl>
-                                <Input placeholder="DD/MM/YYYY" {...field} disabled={loading} />
+                                <Input 
+                                    placeholder="DD/MM/YYYY" 
+                                    {...field} 
+                                    onChange={handleDobChange} 
+                                    disabled={loading} 
+                                    maxLength={10}
+                                />
                               </FormControl>
                               <FormMessage />
                           </FormItem>

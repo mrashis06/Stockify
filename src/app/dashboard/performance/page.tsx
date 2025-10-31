@@ -108,9 +108,20 @@ export default function PerformancePage() {
         }
     };
 
-    const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
-        setDateInputs(prev => ({ ...prev, [field]: e.target.value }));
+     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
+        const separator = dateFormat.includes('-') ? '-' : '/';
+        const rawValue = e.target.value.replace(/[^0-9]/g, '');
+        let formattedValue = rawValue;
+
+        if (rawValue.length > 4) {
+            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2, 4)}${separator}${rawValue.slice(4, 8)}`;
+        } else if (rawValue.length > 2) {
+            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2, 4)}`;
+        }
+        
+        setDateInputs(prev => ({ ...prev, [field]: formattedValue }));
     };
+
 
     const handleDateInputBlur = (field: 'from' | 'to') => {
         const dateStr = dateInputs[field];
