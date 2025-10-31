@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -44,6 +45,7 @@ type DailyRecord = {
 
 const dateRangeOptions = [
     { label: 'Today', value: 'today' },
+    { label: 'Yesterday', value: 'yesterday' },
     { label: 'Last 30 Days', value: '30d' },
     { label: 'Last 60 Days', value: '60d' },
     { label: 'Last 90 Days', value: '90d' },
@@ -94,6 +96,9 @@ export default function PerformancePage() {
         const now = new Date();
         if (value === 'today') {
             setDate({ from: now, to: now });
+        } else if (value === 'yesterday') {
+            const yesterday = subDays(now, 1);
+            setDate({ from: yesterday, to: yesterday });
         } else if (value === '30d') {
             setDate({ from: subDays(now, 29), to: now });
         } else if (value === '60d') {
