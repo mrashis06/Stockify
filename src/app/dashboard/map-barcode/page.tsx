@@ -11,13 +11,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Barcode, HelpCircle, Search, CheckCircle, Info, Scan, Link2 } from 'lucide-react';
+import { Barcode, HelpCircle, Search, CheckCircle, Info, Scan, Link2, ShoppingCart } from 'lucide-react';
 import SharedScanner from '@/components/dashboard/shared-scanner';
 import { useDateFormat } from '@/hooks/use-date-format';
+import { useRouter } from 'next/navigation';
 
 export default function MapBarcodePage() {
     const { inventory, updateBrand, linkBarcodeToProduct } = useInventory();
     const { toast } = useToast();
+    const router = useRouter();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
     const { formatDate } = useDateFormat();
 
@@ -184,15 +186,25 @@ export default function MapBarcodePage() {
                                             <Link2 className="mr-2 h-4 w-4" />
                                             Link to a Different Product
                                         </Button>
+                                        <Button onClick={() => router.push('/dashboard/sales')} className="w-full bg-green-600 hover:bg-green-700">
+                                            <ShoppingCart className="mr-2 h-4 w-4" />
+                                            Go to POS
+                                        </Button>
                                     </div>
                                 ) : mappingComplete ? (
-                                    <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-500/50">
-                                        <CheckCircle className="h-4 w-4 text-green-600" />
-                                        <AlertTitle>Mapping Successful</AlertTitle>
-                                        <AlertDescription>
-                                            The barcode has been linked to **{mappedItemDetails?.brand} ({mappedItemDetails?.size})**.
-                                        </AlertDescription>
-                                    </Alert>
+                                    <>
+                                        <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-500/50">
+                                            <CheckCircle className="h-4 w-4 text-green-600" />
+                                            <AlertTitle>Mapping Successful</AlertTitle>
+                                            <AlertDescription>
+                                                The barcode has been linked to **{mappedItemDetails?.brand} ({mappedItemDetails?.size})**.
+                                            </AlertDescription>
+                                        </Alert>
+                                        <Button onClick={() => router.push('/dashboard/sales')} className="w-full bg-green-600 hover:bg-green-700">
+                                            <ShoppingCart className="mr-2 h-4 w-4" />
+                                            Go to POS
+                                        </Button>
+                                    </>
                                 ) : (
                                     <Alert variant="destructive">
                                         <AlertTitle>New Barcode Detected</AlertTitle>
@@ -339,6 +351,8 @@ function LinkProductDialog({ isOpen, onOpenChange, sourceProduct, onLink }: { is
         </Dialog>
     )
 }
+
+    
 
     
 
