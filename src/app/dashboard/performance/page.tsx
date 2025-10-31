@@ -76,6 +76,13 @@ export default function PerformancePage() {
         if (date?.from) setDateInputs(prev => ({ ...prev, from: formatDate(date.from) }));
         if (date?.to) setDateInputs(prev => ({ ...prev, to: formatDate(date.to) }));
     }, [date, formatDate]);
+    
+    useEffect(() => {
+        if(masterInventory.length > 0) {
+            handleGenerateReport();
+        }
+    }, [masterInventory.length]);
+
 
     const allCategories = useMemo(() => {
         const cats = new Set(masterInventory.map(i => i.category).filter(Boolean));
@@ -192,11 +199,11 @@ export default function PerformancePage() {
 
     }, [masterInventory]);
     
-    useEffect(() => {
+    const handleGenerateReport = () => {
         if (masterInventory.length > 0) {
             fetchPerformanceData(date, categoryFilter, productFilter, sortOrder);
         }
-    }, [masterInventory, date, categoryFilter, productFilter, sortOrder, fetchPerformanceData]);
+    };
     
     const fetchSingleProductHistory = useCallback(async (range: DateRange | undefined, productId: string): Promise<DailyRecord[]> => {
         if (!range?.from || !productId) return [];
@@ -290,7 +297,7 @@ export default function PerformancePage() {
         });
     };
 
-    if (loading || inventoryLoading) {
+    if (inventoryLoading) {
         return null;
     }
 
@@ -366,6 +373,10 @@ export default function PerformancePage() {
                             <SelectItem value="asc">Lowest Units Sold</SelectItem>
                         </SelectContent>
                     </Select>
+                     <Button onClick={handleGenerateReport} disabled={loading} className="w-full md:w-auto">
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
+                        Generate Report
+                    </Button>
                 </CardContent>
             </Card>
 
@@ -381,51 +392,57 @@ export default function PerformancePage() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                     <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Brand</TableHead>
-                                    <TableHead>Size</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead className="text-right text-destructive">Units Sold</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {performanceData.length > 0 ? (
-                                    performanceData.map(item => (
-                                        <TableRow key={item.productId}>
-                                            <TableCell className="font-medium">{item.brand}</TableCell>
-                                            <TableCell>{item.size}</TableCell>
-                                            <TableCell>{item.category}</TableCell>
-                                            <TableCell className="text-right font-bold text-destructive">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <MinusCircle className="h-4 w-4" />
-                                                    {item.unitsSold}
-                                                </div>
+                     {loading ? (
+                        <div className="flex justify-center items-center h-64">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                     ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Brand</TableHead>
+                                        <TableHead>Size</TableHead>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead className="text-right text-destructive">Units Sold</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {performanceData.length > 0 ? (
+                                        performanceData.map(item => (
+                                            <TableRow key={item.productId}>
+                                                <TableCell className="font-medium">{item.brand}</TableCell>
+                                                <TableCell>{item.size}</TableCell>
+                                                <TableCell>{item.category}</TableCell>
+                                                <TableCell className="text-right font-bold text-destructive">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <MinusCircle className="h-4 w-4" />
+                                                        {item.unitsSold}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="h-24 text-center">
+                                                No data found for the selected filters.
                                             </TableCell>
                                         </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center">
-                                            No data found for the selected filters.
-                                        </TableCell>
-                                    </TableRow>
+                                    )}
+                                </TableBody>
+                                {performanceData.length > 1 && (
+                                    <TableFooter>
+                                        <TableRow className="bg-muted/50">
+                                            <TableCell colSpan={3} className="font-bold text-right text-base">Grand Totals</TableCell>
+                                            <TableCell className="text-right font-extrabold text-destructive text-base">
+                                                {performanceData.reduce((sum, item) => sum + item.unitsSold, 0)}
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableFooter>
                                 )}
-                            </TableBody>
-                            {performanceData.length > 1 && (
-                                <TableFooter>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={3} className="font-bold text-right text-base">Grand Totals</TableCell>
-                                        <TableCell className="text-right font-extrabold text-destructive text-base">
-                                            {performanceData.reduce((sum, item) => sum + item.unitsSold, 0)}
-                                        </TableCell>
-                                    </TableRow>
-                                </TableFooter>
-                            )}
-                        </Table>
-                    </div>
+                            </Table>
+                        </div>
+                     )}
                 </CardContent>
             </Card>
 

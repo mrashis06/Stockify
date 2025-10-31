@@ -111,6 +111,10 @@ export default function ReportsPage() {
         if (date?.from) setDateInputs(prev => ({...prev, from: formatDate(date.from)}));
         if (date?.to) setDateInputs(prev => ({...prev, to: formatDate(date.to)}));
     }, [date, formatDate]);
+    
+    useEffect(() => {
+       handleFilter();
+    }, []); 
 
 
     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
@@ -190,10 +194,6 @@ export default function ReportsPage() {
         }
     }, []);
     
-    useEffect(() => {
-       fetchReportData(date);
-    }, [date, fetchReportData]); 
-
     const handleFilter = () => {
         fetchReportData(date);
     };
@@ -444,7 +444,7 @@ export default function ReportsPage() {
         
         if (isSingleDay && grandTotal > 0) {
             let finalYpos = finalY;
-            const singleDayGrandTotal = (reportType === 'offcounter' ? offCounterTotals.totalAmount : reportType === 'onbar' ? onBarTotals.totalAmount : grandTotal);
+            const singleDayGrandTotal = reportType === 'offcounter' ? offCounterTotals.totalAmount : reportType === 'onbar' ? onBarTotals.totalAmount : grandTotal;
             
             if ((doc as any).lastAutoTable) {
               finalYpos = (doc as any).lastAutoTable.finalY;
@@ -497,7 +497,7 @@ export default function ReportsPage() {
             addSectionToCsv("On-Bar Sales", onBarSalesData, ["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"], false);
         }
         
-        const finalGrandTotal = (reportType === 'offcounter' ? offCounterTotals.totalAmount : reportType === 'onbar' ? onBarTotals.totalAmount : grandTotal);
+        const finalGrandTotal = reportType === 'offcounter' ? offCounterTotals.totalAmount : reportType === 'onbar' ? onBarTotals.totalAmount : grandTotal;
 
         if (offCounterSalesData.length > 0 || onBarSalesData.length > 0) {
             csvContent += `Grand Total,,,,${finalGrandTotal.toFixed(2)}\n`;
@@ -575,7 +575,7 @@ export default function ReportsPage() {
                         />
                     </div>
                 </div>
-                 <div className="flex-grow md:flex-grow-0 md:ml-auto">
+                 <div className="flex-grow md:flex-grow-0 md:ml-auto flex items-center gap-2">
                     <Select value={reportType} onValueChange={(value) => setReportType(value as 'offcounter' | 'onbar' | 'both')}>
                         <SelectTrigger className="w-full md:w-[220px]">
                             <SelectValue placeholder="Select Report Type" />
@@ -601,108 +601,66 @@ export default function ReportsPage() {
                             </SelectItem>
                         </SelectContent>
                     </Select>
+                    <Button onClick={handleFilter} disabled={loading}>
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
+                        Generate
+                    </Button>
                  </div>
             </CardContent>
         </Card>
         
-        {reportType === 'offcounter' || reportType === 'both' ? (
-          <Card>
-            <CardHeader>
-                <CardTitle>Off-Counter Sales Details</CardTitle>
-                <CardDescription>An aggregated summary of sales for the selected period.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                    <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Brand</TableHead>
-                                <TableHead>Size</TableHead>
-                                <TableHead>Category</TableHead>
-                                <TableHead className="text-right">Price</TableHead>
-                                <TableHead className="text-right">Units Sold</TableHead>
-                                <TableHead className="text-right">Total Amount</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {offCounterSalesData.length > 0 ? (
-                                offCounterSalesData.map(item => (
-                                    <TableRow key={item.productId}>
-                                        <TableCell className="font-medium">{item.brand}</TableCell>
-                                        <TableCell>{item.size}</TableCell>
-                                        <TableCell>{item.category}</TableCell>
-                                        <TableCell className="text-right">{Number(item.price).toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">{item.unitsSold}</TableCell>
-                                        <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
-                                        No Off-Counter sales data for this period.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                        <TableFooter>
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-bold text-right text-base">Off-Counter Total</TableCell>
-                                <TableCell className="font-bold text-right text-base">{offCounterTotals.totalUnits}</TableCell>
-                                <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
-                                    <IndianRupee className="h-4 w-4" />
-                                    {offCounterTotals.totalAmount.toFixed(2)}
-                                </TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </div>
-            </CardContent>
-          </Card>
-        ) : null}
-        
-        {reportType === 'onbar' || reportType === 'both' ? (
-             <Card>
+        {loading ? (
+            <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        ) : (
+        <>
+            {reportType === 'offcounter' || reportType === 'both' ? (
+            <Card>
                 <CardHeader>
-                    <CardTitle>On-Bar Sales Details</CardTitle>
-                    <CardDescription>An aggregated summary of on-bar sales for the selected period.</CardDescription>
+                    <CardTitle>Off-Counter Sales Details</CardTitle>
+                    <CardDescription>An aggregated summary of sales for the selected period.</CardDescription>
                 </CardHeader>
                 <CardContent>
                         <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
-                                 <TableRow>
+                                <TableRow>
                                     <TableHead>Brand</TableHead>
                                     <TableHead>Size</TableHead>
                                     <TableHead>Category</TableHead>
-                                    <TableHead className="text-right">Units/Volume Sold</TableHead>
+                                    <TableHead className="text-right">Price</TableHead>
+                                    <TableHead className="text-right">Units Sold</TableHead>
                                     <TableHead className="text-right">Total Amount</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {onBarSalesData.length > 0 ? (
-                                    onBarSalesData.map(item => (
+                                {offCounterSalesData.length > 0 ? (
+                                    offCounterSalesData.map(item => (
                                         <TableRow key={item.productId}>
                                             <TableCell className="font-medium">{item.brand}</TableCell>
                                             <TableCell>{item.size}</TableCell>
                                             <TableCell>{item.category}</TableCell>
-                                            <TableCell className="text-right">{`${item.unitsSold} ${item.category === 'Beer' ? 'units' : 'ml'}`}</TableCell>
+                                            <TableCell className="text-right">{Number(item.price).toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">{item.unitsSold}</TableCell>
                                             <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="h-24 text-center">
-                                            No On-Bar sales data for this period.
+                                        <TableCell colSpan={6} className="h-24 text-center">
+                                            No Off-Counter sales data for this period.
                                         </TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
                             <TableFooter>
                                 <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-bold text-right text-base">On-Bar Total</TableCell>
-                                     <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
+                                    <TableCell colSpan={4} className="font-bold text-right text-base">Off-Counter Total</TableCell>
+                                    <TableCell className="font-bold text-right text-base">{offCounterTotals.totalUnits}</TableCell>
+                                    <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
                                         <IndianRupee className="h-4 w-4" />
-                                        {onBarTotals.totalAmount.toFixed(2)}
+                                        {offCounterTotals.totalAmount.toFixed(2)}
                                     </TableCell>
                                 </TableRow>
                             </TableFooter>
@@ -710,21 +668,75 @@ export default function ReportsPage() {
                     </div>
                 </CardContent>
             </Card>
-        ) : null}
+            ) : null}
+            
+            {reportType === 'onbar' || reportType === 'both' ? (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>On-Bar Sales Details</CardTitle>
+                        <CardDescription>An aggregated summary of on-bar sales for the selected period.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                            <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Brand</TableHead>
+                                        <TableHead>Size</TableHead>
+                                        <TableHead>Category</TableHead>
+                                        <TableHead className="text-right">Units/Volume Sold</TableHead>
+                                        <TableHead className="text-right">Total Amount</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {onBarSalesData.length > 0 ? (
+                                        onBarSalesData.map(item => (
+                                            <TableRow key={item.productId}>
+                                                <TableCell className="font-medium">{item.brand}</TableCell>
+                                                <TableCell>{item.size}</TableCell>
+                                                <TableCell>{item.category}</TableCell>
+                                                <TableCell className="text-right">{`${item.unitsSold} ${item.category === 'Beer' ? 'units' : 'ml'}`}</TableCell>
+                                                <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="h-24 text-center">
+                                                No On-Bar sales data for this period.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                                <TableFooter>
+                                    <TableRow className="bg-muted/50">
+                                        <TableCell colSpan={4} className="font-bold text-right text-base">On-Bar Total</TableCell>
+                                        <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
+                                            <IndianRupee className="h-4 w-4" />
+                                            {onBarTotals.totalAmount.toFixed(2)}
+                                        </TableCell>
+                                    </TableRow>
+                                </TableFooter>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+            ) : null}
 
-        {reportType === 'both' && (offCounterSalesData.length > 0 || onBarSalesData.length > 0) && (
-             <Card className="border-primary/50">
-                <CardHeader>
-                    <CardTitle className="text-primary">Grand Total Sales</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex justify-end">
-                        <p className="text-2xl font-bold flex items-center gap-2">
-                           <IndianRupee className="h-6 w-6" /> {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                    </div>
-                </CardContent>
-             </Card>
+            {reportType === 'both' && (offCounterSalesData.length > 0 || onBarSalesData.length > 0) && (
+                <Card className="border-primary/50">
+                    <CardHeader>
+                        <CardTitle className="text-primary">Grand Total Sales</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex justify-end">
+                            <p className="text-2xl font-bold flex items-center gap-2">
+                            <IndianRupee className="h-6 w-6" /> {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+        </>
         )}
     </div>
   );
