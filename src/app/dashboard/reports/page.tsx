@@ -359,7 +359,10 @@ export default function ReportsPage() {
                         startY: finalY + 10,
                         head: [["Brand", "Size", "Category", "Price", "Units Sold", "Total Amount"]],
                         body: dailyOffCounter,
+                        foot: [['Total', '', '', '', dayTotalOffCounter.units, dayTotalOffCounter.amount.toFixed(2)]],
                         headStyles: { fillColor: [40, 40, 40] },
+                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                        showFoot: 'lastPage',
                     });
                     finalY = (doc as any).lastAutoTable.finalY;
                 }
@@ -372,23 +375,15 @@ export default function ReportsPage() {
                         startY: finalY + 10,
                         head: [["Brand", "Size", "Category", "Units/Volume Sold", "Total Amount"]],
                         body: dailyOnBar,
+                        foot: [['Total', '', '', '', dayTotalOnBar.amount.toFixed(2)]],
                         headStyles: { fillColor: [40, 40, 40] },
+                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
+                        showFoot: 'lastPage',
                     });
                     finalY = (doc as any).lastAutoTable.finalY;
                 }
 
-                if (dailyOffCounter.length > 0 || dailyOnBar.length > 0) {
-                     doc.autoTable({
-                        startY: finalY + 2,
-                        body: [], // Empty body
-                        foot: [['Day Total', '', '', '', (dayTotalOffCounter.amount + dayTotalOnBar.amount).toFixed(2)]],
-                        footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
-                        showFoot: 'lastPage',
-                        columnStyles: { 0: { halign: 'right' } }
-                    });
-                    finalY = (doc as any).lastAutoTable.finalY;
-                }
-                 else if (dailyOffCounter.length === 0 && dailyOnBar.length === 0) {
+                if (dailyOffCounter.length === 0 && dailyOnBar.length === 0) {
                     doc.setFontSize(10);
                     doc.setFont('helvetica', 'normal');
                     doc.text('No sales recorded for this day.', 14, finalY + 8);
@@ -707,3 +702,6 @@ export default function ReportsPage() {
   );
 }
 
+
+
+    
