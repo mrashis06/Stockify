@@ -305,7 +305,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
             const image = PlaceHolderImages.find(p => p.id === category.imageId);
             return (
               <Card key={category.name} className="overflow-hidden hover:shadow-lg transition-shadow">
-               <Link href="/dashboard/inventory">
+               <Link href={`/dashboard/inventory?category=${encodeURIComponent(category.name)}`}>
                 <CardContent className="p-0">
                   <div className="relative aspect-square w-full">
                     {image && (

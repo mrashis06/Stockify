@@ -68,7 +68,7 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('All Categories');
+    const [categoryFilter, setCategoryFilter] = useState(() => searchParams?.category as string || 'All Categories');
     const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
     const [isEditBrandOpen, setIsEditBrandOpen] = useState(false);
     const [editingBrand, setEditingBrand] = useState<InventoryItem | null>(null);
@@ -78,6 +78,13 @@ export default function InventoryPage({ params, searchParams }: { params: { slug
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
     const { toast } = useToast();
+    
+    useEffect(() => {
+        const category = searchParams?.category as string;
+        if (category) {
+            setCategoryFilter(decodeURIComponent(category));
+        }
+    }, [searchParams]);
 
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'added'> & {prevStock: number}) => {
         try {
