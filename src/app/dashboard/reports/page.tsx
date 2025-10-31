@@ -732,19 +732,37 @@ export default function ReportsPage() {
                 </Card>
             ) : null}
 
-            {reportType === 'both' && (offCounterSalesData.length > 0 || onBarSalesData.length > 0) && (
-                <Card className="border-primary/50">
-                    <CardHeader>
-                        <CardTitle className="text-primary">Grand Total Sales</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex justify-end">
-                            <p className="text-2xl font-bold flex items-center gap-2">
-                            <IndianRupee className="h-6 w-6" /> {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+             {reportType === 'both' && (offCounterSalesData.length > 0 || onBarSalesData.length > 0) && (
+                <div className="mt-6 flex justify-end">
+                    <div className="min-w-[350px] space-y-2">
+                        {(reportType === 'both' || reportType === 'offcounter') && (
+                            <div className="flex justify-between items-center py-2">
+                                <p className="font-medium text-muted-foreground">Off-Counter Sales Total:</p>
+                                <p className="font-semibold flex items-center">
+                                    <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                    {offCounterTotals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                            </div>
+                        )}
+                        {(reportType === 'both' || reportType === 'onbar') && (
+                             <div className="flex justify-between items-center py-2">
+                                <p className="font-medium text-muted-foreground">On-Bar Sales Total:</p>
+                                <p className="font-semibold flex items-center">
+                                    <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                    {onBarTotals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                            </div>
+                        )}
+                        <Separator />
+                        <div className="flex justify-between items-center pt-2">
+                            <p className="text-xl font-bold text-primary">Grand Total Sales:</p>
+                            <p className="text-xl font-bold text-primary flex items-center">
+                                <IndianRupee className="h-6 w-6 mr-1 shrink-0" />
+                                {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             )}
         </>
         )}
@@ -755,3 +773,4 @@ export default function ReportsPage() {
 
 
     
+
