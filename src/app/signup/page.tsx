@@ -206,15 +206,25 @@ export default function SignupPage() {
   }
 
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value.replace(/[^0-9]/g, '');
-    let formattedValue = rawValue;
+    let value = e.target.value;
+    const prevValue = form.getValues('dob');
 
+    // Handle backspace
+    if (value.length < prevValue.length) {
+        form.setValue('dob', value);
+        return;
+    }
+
+    const rawValue = value.replace(/[^0-9]/g, '');
+    if (rawValue.length > 8) return;
+
+    let formattedValue = rawValue;
     if (rawValue.length > 4) {
       formattedValue = `${rawValue.slice(0, 2)}/${rawValue.slice(2, 4)}/${rawValue.slice(4, 8)}`;
     } else if (rawValue.length > 2) {
-      formattedValue = `${rawValue.slice(0, 2)}/${rawValue.slice(2, 4)}`;
+      formattedValue = `${rawValue.slice(0, 2)}/${rawValue.slice(2)}`;
     }
-    form.setValue('dob', formattedValue);
+    form.setValue('dob', formattedValue, { shouldValidate: true });
   };
 
   const onSubmit = async (data: SignupFormValues) => {

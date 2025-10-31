@@ -119,13 +119,23 @@ export default function ReportsPage() {
 
     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
         const separator = dateFormat.includes('-') ? '-' : '/';
-        const rawValue = e.target.value.replace(/[^0-9]/g, '');
-        let formattedValue = rawValue;
+        let value = e.target.value;
+        const prevValue = dateInputs[field];
 
+        // Handle backspace: allow user to delete separators
+        if (value.length < prevValue.length) {
+            setDateInputs(prev => ({ ...prev, [field]: value }));
+            return;
+        }
+
+        const rawValue = value.replace(/[^0-9]/g, '');
+        if (rawValue.length > 8) return;
+
+        let formattedValue = rawValue;
         if (rawValue.length > 4) {
-            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2, 4)}${separator}${rawValue.slice(4, 8)}`;
+            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2, 4)}${separator}${rawValue.slice(4)}`;
         } else if (rawValue.length > 2) {
-            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2, 4)}`;
+            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2)}`;
         }
         
         setDateInputs(prev => ({ ...prev, [field]: formattedValue }));
