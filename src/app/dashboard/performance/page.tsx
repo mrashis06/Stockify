@@ -44,7 +44,7 @@ const RealTimeClock = () => {
   };
 
   return (
-    <div className="font-mono font-semibold text-muted-foreground">
+    <div className="font-mono font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">
       {formatTime(time)}
     </div>
   );
@@ -341,9 +341,9 @@ export default function PerformancePage() {
         <div className="flex flex-col gap-8">
             <header>
                 <h1 className="text-2xl font-bold tracking-tight">Product Performance</h1>
-                <div className="flex items-center gap-2 text-sm">
-                    <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
-                    <span className="text-muted-foreground font-bold">&bull;</span>
+                <div className="flex items-center gap-2">
+                    <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                    <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                     <RealTimeClock />
                 </div>
             </header>
