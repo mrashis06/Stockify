@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { useDailySaleReport } from '@/hooks/use-daily-sale-report';
@@ -18,6 +19,33 @@ import { useToast } from '@/hooks/use-toast';
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
+
+const RealTimeClock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="font-mono text-sm font-semibold text-muted-foreground">
+      {formatTime(time)}
+    </div>
+  );
+};
 
 export default function DailySalePage() {
     const { toast } = useToast();
@@ -126,7 +154,11 @@ export default function DailySalePage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">BL Sale Report</h1>
-                     <p className="text-muted-foreground font-bold">{formatDate(selectedDate, 'dd/MM/yyyy')}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-muted-foreground font-bold">{formatDate(selectedDate, 'dd/MM/yyyy')}</p>
+                        <span className="text-muted-foreground font-bold">&bull;</span>
+                        <RealTimeClock />
+                    </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     <Select onValueChange={handleDateChange} value={dateOption}>

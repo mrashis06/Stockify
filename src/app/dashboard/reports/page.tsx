@@ -32,6 +32,33 @@ import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 
+const RealTimeClock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="font-mono text-sm font-semibold text-muted-foreground">
+      {formatTime(time)}
+    </div>
+  );
+};
+
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -537,7 +564,11 @@ export default function ReportsPage() {
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sales Statement</h1>
-          <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+            <span className="text-muted-foreground font-bold">&bull;</span>
+            <RealTimeClock />
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button onClick={handleExportPDF} disabled={loading || (offCounterSalesData.length === 0 && onBarSalesData.length === 0)} className="bg-red-600 hover:bg-red-700 text-white">
@@ -769,9 +800,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-
-
-    
-
-

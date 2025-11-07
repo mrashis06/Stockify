@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -41,6 +42,33 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import ProfilePictureDialog from '@/components/dashboard/profile-picture-dialog';
+
+const RealTimeClock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="font-mono text-sm font-semibold text-muted-foreground">
+      {formatTime(time)}
+    </div>
+  );
+};
 
 
 const formSchema = z.object({
@@ -206,7 +234,11 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
         )}
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+        <div className="flex items-center gap-2">
+            <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+            <span className="text-muted-foreground font-bold">&bull;</span>
+            <RealTimeClock />
+        </div>
       </header>
       
       <Card className="mb-8">
@@ -369,5 +401,3 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
     </div>
   );
 }
-
-    

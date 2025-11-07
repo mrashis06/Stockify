@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -21,6 +22,33 @@ import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
+
+const RealTimeClock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="font-mono text-sm font-semibold text-muted-foreground">
+      {formatTime(time)}
+    </div>
+  );
+};
 
 export default function OnBarPage({ params, searchParams }: { params: { slug: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
     const { 
@@ -167,7 +195,11 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
-                    <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                        <span className="text-muted-foreground font-bold">&bull;</span>
+                        <RealTimeClock />
+                    </div>
                 </div>
                 <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
                     <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
@@ -291,5 +323,3 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
-
-    

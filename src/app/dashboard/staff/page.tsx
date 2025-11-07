@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -24,6 +25,33 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { createStaffBroadcast, deleteStaffBroadcast, Notification } from '@/hooks/use-notifications';
 import { Separator } from '@/components/ui/separator';
+
+const RealTimeClock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="font-mono text-sm font-semibold text-muted-foreground">
+      {formatTime(time)}
+    </div>
+  );
+};
 
 
 type StaffMember = {
@@ -340,7 +368,11 @@ export default function StaffPage() {
 
             <div className="mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
-                <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                <div className="flex items-center gap-2">
+                    <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                    <span className="text-muted-foreground font-bold">&bull;</span>
+                    <RealTimeClock />
+                </div>
             </div>
             <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
                 <div className="space-y-8">

@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,33 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDateFormat } from '@/hooks/use-date-format';
 import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
 import type { AddGodownItemFormValues } from '@/components/dashboard/add-godown-item-dialog';
+
+const RealTimeClock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="font-mono text-sm font-semibold text-muted-foreground">
+      {formatTime(time)}
+    </div>
+  );
+};
 
 
 export default function GodownPage() {
@@ -343,7 +371,11 @@ export default function GodownPage() {
        
         <div className="mb-6">
             <h1 className="text-2xl font-bold tracking-tight">Godown Stock</h1>
-            <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+            <div className="flex items-center gap-2">
+                <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                <span className="text-muted-foreground font-bold">&bull;</span>
+                <RealTimeClock />
+            </div>
         </div>
         <Card>
             <CardContent className="p-4 md:p-6">
@@ -486,5 +518,3 @@ export default function GodownPage() {
     </main>
   );
 }
-
-    

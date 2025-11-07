@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -15,6 +16,33 @@ import { Barcode, HelpCircle, Search, CheckCircle, Info, Scan, Link2, ShoppingCa
 import SharedScanner from '@/components/dashboard/shared-scanner';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { useRouter } from 'next/navigation';
+
+const RealTimeClock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="font-mono text-sm font-semibold text-muted-foreground">
+      {formatTime(time)}
+    </div>
+  );
+};
 
 export default function MapBarcodePage() {
     const { inventory, updateBrand, linkBarcodeToProduct } = useInventory();
@@ -138,7 +166,11 @@ export default function MapBarcodePage() {
             )}
             <div className="mb-6">
                 <h1 className="text-2xl font-bold tracking-tight">Map Product Barcodes</h1>
-                <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                <div className="flex items-center gap-2">
+                    <p className="text-muted-foreground font-bold">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                    <span className="text-muted-foreground font-bold">&bull;</span>
+                    <RealTimeClock />
+                </div>
             </div>
             <Card className="max-w-2xl mx-auto">
                 <CardHeader>
@@ -351,9 +383,3 @@ function LinkProductDialog({ isOpen, onOpenChange, sourceProduct, onLink }: { is
         </Dialog>
     )
 }
-
-    
-
-    
-
-    
