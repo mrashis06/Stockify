@@ -47,6 +47,34 @@ import ProfilePictureDialog from '@/components/dashboard/profile-picture-dialog'
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 
+const RealTimeClock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  return (
+    <div className="hidden sm:flex items-center justify-center font-mono text-sm font-semibold bg-muted text-muted-foreground px-3 py-1.5 rounded-md">
+      {formatTime(time)}
+    </div>
+  );
+};
+
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, loading: authLoading, shopId, isStaffActive } = useAuth();
   const { notifications, markAsRead, markAllAsRead, deleteNotifications } = useNotifications();
@@ -291,6 +319,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
         
         <div className="flex items-center gap-2 sm:gap-4">
+          <RealTimeClock />
           <ThemeToggle />
           <DropdownMenu onOpenChange={() => setSelectedNotifIds(new Set())}>
             <DropdownMenuTrigger asChild>
