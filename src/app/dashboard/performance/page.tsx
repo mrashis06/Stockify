@@ -87,48 +87,6 @@ export default function PerformancePage() {
 
     usePageLoading(loading || inventoryLoading);
     
-    useEffect(() => {
-        if(masterInventory.length > 0) {
-            handleGenerateReport();
-        }
-    }, [masterInventory.length]);
-
-
-    const allCategories = useMemo(() => {
-        const cats = new Set(masterInventory.map(i => i.category).filter(Boolean));
-        return ['All Categories', ...Array.from(cats).sort()];
-    }, [masterInventory]);
-    
-    const filteredProductsForDropdown = useMemo(() => {
-        if (categoryFilter === 'All Categories') return [];
-        return masterInventory.filter(item => item.category === categoryFilter);
-    }, [masterInventory, categoryFilter]);
-    
-    useEffect(() => {
-        setProductFilter('All Products');
-    }, [categoryFilter]);
-
-    const handleDateRangeOptionChange = (value: string) => {
-        setDateRangeOption(value);
-        const now = new Date();
-        if (value === 'today') {
-            setFromDate(now);
-            setToDate(now);
-        } else if (value === 'yesterday') {
-            const yesterday = subDays(now, 1);
-            setFromDate(yesterday);
-            setToDate(yesterday);
-        } else if (value.endsWith('d')) {
-            const days = parseInt(value.replace('d', ''));
-            setFromDate(subDays(now, days - 1));
-            setToDate(now);
-        } else if (value.endsWith('m')) {
-            const months = parseInt(value.replace('m', ''));
-            setFromDate(subMonths(now, months));
-            setToDate(now);
-        }
-    };
-
     const fetchPerformanceData = useCallback(async (range: {from?: Date, to?:Date}, category: string, product: string, sort: 'desc' | 'asc') => {
         if (!range?.from) return;
         setLoading(true);
@@ -184,10 +142,46 @@ export default function PerformancePage() {
         }
 
     }, [masterInventory]);
-    
-    const handleGenerateReport = () => {
-        if (masterInventory.length > 0) {
+
+    useEffect(() => {
+        if(masterInventory.length > 0) {
             fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, sortOrder);
+        }
+    }, [masterInventory.length, fromDate, toDate, categoryFilter, productFilter, sortOrder, fetchPerformanceData]);
+
+
+    const allCategories = useMemo(() => {
+        const cats = new Set(masterInventory.map(i => i.category).filter(Boolean));
+        return ['All Categories', ...Array.from(cats).sort()];
+    }, [masterInventory]);
+    
+    const filteredProductsForDropdown = useMemo(() => {
+        if (categoryFilter === 'All Categories') return [];
+        return masterInventory.filter(item => item.category === categoryFilter);
+    }, [masterInventory, categoryFilter]);
+    
+    useEffect(() => {
+        setProductFilter('All Products');
+    }, [categoryFilter]);
+
+    const handleDateRangeOptionChange = (value: string) => {
+        setDateRangeOption(value);
+        const now = new Date();
+        if (value === 'today') {
+            setFromDate(now);
+            setToDate(now);
+        } else if (value === 'yesterday') {
+            const yesterday = subDays(now, 1);
+            setFromDate(yesterday);
+            setToDate(yesterday);
+        } else if (value.endsWith('d')) {
+            const days = parseInt(value.replace('d', ''));
+            setFromDate(subDays(now, days - 1));
+            setToDate(now);
+        } else if (value.endsWith('m')) {
+            const months = parseInt(value.replace('m', ''));
+            setFromDate(subMonths(now, months));
+            setToDate(now);
         }
     };
     
@@ -342,10 +336,6 @@ export default function PerformancePage() {
                             <SelectTrigger className="w-full md:w-[220px]"><ChevronsUpDown className="mr-2 h-4 w-4" /><SelectValue placeholder="Sort by..." /></SelectTrigger>
                             <SelectContent><SelectItem value="desc">Highest Units Sold</SelectItem><SelectItem value="asc">Lowest Units Sold</SelectItem></SelectContent>
                         </Select>
-                        <Button onClick={handleGenerateReport} disabled={loading} className="w-full md:w-auto ml-auto">
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
-                            Generate Report
-                        </Button>
                     </div>
                 </CardContent>
             </Card>

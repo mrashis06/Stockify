@@ -118,32 +118,6 @@ export default function ReportsPage() {
 
     usePageLoading(loading);
     
-    useEffect(() => {
-       handleFilter();
-    }, []); 
-
-    const handleDateRangeOptionChange = (value: string) => {
-        setDateRangeOption(value);
-        const now = new Date();
-        if (value === 'today') {
-            setFromDate(now);
-            setToDate(now);
-        } else if (value === 'yesterday') {
-            const yesterday = subDays(now, 1);
-            setFromDate(yesterday);
-            setToDate(yesterday);
-        } else if (value.endsWith('d')) {
-            const days = parseInt(value.replace('d', ''));
-            setFromDate(subDays(now, days - 1));
-            setToDate(now);
-        } else if (value.endsWith('m')) {
-            const months = parseInt(value.replace('m', ''));
-            setFromDate(subMonths(now, months));
-            setToDate(now);
-        }
-    };
-
-
     const fetchReportData = useCallback(async (range: { from?: Date, to?: Date }) => {
         if (!range?.from) {
             toast({ title: "Error", description: "Please select a start date.", variant: "destructive" });
@@ -175,9 +149,30 @@ export default function ReportsPage() {
             setLoading(false);
         }
     }, []);
-    
-    const handleFilter = () => {
-        fetchReportData({ from: fromDate, to: toDate });
+
+    useEffect(() => {
+       fetchReportData({ from: fromDate, to: toDate });
+    }, [fromDate, toDate, fetchReportData]); 
+
+    const handleDateRangeOptionChange = (value: string) => {
+        setDateRangeOption(value);
+        const now = new Date();
+        if (value === 'today') {
+            setFromDate(now);
+            setToDate(now);
+        } else if (value === 'yesterday') {
+            const yesterday = subDays(now, 1);
+            setFromDate(yesterday);
+            setToDate(yesterday);
+        } else if (value.endsWith('d')) {
+            const days = parseInt(value.replace('d', ''));
+            setFromDate(subDays(now, days - 1));
+            setToDate(now);
+        } else if (value.endsWith('m')) {
+            const months = parseInt(value.replace('m', ''));
+            setFromDate(subMonths(now, months));
+            setToDate(now);
+        }
     };
     
     const masterInventoryMap = useMemo(() => {
@@ -564,10 +559,6 @@ export default function ReportsPage() {
                             <SelectItem value="onbar"><div className="flex items-center gap-2"><GlassWater className="h-4 w-4" /><span>On-Bar Sales</span></div></SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button onClick={handleFilter} disabled={loading} className="ml-auto">
-                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
-                        Generate
-                    </Button>
                  </div>
             </CardContent>
         </Card>
