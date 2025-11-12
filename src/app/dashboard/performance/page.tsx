@@ -147,7 +147,7 @@ export default function PerformancePage() {
         if(masterInventory.length > 0) {
             fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, sortOrder);
         }
-    }, [masterInventory.length, fromDate, toDate, categoryFilter, productFilter, sortOrder, fetchPerformanceData]);
+    }, [masterInventory.length, fetchPerformanceData]);
 
 
     const allCategories = useMemo(() => {
@@ -167,21 +167,43 @@ export default function PerformancePage() {
     const handleDateRangeOptionChange = (value: string) => {
         setDateRangeOption(value);
         const now = new Date();
-        if (value === 'today') {
+        if (value === 'custom') {
+            setFromDate(new Date());
+            setToDate(new Date());
+        } else if (value === 'today') {
             setFromDate(now);
             setToDate(now);
+            fetchPerformanceData({from: now, to: now}, categoryFilter, productFilter, sortOrder);
         } else if (value === 'yesterday') {
             const yesterday = subDays(now, 1);
             setFromDate(yesterday);
             setToDate(yesterday);
+            fetchPerformanceData({from: yesterday, to: yesterday}, categoryFilter, productFilter, sortOrder);
         } else if (value.endsWith('d')) {
             const days = parseInt(value.replace('d', ''));
-            setFromDate(subDays(now, days - 1));
+            const newFromDate = subDays(now, days - 1);
+            setFromDate(newFromDate);
             setToDate(now);
+            fetchPerformanceData({from: newFromDate, to: now}, categoryFilter, productFilter, sortOrder);
         } else if (value.endsWith('m')) {
             const months = parseInt(value.replace('m', ''));
-            setFromDate(subMonths(now, months));
+            const newFromDate = subMonths(now, months);
+            setFromDate(newFromDate);
             setToDate(now);
+            fetchPerformanceData({from: newFromDate, to: now}, categoryFilter, productFilter, sortOrder);
+        }
+    };
+    
+    const handleApplyCustomDate = (date: Date | undefined, type: 'from' | 'to') => {
+        if (type === 'from') {
+            setFromDate(date);
+        } else {
+            setToDate(date);
+        }
+        if (fromDate && toDate) {
+             const newFrom = type === 'from' ? date : fromDate;
+             const newTo = type === 'to' ? date : toDate;
+             fetchPerformanceData({from: newFrom, to: newTo}, categoryFilter, productFilter, sortOrder);
         }
     };
     
@@ -312,13 +334,13 @@ export default function PerformancePage() {
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : <span>From date</span>}</Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar selected={fromDate} onSelect={setFromDate} onApply={(d) => { setFromDate(d); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => handleApplyCustomDate(d, 'from')} onApply={(d) => { handleApplyCustomDate(d, 'from'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
                                 </Popover>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : <span>To date</span>}</Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar selected={toDate} onSelect={setToDate} onApply={(d) => { setToDate(d); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => handleApplyCustomDate(d, 'to')} onApply={(d) => { handleApplyCustomDate(d, 'to'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
                                 </Popover>
                             </div>
                         )}
@@ -336,6 +358,10 @@ export default function PerformancePage() {
                             <SelectTrigger className="w-full md:w-[220px]"><ChevronsUpDown className="mr-2 h-4 w-4" /><SelectValue placeholder="Sort by..." /></SelectTrigger>
                             <SelectContent><SelectItem value="desc">Highest Units Sold</SelectItem><SelectItem value="asc">Lowest Units Sold</SelectItem></SelectContent>
                         </Select>
+                         <Button onClick={() => fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, sortOrder)} disabled={loading}>
+                            <Filter className="mr-2 h-4 w-4" />
+                            Generate Report
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -409,5 +435,3 @@ export default function PerformancePage() {
         </div>
     );
 }
-
-    
