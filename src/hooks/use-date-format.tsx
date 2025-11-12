@@ -2,7 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { format as formatDateFns, parseISO } from 'date-fns';
+import { format as formatDateFns, parseISO, isValid } from 'date-fns';
 
 export const supportedDateFormats = [
     { format: 'dd-MM-yyyy', label: 'DD-MM-YYYY' },
@@ -16,7 +16,7 @@ type DateFormat = typeof supportedDateFormats[number]['format'];
 type DateFormatContextType = {
   dateFormat: DateFormat;
   setDateFormat: (format: DateFormat) => void;
-  formatDate: (date: Date | string | number, formatOverride?: string) => string;
+  formatDate: (date: Date | string | number | undefined, formatOverride?: string) => string;
 };
 
 const DateFormatContext = createContext<DateFormatContextType | undefined>(undefined);
@@ -36,12 +36,28 @@ export const DateFormatProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('dateFormat', newFormat);
   };
   
-  const formatDate = useCallback((date: Date | string | number, formatOverride: string = dateFormat): string => {
+  const formatDate = useCallback((date: Date | string | number | undefined, formatOverride: string = dateFormat): string => {
+    if (!date) {
+        return 'N/A';
+    }
     try {
-        let dateObj = date instanceof Date ? date : typeof date === 'string' ? parseISO(date) : new Date(date);
+        let dateObj;
+        if (date instanceof Date) {
+            dateObj = date;
+        } else if (typeof date === 'string') {
+            dateObj = parseISO(date);
+        } else if (typeof date === 'number') {
+            dateObj = new Date(date);
+        } else {
+             return 'Invalid Date';
+        }
+
+        if (!isValid(dateObj)) {
+            return 'Invalid Date';
+        }
+
         return formatDateFns(dateObj, formatOverride);
     } catch (error) {
-        console.error("Invalid date for formatting:", date);
         return 'Invalid Date';
     }
   }, [dateFormat]);
