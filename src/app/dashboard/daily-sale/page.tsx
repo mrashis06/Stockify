@@ -7,7 +7,7 @@ import 'jspdf-autotable';
 import { useDailySaleReport } from '@/hooks/use-daily-sale-report';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { IndianRupee, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { IndianRupee, Download, ChevronDown, ChevronRight, Eye } from 'lucide-react';
 import { usePageLoading } from '@/hooks/use-loading';
 import { Button } from '@/components/ui/button';
 import { useDateFormat } from '@/hooks/use-date-format';
@@ -73,7 +73,7 @@ export default function DailySalePage() {
         setExpandedRows(newSet);
     };
     
-    const handleExportPDF = () => {
+    const generateAndShowPdf = (action: 'download' | 'preview') => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
         const reportDate = formatDate(selectedDate, 'dd/MM/yyyy');
         
@@ -135,12 +135,15 @@ export default function DailySalePage() {
         doc.text("Total Sale", 22, yPos + 4);
         doc.text(totalString, doc.internal.pageSize.width - 22, yPos + 4, { align: 'right' });
 
-        doc.save(`BL_Sale_Report_${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
-        
-        toast({
-            title: "Export Successful",
-            description: "Your BL Sale Report has been downloaded.",
-        });
+        if (action === 'download') {
+            doc.save(`BL_Sale_Report_${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
+            toast({
+                title: "Export Successful",
+                description: "Your BL Sale Report has been downloaded.",
+            });
+        } else {
+            doc.output('dataurlnewwindow');
+        }
     };
 
 
@@ -169,7 +172,11 @@ export default function DailySalePage() {
                             <SelectItem value="yesterday">Yesterday</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button onClick={handleExportPDF} disabled={blReport.length === 0}>
+                     <Button onClick={() => generateAndShowPdf('preview')} disabled={blReport.length === 0} variant="outline">
+                        <Eye className="mr-2 h-4 w-4" />
+                        Preview
+                    </Button>
+                    <Button onClick={() => generateAndShowPdf('download')} disabled={blReport.length === 0}>
                         <Download className="mr-2 h-4 w-4" />
                         Export to PDF
                     </Button>
