@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -69,25 +71,14 @@ type DailyRecord = {
     unitsAdded: number;
 }
 
-const dateRangeOptions = [
-    { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
-    { label: 'Last 30 Days', value: '30d' },
-    { label: 'Last 60 Days', value: '60d' },
-    { label: 'Last 90 Days', value: '90d' },
-    { label: 'Custom Range', value: 'custom' },
-];
-
 export default function PerformancePage() {
     const { inventory: masterInventory, loading: inventoryLoading } = useInventory();
-    const { formatDate, dateFormat } = useDateFormat();
+    const { formatDate } = useDateFormat();
     const [loading, setLoading] = useState(true);
 
-    const [dateRangeOption, setDateRangeOption] = useState('today');
-    const [date, setDate] = useState<DateRange | undefined>({
-        from: new Date(),
-        to: new Date(),
-    });
+    const [dateRangeOption, setDateRangeOption] = useState('30d');
+    const [fromDate, setFromDate] = useState<Date | undefined>(subDays(new Date(), 29));
+    const [toDate, setToDate] = useState<Date | undefined>(new Date());
     
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [productFilter, setProductFilter] = useState('All Products');
@@ -121,20 +112,24 @@ export default function PerformancePage() {
         setDateRangeOption(value);
         const now = new Date();
         if (value === 'today') {
-            setDate({ from: now, to: now });
+            setFromDate(now);
+            setToDate(now);
         } else if (value === 'yesterday') {
             const yesterday = subDays(now, 1);
-            setDate({ from: yesterday, to: yesterday });
-        } else if (value === '30d') {
-            setDate({ from: subDays(now, 29), to: now });
-        } else if (value === '60d') {
-            setDate({ from: subDays(now, 59), to: now });
-        } else if (value === '90d') {
-            setDate({ from: subDays(now, 89), to: now });
+            setFromDate(yesterday);
+            setToDate(yesterday);
+        } else if (value.endsWith('d')) {
+            const days = parseInt(value.replace('d', ''));
+            setFromDate(subDays(now, days - 1));
+            setToDate(now);
+        } else if (value.endsWith('m')) {
+            const months = parseInt(value.replace('m', ''));
+            setFromDate(subMonths(now, months));
+            setToDate(now);
         }
     };
 
-    const fetchPerformanceData = useCallback(async (range: DateRange | undefined, category: string, product: string, sort: 'desc' | 'asc') => {
+    const fetchPerformanceData = useCallback(async (range: {from?: Date, to?:Date}, category: string, product: string, sort: 'desc' | 'asc') => {
         if (!range?.from) return;
         setLoading(true);
 
@@ -192,11 +187,11 @@ export default function PerformancePage() {
     
     const handleGenerateReport = () => {
         if (masterInventory.length > 0) {
-            fetchPerformanceData(date, categoryFilter, productFilter, sortOrder);
+            fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, sortOrder);
         }
     };
     
-    const fetchSingleProductHistory = useCallback(async (range: DateRange | undefined, productId: string): Promise<DailyRecord[]> => {
+    const fetchSingleProductHistory = useCallback(async (range: {from?: Date, to?: Date}, productId: string): Promise<DailyRecord[]> => {
         if (!range?.from || !productId) return [];
         
         const history: DailyRecord[] = [];
@@ -223,8 +218,8 @@ export default function PerformancePage() {
 
     const handleExportPDF = async () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
-        const from = date?.from ? formatDate(date.from) : 'N/A';
-        const to = date?.to ? formatDate(date.to) : 'N/A';
+        const from = fromDate ? formatDate(fromDate) : 'N/A';
+        const to = toDate ? formatDate(toDate) : 'N/A';
 
         // Add Shop Name Header
         doc.setFontSize(18);
@@ -237,7 +232,7 @@ export default function PerformancePage() {
              const selectedProduct = masterInventory.find(p => p.id === productFilter);
              if (!selectedProduct) return;
 
-             const history = await fetchSingleProductHistory(date, productFilter);
+             const history = await fetchSingleProductHistory({from: fromDate, to: toDate}, productFilter);
              
              doc.setFontSize(14);
              doc.text(`Sales History for ${selectedProduct.brand} (${selectedProduct.size})`, 14, 25);
@@ -307,90 +302,51 @@ export default function PerformancePage() {
                 <CardHeader>
                     <CardTitle>Filters</CardTitle>
                 </CardHeader>
-                <CardContent className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full flex-wrap">
-                    <Select value={dateRangeOption} onValueChange={handleDateRangeOptionChange}>
-                         <SelectTrigger className="w-full md:w-auto">
-                            <SelectValue placeholder="Select Date Range" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {dateRangeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    
-                    {dateRangeOption === 'custom' && (
-                        <div className="flex items-center gap-2">
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-full justify-start text-left font-normal md:w-[240px]",
-                                        !date && "text-muted-foreground"
-                                    )}
-                                    >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {date?.from ? (
-                                        date.to ? (
-                                        <>
-                                            {formatDate(date.from)} - {formatDate(date.to)}
-                                        </>
-                                        ) : (
-                                            formatDate(date.from)
-                                        )
-                                    ) : (
-                                        <span>Pick a date range</span>
-                                    )}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                    initialFocus
-                                    mode="range"
-                                    defaultMonth={date?.from}
-                                    selected={date}
-                                    onSelect={setDate}
-                                    numberOfMonths={2}
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                    )}
-                    
-                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                        <SelectTrigger className="w-full md:w-[180px]">
-                            <SelectValue placeholder="Select Category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                             {allCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-
-                    <Select value={productFilter} onValueChange={setProductFilter} disabled={categoryFilter === 'All Categories'}>
-                        <SelectTrigger className="w-full md:w-[220px]">
-                            <SelectValue placeholder="Select Product" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="All Products">All Products</SelectItem>
-                            {filteredProductsForDropdown.map(p => (
-                                <SelectItem key={p.id} value={p.id}>{p.brand} ({p.size})</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-
-                    <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
-                        <SelectTrigger className="w-full md:w-[220px]">
-                            <ChevronsUpDown className="mr-2 h-4 w-4" />
-                            <SelectValue placeholder="Sort by..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="desc">Highest Units Sold</SelectItem>
-                            <SelectItem value="asc">Lowest Units Sold</SelectItem>
-                        </SelectContent>
-                    </Select>
-                     <Button onClick={handleGenerateReport} disabled={loading} className="w-full md:w-auto">
-                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
-                        Generate Report
-                    </Button>
+                <CardContent className="space-y-6">
+                    <div className="flex flex-col md:flex-row gap-6">
+                        <RadioGroup value={dateRangeOption} onValueChange={handleDateRangeOptionChange} className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="30d" id="30d" /><Label htmlFor="30d">Last 30 days</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="60d" id="60d" /><Label htmlFor="60d">Last 60 days</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="90d" id="90d" /><Label htmlFor="90d">Last 90 days</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="1m" id="1m" /><Label htmlFor="1m">Last month</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="3m" id="3m" /><Label htmlFor="3m">Last 3 months</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="custom" id="custom" /><Label htmlFor="custom">Custom date range</Label></div>
+                        </RadioGroup>
+                        {dateRangeOption === 'custom' && (
+                            <div className="flex items-center gap-4">
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : <span>From date</span>}</Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0"><Calendar selected={fromDate} onSelect={setFromDate} onApply={(d) => { setFromDate(d); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                </Popover>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : <span>To date</span>}</Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0"><Calendar selected={toDate} onSelect={setToDate} onApply={(d) => { setToDate(d); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                </Popover>
+                            </div>
+                        )}
+                    </div>
+                     <div className="flex flex-col md:flex-row items-center gap-4 w-full flex-wrap">
+                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                            <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Select Category" /></SelectTrigger>
+                            <SelectContent>{allCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Select value={productFilter} onValueChange={setProductFilter} disabled={categoryFilter === 'All Categories'}>
+                            <SelectTrigger className="w-full md:w-[220px]"><SelectValue placeholder="Select Product" /></SelectTrigger>
+                            <SelectContent><SelectItem value="All Products">All Products</SelectItem>{filteredProductsForDropdown.map(p => (<SelectItem key={p.id} value={p.id}>{p.brand} ({p.size})</SelectItem>))}</SelectContent>
+                        </Select>
+                        <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
+                            <SelectTrigger className="w-full md:w-[220px]"><ChevronsUpDown className="mr-2 h-4 w-4" /><SelectValue placeholder="Sort by..." /></SelectTrigger>
+                            <SelectContent><SelectItem value="desc">Highest Units Sold</SelectItem><SelectItem value="asc">Lowest Units Sold</SelectItem></SelectContent>
+                        </Select>
+                        <Button onClick={handleGenerateReport} disabled={loading} className="w-full md:w-auto ml-auto">
+                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
+                            Generate Report
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO, isValid, format, subDays } from 'date-fns';
+import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO, isValid, format, subDays, subMonths } from 'date-fns';
 import { Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package, Combine, Calendar as CalendarIcon } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
@@ -32,6 +32,8 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -94,37 +96,20 @@ type OnBarSoldItem = {
     totalAmount: number;
 }
 
-const dateRangeOptions = [
-    { label: 'Today', value: 'today' },
-    { label: 'Yesterday', value: 'yesterday' },
-    { label: 'Last 30 Days', value: '30d' },
-    { label: 'Last 60 Days', value: '60d' },
-    { label: 'Last 90 Days', value: '90d' },
-    { label: 'Custom Range', value: 'custom' },
-];
-
 
 export default function ReportsPage() {
-    const { formatDate, dateFormat } = useDateFormat();
+    const { formatDate } = useDateFormat();
     const searchParams = useSearchParams();
     const { inventory: masterInventory } = useInventory();
+    
     const [dateRangeOption, setDateRangeOption] = useState('today');
-
-    const [date, setDate] = useState<DateRange | undefined>(() => {
+    const [fromDate, setFromDate] = useState<Date | undefined>(() => {
         const fromParam = searchParams.get('from');
+        return fromParam && isValid(parseISO(fromParam)) ? parseISO(fromParam) : new Date();
+    });
+    const [toDate, setToDate] = useState<Date | undefined>(() => {
         const toParam = searchParams.get('to');
-        if (fromParam) {
-            const fromDate = parseISO(fromParam);
-            if (isValid(fromDate)) {
-                const toDate = toParam ? parseISO(toParam) : fromDate;
-                setDateRangeOption('custom');
-                return {
-                    from: fromDate,
-                    to: isValid(toDate) ? toDate : fromDate
-                }
-            }
-        }
-        return { from: new Date(), to: new Date() };
+        return toParam && isValid(parseISO(toParam)) ? parseISO(toParam) : new Date();
     });
     
     const [reportType, setReportType] = useState<'offcounter' | 'onbar' | 'both'>('both');
@@ -137,25 +122,29 @@ export default function ReportsPage() {
        handleFilter();
     }, []); 
 
-
     const handleDateRangeOptionChange = (value: string) => {
         setDateRangeOption(value);
         const now = new Date();
         if (value === 'today') {
-            setDate({ from: now, to: now });
+            setFromDate(now);
+            setToDate(now);
         } else if (value === 'yesterday') {
             const yesterday = subDays(now, 1);
-            setDate({ from: yesterday, to: yesterday });
-        } else if (value === '30d') {
-            setDate({ from: subDays(now, 29), to: now });
-        } else if (value === '60d') {
-            setDate({ from: subDays(now, 59), to: now });
-        } else if (value === '90d') {
-            setDate({ from: subDays(now, 89), to: now });
+            setFromDate(yesterday);
+            setToDate(yesterday);
+        } else if (value.endsWith('d')) {
+            const days = parseInt(value.replace('d', ''));
+            setFromDate(subDays(now, days - 1));
+            setToDate(now);
+        } else if (value.endsWith('m')) {
+            const months = parseInt(value.replace('m', ''));
+            setFromDate(subMonths(now, months));
+            setToDate(now);
         }
     };
 
-    const fetchReportData = useCallback(async (range: DateRange | undefined) => {
+
+    const fetchReportData = useCallback(async (range: { from?: Date, to?: Date }) => {
         if (!range?.from) {
             toast({ title: "Error", description: "Please select a start date.", variant: "destructive" });
             setLoading(false);
@@ -188,7 +177,7 @@ export default function ReportsPage() {
     }, []);
     
     const handleFilter = () => {
-        fetchReportData(date);
+        fetchReportData({ from: fromDate, to: toDate });
     };
     
     const masterInventoryMap = useMemo(() => {
@@ -274,15 +263,15 @@ export default function ReportsPage() {
     const handleExportPDF = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
         
-        const startDate = date?.from ? formatDate(date.from) : '';
-        const endDate = date?.to ? formatDate(date.to) : startDate;
-        const isSingleDay = !date?.to || isSameDay(date?.from || new Date(), date.to);
+        const startDateStr = fromDate ? formatDate(fromDate) : '';
+        const endDateStr = toDate ? formatDate(toDate) : startDateStr;
+        const isSingleDay = !toDate || isSameDay(fromDate || new Date(), toDate);
         
         doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
         doc.text("BHOLE BABA FL ON SHOP", doc.internal.pageSize.width / 2, 15, { align: 'center' });
         
-        const dateRangeStr = isSingleDay ? `for ${startDate}` : `from ${startDate} to ${endDate}`;
+        const dateRangeStr = isSingleDay ? `for ${startDateStr}` : `from ${startDateStr} to ${endDateStr}`;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text(`Sales Statement ${dateRangeStr}`, doc.internal.pageSize.width - 14, 25, { align: 'right' });
@@ -370,7 +359,6 @@ export default function ReportsPage() {
                         foot: [['Total', '', '', '', dayTotalOffCounter.units, dayTotalOffCounter.amount.toFixed(2)]],
                         headStyles: { fillColor: [40, 40, 40] },
                         footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
-                        showFoot: 'lastPage',
                     });
                     finalY = (doc as any).lastAutoTable.finalY;
                 }
@@ -386,7 +374,6 @@ export default function ReportsPage() {
                         foot: [['Total', '', '', '', dayTotalOnBar.amount.toFixed(2)]],
                         headStyles: { fillColor: [40, 40, 40] },
                         footStyles: { fillColor: [244, 244, 245], textColor: [20, 20, 20], fontStyle: 'bold' },
-                        showFoot: 'lastPage',
                     });
                     finalY = (doc as any).lastAutoTable.finalY;
                 }
@@ -427,7 +414,6 @@ export default function ReportsPage() {
                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
                 theme: 'striped',
                 didDrawPage: (data) => {
-                    // Center the table
                     const tableWidth = data.table.width ?? 0;
                     const pageWidth = doc.internal.pageSize.width;
                     data.cursor.x = (pageWidth - tableWidth) / 2;
@@ -449,11 +435,10 @@ export default function ReportsPage() {
                 foot: [['Grand Total Sales', `Rs. ${singleDayGrandTotal.toFixed(2)}`]],
                 footStyles: { fillColor: [22, 163, 74], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
                 columnStyles: { 0: { halign: 'right' } },
-                showFoot: 'lastPage'
             });
         }
         
-        const fileDate = date?.from ? formatDate(date.from, 'yyyy-MM-dd') : 'report';
+        const fileDate = fromDate ? formatDate(fromDate, 'yyyy-MM-dd') : 'report';
         doc.save(`${reportType}_sales_report_${fileDate}.pdf`);
 
         toast({
@@ -499,7 +484,7 @@ export default function ReportsPage() {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        const fileDate = date?.from ? formatDate(date.from, 'yyyy-MM-dd') : 'report';
+        const fileDate = fromDate ? formatDate(fromDate, 'yyyy-MM-dd') : 'report';
         link.setAttribute("download", `${reportType}_sales_report_${fileDate}.csv`);
         document.body.appendChild(link);
         link.click();
@@ -542,83 +527,44 @@ export default function ReportsPage() {
             <CardHeader>
                 <CardTitle>Report Generation</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
-                    <Select value={dateRangeOption} onValueChange={handleDateRangeOptionChange}>
-                         <SelectTrigger className="w-full md:w-auto">
-                            <SelectValue placeholder="Select Date Range" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {dateRangeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                     {dateRangeOption === 'custom' && (
-                        <div className="flex items-center gap-2">
+            <CardContent className="space-y-6">
+                 <div className="flex flex-col md:flex-row gap-6">
+                    <RadioGroup value={dateRangeOption} onValueChange={handleDateRangeOptionChange} className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="today" id="today" /><Label htmlFor="today">Today</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="yesterday" id="yesterday" /><Label htmlFor="yesterday">Yesterday</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="30d" id="30d" /><Label htmlFor="30d">Last 30 days</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="60d" id="60d" /><Label htmlFor="60d">Last 60 days</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="90d" id="90d" /><Label htmlFor="90d">Last 90 days</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="custom" id="custom" /><Label htmlFor="custom">Custom date range</Label></div>
+                    </RadioGroup>
+
+                    {dateRangeOption === 'custom' && (
+                        <div className="flex items-center gap-4">
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button
-                                    id="date"
-                                    variant={"outline"}
-                                    className={cn(
-                                        "w-full justify-start text-left font-normal md:w-[240px]",
-                                        !date && "text-muted-foreground"
-                                    )}
-                                    >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {date?.from ? (
-                                        date.to ? (
-                                        <>
-                                            {formatDate(date.from)} - {formatDate(date.to)}
-                                        </>
-                                        ) : (
-                                            formatDate(date.from)
-                                        )
-                                    ) : (
-                                        <span>Pick a date range</span>
-                                    )}
-                                    </Button>
+                                    <Button variant={"outline"} className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : <span>From date</span>}</Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                    initialFocus
-                                    mode="range"
-                                    defaultMonth={date?.from}
-                                    selected={date}
-                                    onSelect={setDate}
-                                    numberOfMonths={2}
-                                    />
-                                </PopoverContent>
+                                <PopoverContent className="w-auto p-0"><Calendar selected={fromDate} onSelect={setFromDate} onApply={(d) => { setFromDate(d); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                            </Popover>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : <span>To date</span>}</Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0"><Calendar selected={toDate} onSelect={setToDate} onApply={(d) => { setToDate(d); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
                     )}
                 </div>
-                 <div className="flex-grow md:flex-grow-0 md:ml-auto flex items-center gap-2">
+                 <div className="flex items-center gap-2">
                     <Select value={reportType} onValueChange={(value) => setReportType(value as 'offcounter' | 'onbar' | 'both')}>
-                        <SelectTrigger className="w-full md:w-[220px]">
-                            <SelectValue placeholder="Select Report Type" />
-                        </SelectTrigger>
+                        <SelectTrigger className="w-full md:w-[220px]"><SelectValue placeholder="Select Report Type" /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="both">
-                                <div className="flex items-center gap-2">
-                                    <Combine className="h-4 w-4" />
-                                    <span>Both (Combined)</span>
-                                </div>
-                            </SelectItem>
-                            <SelectItem value="offcounter">
-                                <div className="flex items-center gap-2">
-                                    <Package className="h-4 w-4" />
-                                    <span>Off-Counter Sales</span>
-                                </div>
-                            </SelectItem>
-                            <SelectItem value="onbar">
-                                 <div className="flex items-center gap-2">
-                                    <GlassWater className="h-4 w-4" />
-                                    <span>On-Bar Sales</span>
-                                </div>
-                            </SelectItem>
+                            <SelectItem value="both"><div className="flex items-center gap-2"><Combine className="h-4 w-4" /><span>Both (Combined)</span></div></SelectItem>
+                            <SelectItem value="offcounter"><div className="flex items-center gap-2"><Package className="h-4 w-4" /><span>Off-Counter Sales</span></div></SelectItem>
+                            <SelectItem value="onbar"><div className="flex items-center gap-2"><GlassWater className="h-4 w-4" /><span>On-Bar Sales</span></div></SelectItem>
                         </SelectContent>
                     </Select>
-                    <Button onClick={handleFilter} disabled={loading}>
+                    <Button onClick={handleFilter} disabled={loading} className="ml-auto">
                         {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Filter className="mr-2 h-4 w-4" />}
                         Generate
                     </Button>

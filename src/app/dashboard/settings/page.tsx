@@ -309,11 +309,12 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0" align="start">
                                     <Calendar
-                                        mode="single"
                                         selected={field.value}
                                         onSelect={field.onChange}
+                                        onApply={(d) => { field.onChange(d); (document.activeElement as HTMLElement)?.blur() }}
+                                        onCancel={() => (document.activeElement as HTMLElement)?.blur()}
                                         disabled={(date) =>
-                                        date > new Date() || date < new Date("1900-01-01")
+                                            date > new Date() || date < new Date("1900-01-01")
                                         }
                                         initialFocus
                                         captionLayout="dropdown-buttons"

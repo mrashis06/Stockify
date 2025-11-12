@@ -40,6 +40,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { useDateFormat } from '@/hooks/use-date-format';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 type IdType = 'aadhaar' | 'pan' | 'dl';
 
@@ -275,19 +277,21 @@ export default function SignupPage() {
                       render={({ field }) => (
                          <FormItem>
                              <FormLabel>ID Type</FormLabel>
-                             <Select value={selectedIdType} onValueChange={(value: IdType) => {
-                                 setSelectedIdType(value);
-                                 handleRemoveId();
-                             }}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select ID Type" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {idTypeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                             <RadioGroup
+                                value={selectedIdType}
+                                onValueChange={(value: IdType) => {
+                                  setSelectedIdType(value);
+                                  handleRemoveId();
+                                }}
+                                className="flex space-x-4"
+                              >
+                                {idTypeOptions.map(opt => (
+                                  <div key={opt.value} className="flex items-center space-x-2">
+                                    <RadioGroupItem value={opt.value} id={opt.value} />
+                                    <Label htmlFor={opt.value}>{opt.label}</Label>
+                                  </div>
+                                ))}
+                              </RadioGroup>
                         </FormItem>
                       )}
                     />
@@ -365,9 +369,9 @@ export default function SignupPage() {
                               </PopoverTrigger>
                               <PopoverContent className="w-auto p-0" align="start">
                               <Calendar
-                                  mode="single"
                                   selected={field.value}
-                                  onSelect={field.onChange}
+                                  onApply={(d) => { field.onChange(d); (document.activeElement as HTMLElement)?.blur() }}
+                                  onCancel={() => (document.activeElement as HTMLElement)?.blur()}
                                   disabled={(date) =>
                                   date > new Date() || date < new Date("1900-01-01")
                                   }
