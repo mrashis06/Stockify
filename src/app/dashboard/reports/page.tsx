@@ -152,46 +152,51 @@ export default function ReportsPage() {
 
     useEffect(() => {
        fetchReportData({ from: fromDate, to: toDate });
-    }, [fetchReportData]); 
+    }, []); 
 
     const handleDateRangeOptionChange = (value: string) => {
         setDateRangeOption(value);
         const now = new Date();
-        if (value === 'custom') {
-            setFromDate(new Date());
-            setToDate(new Date());
-        } else if (value === 'today') {
-            setFromDate(now);
-            setToDate(now);
-            fetchReportData({ from: now, to: now });
+        let newFromDate: Date | undefined = fromDate;
+        let newToDate: Date | undefined = toDate;
+
+        if (value === 'today') {
+            newFromDate = now;
+            newToDate = now;
         } else if (value === 'yesterday') {
             const yesterday = subDays(now, 1);
-            setFromDate(yesterday);
-            setToDate(yesterday);
-            fetchReportData({ from: yesterday, to: yesterday });
+            newFromDate = yesterday;
+            newToDate = yesterday;
         } else if (value.endsWith('d')) {
             const days = parseInt(value.replace('d', ''));
-            const newFromDate = subDays(now, days - 1);
-            setFromDate(newFromDate);
-            setToDate(now);
-            fetchReportData({ from: newFromDate, to: now });
+            newFromDate = subDays(now, days - 1);
+            newToDate = now;
         } else if (value.endsWith('m')) {
             const months = parseInt(value.replace('m', ''));
-            const newFromDate = subMonths(now, months);
-            setFromDate(newFromDate);
-            setToDate(now);
-            fetchReportData({ from: newFromDate, to: now });
+            newFromDate = subMonths(now, months);
+            newToDate = now;
+        } else if (value === 'custom') {
+            // For custom, we just enable the inputs but don't fetch yet.
+            // Fetching happens on "Apply"
+            return;
         }
+        
+        setFromDate(newFromDate);
+        setToDate(newToDate);
+        fetchReportData({ from: newFromDate, to: newToDate });
     };
     
     const handleApplyCustomDate = (date: Date | undefined, type: 'from' | 'to') => {
+        let newFrom = fromDate;
+        let newTo = toDate;
+        
         if (type === 'from') {
+            newFrom = date;
             setFromDate(date);
         } else {
+            newTo = date;
             setToDate(date);
         }
-        const newFrom = type === 'from' ? date : fromDate;
-        const newTo = type === 'to' ? date : toDate;
         
         if (newFrom && newTo) {
              fetchReportData({from: newFrom, to: newTo});
@@ -562,13 +567,13 @@ export default function ReportsPage() {
                                 <PopoverTrigger asChild>
                                     <Button variant={"outline"} className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : <span>From date</span>}</Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => handleApplyCustomDate(d, 'from')} onApply={(d) => { handleApplyCustomDate(d, 'from'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => setFromDate(d)} onApply={(d) => { handleApplyCustomDate(d, 'from'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
                             </Popover>
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant={"outline"} className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : <span>To date</span>}</Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => handleApplyCustomDate(d, 'to')} onApply={(d) => { handleApplyCustomDate(d, 'to'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => setToDate(d)} onApply={(d) => { handleApplyCustomDate(d, 'to'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
                     )}

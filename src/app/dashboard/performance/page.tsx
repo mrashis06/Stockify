@@ -147,7 +147,7 @@ export default function PerformancePage() {
         if(masterInventory.length > 0) {
             fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, sortOrder);
         }
-    }, [masterInventory.length, fetchPerformanceData]);
+    }, [masterInventory.length]);
 
 
     const allCategories = useMemo(() => {
@@ -167,42 +167,45 @@ export default function PerformancePage() {
     const handleDateRangeOptionChange = (value: string) => {
         setDateRangeOption(value);
         const now = new Date();
-        if (value === 'custom') {
-            setFromDate(new Date());
-            setToDate(new Date());
-        } else if (value === 'today') {
-            setFromDate(now);
-            setToDate(now);
-            fetchPerformanceData({from: now, to: now}, categoryFilter, productFilter, sortOrder);
+        let newFromDate: Date | undefined = fromDate;
+        let newToDate: Date | undefined = toDate;
+
+        if (value === 'today') {
+            newFromDate = now;
+            newToDate = now;
         } else if (value === 'yesterday') {
             const yesterday = subDays(now, 1);
-            setFromDate(yesterday);
-            setToDate(yesterday);
-            fetchPerformanceData({from: yesterday, to: yesterday}, categoryFilter, productFilter, sortOrder);
+            newFromDate = yesterday;
+            newToDate = yesterday;
         } else if (value.endsWith('d')) {
             const days = parseInt(value.replace('d', ''));
-            const newFromDate = subDays(now, days - 1);
-            setFromDate(newFromDate);
-            setToDate(now);
-            fetchPerformanceData({from: newFromDate, to: now}, categoryFilter, productFilter, sortOrder);
+            newFromDate = subDays(now, days - 1);
+            newToDate = now;
         } else if (value.endsWith('m')) {
             const months = parseInt(value.replace('m', ''));
-            const newFromDate = subMonths(now, months);
-            setFromDate(newFromDate);
-            setToDate(now);
-            fetchPerformanceData({from: newFromDate, to: now}, categoryFilter, productFilter, sortOrder);
+            newFromDate = subMonths(now, months);
+            newToDate = now;
+        } else if (value === 'custom') {
+            return;
         }
+        
+        setFromDate(newFromDate);
+        setToDate(newToDate);
+        fetchPerformanceData({from: newFromDate, to: newToDate}, categoryFilter, productFilter, sortOrder);
     };
     
     const handleApplyCustomDate = (date: Date | undefined, type: 'from' | 'to') => {
+         let newFrom = fromDate;
+         let newTo = toDate;
+        
         if (type === 'from') {
+            newFrom = date;
             setFromDate(date);
         } else {
+            newTo = date;
             setToDate(date);
         }
-        if (fromDate && toDate) {
-             const newFrom = type === 'from' ? date : fromDate;
-             const newTo = type === 'to' ? date : toDate;
+        if (newFrom && newTo) {
              fetchPerformanceData({from: newFrom, to: newTo}, categoryFilter, productFilter, sortOrder);
         }
     };
@@ -334,34 +337,30 @@ export default function PerformancePage() {
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : <span>From date</span>}</Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => handleApplyCustomDate(d, 'from')} onApply={(d) => { handleApplyCustomDate(d, 'from'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => setFromDate(d)} onApply={(d) => { handleApplyCustomDate(d, 'from'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
                                 </Popover>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : <span>To date</span>}</Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => handleApplyCustomDate(d, 'to')} onApply={(d) => { handleApplyCustomDate(d, 'to'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => setToDate(d)} onApply={(d) => { handleApplyCustomDate(d, 'to'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
                                 </Popover>
                             </div>
                         )}
                     </div>
                      <div className="flex flex-col md:flex-row items-center gap-4 w-full flex-wrap">
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                        <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); fetchPerformanceData({from: fromDate, to: toDate}, v, productFilter, sortOrder); }}>
                             <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Select Category" /></SelectTrigger>
                             <SelectContent>{allCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}</SelectContent>
                         </Select>
-                        <Select value={productFilter} onValueChange={setProductFilter} disabled={categoryFilter === 'All Categories'}>
+                        <Select value={productFilter} onValueChange={(v) => { setProductFilter(v); fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, v, sortOrder); }} disabled={categoryFilter === 'All Categories'}>
                             <SelectTrigger className="w-full md:w-[220px]"><SelectValue placeholder="Select Product" /></SelectTrigger>
                             <SelectContent><SelectItem value="All Products">All Products</SelectItem>{filteredProductsForDropdown.map(p => (<SelectItem key={p.id} value={p.id}>{p.brand} ({p.size})</SelectItem>))}</SelectContent>
                         </Select>
-                        <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
+                        <Select value={sortOrder} onValueChange={(v: 'desc' | 'asc') => { setSortOrder(v); fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, v); }}>
                             <SelectTrigger className="w-full md:w-[220px]"><ChevronsUpDown className="mr-2 h-4 w-4" /><SelectValue placeholder="Sort by..." /></SelectTrigger>
                             <SelectContent><SelectItem value="desc">Highest Units Sold</SelectItem><SelectItem value="asc">Lowest Units Sold</SelectItem></SelectContent>
                         </Select>
-                         <Button onClick={() => fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, sortOrder)} disabled={loading}>
-                            <Filter className="mr-2 h-4 w-4" />
-                            Generate Report
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
