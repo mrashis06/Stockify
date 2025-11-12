@@ -255,6 +255,7 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
                         </AvatarFallback>
                     </Avatar>
                      <Button
+                        id="profile-picture-upload-button"
                         variant="secondary"
                         size="icon"
                         onClick={open}
@@ -400,3 +401,5 @@ export default function SettingsPage({ params, searchParams }: { params: { slug:
     </div>
   );
 }
+
+    

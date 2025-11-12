@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { eachDayOfInterval, isSameDay, parse, startOfDay, parseISO, isValid, format, subDays } from 'date-fns';
-import { Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package, Combine } from 'lucide-react';
+import { Download, Filter, Loader2, FileSpreadsheet, IndianRupee, GlassWater, Package, Combine, Calendar as CalendarIcon } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -30,6 +30,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useInventory, InventoryItem } from '@/hooks/use-inventory';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -125,8 +127,6 @@ export default function ReportsPage() {
         return { from: new Date(), to: new Date() };
     });
     
-    const [dateInputs, setDateInputs] = useState<{ from: string; to: string }>({ from: '', to: '' });
-
     const [reportType, setReportType] = useState<'offcounter' | 'onbar' | 'both'>('both');
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -134,53 +134,10 @@ export default function ReportsPage() {
     usePageLoading(loading);
     
     useEffect(() => {
-        if (date?.from) setDateInputs(prev => ({...prev, from: formatDate(date.from)}));
-        if (date?.to) setDateInputs(prev => ({...prev, to: formatDate(date.to)}));
-    }, [date, formatDate]);
-    
-    useEffect(() => {
        handleFilter();
     }, []); 
 
 
-    const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
-        const separator = dateFormat.includes('-') ? '-' : '/';
-        let value = e.target.value;
-        const prevValue = dateInputs[field];
-
-        // Handle backspace: allow user to delete separators
-        if (value.length < prevValue.length) {
-            setDateInputs(prev => ({ ...prev, [field]: value }));
-            return;
-        }
-
-        const rawValue = value.replace(/[^0-9]/g, '');
-        if (rawValue.length > 8) return;
-
-        let formattedValue = rawValue;
-        if (rawValue.length > 4) {
-            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2, 4)}${separator}${rawValue.slice(4)}`;
-        } else if (rawValue.length > 2) {
-            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2)}`;
-        }
-        
-        setDateInputs(prev => ({ ...prev, [field]: formattedValue }));
-    };
-
-
-    const handleDateInputBlur = (field: 'from' | 'to') => {
-        const dateStr = dateInputs[field];
-        if (!dateStr) return; // Ignore empty input
-        
-        const parsedDate = parse(dateStr, dateFormat, new Date());
-        if (isValid(parsedDate)) {
-            setDate(prev => ({ ...prev, [field]: parsedDate }));
-             setDateRangeOption('custom');
-        } else {
-            toast({ title: "Invalid Date", description: `The date format for '${field}' is not correct. Please use ${dateFormat}.`, variant: "destructive" });
-        }
-    };
-    
     const handleDateRangeOptionChange = (value: string) => {
         setDateRangeOption(value);
         const now = new Date();
@@ -595,25 +552,45 @@ export default function ReportsPage() {
                             {dateRangeOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
                         </SelectContent>
                     </Select>
-                     <div className="flex items-center gap-2">
-                        <Input
-                            type="text"
-                            placeholder="From Date"
-                            value={dateInputs.from}
-                            onChange={(e) => handleDateInputChange(e, 'from')}
-                            onBlur={() => handleDateInputBlur('from')}
-                            className="w-full md:w-36"
-                        />
-                         <span className="text-muted-foreground">-</span>
-                         <Input
-                            type="text"
-                            placeholder="To Date"
-                            value={dateInputs.to}
-                            onChange={(e) => handleDateInputChange(e, 'to')}
-                            onBlur={() => handleDateInputBlur('to')}
-                            className="w-full md:w-36"
-                        />
-                    </div>
+                     {dateRangeOption === 'custom' && (
+                        <div className="flex items-center gap-2">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                    id="date"
+                                    variant={"outline"}
+                                    className={cn(
+                                        "w-full justify-start text-left font-normal md:w-[240px]",
+                                        !date && "text-muted-foreground"
+                                    )}
+                                    >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {date?.from ? (
+                                        date.to ? (
+                                        <>
+                                            {formatDate(date.from)} - {formatDate(date.to)}
+                                        </>
+                                        ) : (
+                                            formatDate(date.from)
+                                        )
+                                    ) : (
+                                        <span>Pick a date range</span>
+                                    )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={date?.from}
+                                    selected={date}
+                                    onSelect={setDate}
+                                    numberOfMonths={2}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    )}
                 </div>
                  <div className="flex-grow md:flex-grow-0 md:ml-auto flex items-center gap-2">
                     <Select value={reportType} onValueChange={(value) => setReportType(value as 'offcounter' | 'onbar' | 'both')}>
@@ -799,3 +776,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

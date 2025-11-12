@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import Link from 'next/link';
@@ -33,10 +32,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { ADMIN_UIDS } from '@/lib/constants';
-import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Loader2, Eye, EyeOff, UploadCloud, CheckCircle, AlertCircle, ShieldCheck, RefreshCw, CalendarIcon } from 'lucide-react';
 import { extractIdCardData } from '@/ai/flows/extract-id-card-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { useDateFormat } from '@/hooks/use-date-format';
 
 type IdType = 'aadhaar' | 'pan' | 'dl';
 
@@ -50,15 +53,9 @@ const formSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     email: z.string().email('Invalid email address'),
     phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15, 'Phone number is too long'),
-    dob: z.string().refine((dob) => /^\d{2}\/\d{2}\/\d{4}$/.test(dob), "Date must be in DD/MM/YYYY format")
-      .refine((dob) => {
-        try {
-            const date = parse(dob, 'dd/MM/yyyy', new Date());
-            return differenceInYears(new Date(), date) >= 20;
-        } catch {
-            return false;
-        }
-      }, 'You must be at least 20 years old to sign up.'),
+    dob: z.date({ required_error: "A date of birth is required." }).refine((date) => {
+        return differenceInYears(new Date(), date) >= 20;
+    }, 'You must be at least 20 years old to sign up.'),
     aadhaar: z.string().min(10, 'ID Number must be at least 10 characters.'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string(),
@@ -134,6 +131,7 @@ const IdCardUpload = ({
 export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { formatDate } = useDateFormat();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -149,7 +147,6 @@ export default function SignupPage() {
           name: '',
           email: '',
           phone: '',
-          dob: '',
           aadhaar: '',
           password: '',
           confirmPassword: '',
@@ -177,7 +174,7 @@ export default function SignupPage() {
               if (result.dob) {
                   const [year, month, day] = result.dob.split('-');
                   if (day && month && year) {
-                     form.setValue('dob', `${day}/${month}/${year}`, { shouldValidate: true });
+                     form.setValue('dob', parse(result.dob, 'yyyy-MM-dd', new Date()), { shouldValidate: true });
                   }
               }
               if (result.idNumber) form.setValue('aadhaar', result.idNumber.replace(/\s/g, ''), { shouldValidate: true });
@@ -200,32 +197,10 @@ export default function SignupPage() {
     form.reset({
         ...form.getValues(),
         name: '',
-        dob: '',
+        dob: undefined,
         aadhaar: '',
     });
   }
-
-  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    const prevValue = form.getValues('dob');
-
-    // Handle backspace
-    if (value.length < prevValue.length) {
-        form.setValue('dob', value);
-        return;
-    }
-
-    const rawValue = value.replace(/[^0-9]/g, '');
-    if (rawValue.length > 8) return;
-
-    let formattedValue = rawValue;
-    if (rawValue.length > 4) {
-      formattedValue = `${rawValue.slice(0, 2)}/${rawValue.slice(2, 4)}/${rawValue.slice(4, 8)}`;
-    } else if (rawValue.length > 2) {
-      formattedValue = `${rawValue.slice(0, 2)}/${rawValue.slice(2)}`;
-    }
-    form.setValue('dob', formattedValue, { shouldValidate: true });
-  };
 
   const onSubmit = async (data: SignupFormValues) => {
     setLoading(true);
@@ -235,14 +210,12 @@ export default function SignupPage() {
       const user = userCredential.user;
       
       const role = ADMIN_UIDS.includes(user.uid) ? 'admin' : 'staff';
-      
-      const parsedDate = parse(data.dob, 'dd/MM/yyyy', new Date());
 
       const userDocData: any = {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        dob: parsedDate.toISOString().split('T')[0], // Store as YYYY-MM-DD
+        dob: data.dob.toISOString().split('T')[0], // Store as YYYY-MM-DD
         role: role,
         status: 'active',
         shopId: null,
@@ -369,19 +342,44 @@ export default function SignupPage() {
                       control={form.control}
                       name="dob"
                       render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Date of Birth</FormLabel>
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Date of birth</FormLabel>
+                          <Popover>
+                              <PopoverTrigger asChild>
                               <FormControl>
-                                <Input 
-                                    placeholder="DD/MM/YYYY" 
-                                    {...field} 
-                                    onChange={handleDobChange} 
-                                    disabled={loading} 
-                                    maxLength={10}
-                                />
+                                  <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                      "w-full pl-3 text-left font-normal",
+                                      !field.value && "text-muted-foreground"
+                                  )}
+                                  >
+                                  {field.value ? (
+                                      formatDate(field.value)
+                                  ) : (
+                                      <span>Pick a date</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
                               </FormControl>
-                              <FormMessage />
-                          </FormItem>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                  date > new Date() || date < new Date("1900-01-01")
+                                  }
+                                  initialFocus
+                                  captionLayout="dropdown-buttons"
+                                  fromYear={1900}
+                                  toYear={new Date().getFullYear()}
+                              />
+                              </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
                       )}
                     />
                 </div>
@@ -432,3 +430,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    

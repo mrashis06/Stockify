@@ -89,19 +89,12 @@ export default function PerformancePage() {
         to: new Date(),
     });
     
-    const [dateInputs, setDateInputs] = useState<{ from: string; to: string }>({ from: '', to: '' });
-
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [productFilter, setProductFilter] = useState('All Products');
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
 
     usePageLoading(loading || inventoryLoading);
-    
-    useEffect(() => {
-        if (date?.from) setDateInputs(prev => ({ ...prev, from: formatDate(date.from) }));
-        if (date?.to) setDateInputs(prev => ({ ...prev, to: formatDate(date.to) }));
-    }, [date, formatDate]);
     
     useEffect(() => {
         if(masterInventory.length > 0) {
@@ -138,44 +131,6 @@ export default function PerformancePage() {
             setDate({ from: subDays(now, 59), to: now });
         } else if (value === '90d') {
             setDate({ from: subDays(now, 89), to: now });
-        }
-    };
-
-     const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'from' | 'to') => {
-        const separator = dateFormat.includes('-') ? '-' : '/';
-        let value = e.target.value;
-        const prevValue = dateInputs[field];
-
-        // Handle backspace: allow user to delete separators
-        if (value.length < prevValue.length) {
-            setDateInputs(prev => ({ ...prev, [field]: value }));
-            return;
-        }
-
-        const rawValue = value.replace(/[^0-9]/g, '');
-        if (rawValue.length > 8) return;
-
-        let formattedValue = rawValue;
-        if (rawValue.length > 4) {
-            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2, 4)}${separator}${rawValue.slice(4)}`;
-        } else if (rawValue.length > 2) {
-            formattedValue = `${rawValue.slice(0, 2)}${separator}${rawValue.slice(2)}`;
-        }
-        
-        setDateInputs(prev => ({ ...prev, [field]: formattedValue }));
-    };
-
-
-    const handleDateInputBlur = (field: 'from' | 'to') => {
-        const dateStr = dateInputs[field];
-        if (!dateStr) return;
-        
-        const parsedDate = parse(dateStr, dateFormat, new Date());
-        if (isValid(parsedDate)) {
-            setDate(prev => ({ ...prev, [field]: parsedDate }));
-            setDateRangeOption('custom');
-        } else {
-            toast({ title: "Invalid Date", description: `The date format for '${field}' is not correct. Please use ${dateFormat}.`, variant: "destructive" });
         }
     };
 
@@ -362,25 +317,44 @@ export default function PerformancePage() {
                         </SelectContent>
                     </Select>
                     
-                    <div className="flex items-center gap-2">
-                        <Input
-                            type="text"
-                            placeholder="From Date"
-                            value={dateInputs.from}
-                            onChange={(e) => handleDateInputChange(e, 'from')}
-                            onBlur={() => handleDateInputBlur('from')}
-                            className="w-full md:w-36"
-                        />
-                         <span className="text-muted-foreground">-</span>
-                         <Input
-                            type="text"
-                            placeholder="To Date"
-                            value={dateInputs.to}
-                            onChange={(e) => handleDateInputChange(e, 'to')}
-                            onBlur={() => handleDateInputBlur('to')}
-                            className="w-full md:w-36"
-                        />
-                    </div>
+                    {dateRangeOption === 'custom' && (
+                        <div className="flex items-center gap-2">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                        "w-full justify-start text-left font-normal md:w-[240px]",
+                                        !date && "text-muted-foreground"
+                                    )}
+                                    >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {date?.from ? (
+                                        date.to ? (
+                                        <>
+                                            {formatDate(date.from)} - {formatDate(date.to)}
+                                        </>
+                                        ) : (
+                                            formatDate(date.from)
+                                        )
+                                    ) : (
+                                        <span>Pick a date range</span>
+                                    )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={date?.from}
+                                    selected={date}
+                                    onSelect={setDate}
+                                    numberOfMonths={2}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                    )}
                     
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                         <SelectTrigger className="w-full md:w-[180px]">
@@ -489,3 +463,5 @@ export default function PerformancePage() {
         </div>
     );
 }
+
+    
