@@ -23,8 +23,10 @@ function Calendar({
   onCancel,
   ...props
 }: CalendarProps) {
+  // Use internal state to track the selection until 'Apply' is clicked
   const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(props.selected as Date);
 
+  // Sync internal state if the external prop changes
   React.useEffect(() => {
     setSelectedDate(props.selected as Date);
   }, [props.selected]);
@@ -34,6 +36,8 @@ function Calendar({
   };
 
   const handleCancel = () => {
+    // Reset internal state to original prop on cancel
+    setSelectedDate(props.selected as Date);
     onCancel?.();
   }
 
@@ -48,7 +52,7 @@ function Calendar({
           months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
           month: "space-y-4",
           caption: "flex justify-center pt-1 relative items-center",
-          caption_label: "text-sm font-medium hidden",
+          caption_label: "text-sm font-medium", // No longer hidden
           caption_dropdowns: "flex justify-center gap-2 items-center",
           nav: "space-x-1 flex items-center",
           nav_button: cn(
@@ -78,6 +82,8 @@ function Calendar({
           ...classNames,
         }}
         components={{
+            IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+            IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
             Dropdown: ({ value, onChange, children, ...props }: DropdownProps) => {
             const options = React.Children.toArray(children) as React.ReactElement<React.HTMLProps<HTMLOptionElement>>[];
             const selected = options.find((child) => child.props.value === value);
@@ -94,7 +100,7 @@ function Calendar({
                     handleChange(value);
                 }}
                 >
-                <SelectTrigger className="w-auto focus:ring-0 focus:ring-offset-0">
+                <SelectTrigger className="w-auto focus:ring-0 focus:ring-offset-0 border-0 h-7 px-2 font-medium">
                     <SelectValue>{selected?.props?.children}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
