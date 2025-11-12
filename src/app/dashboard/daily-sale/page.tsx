@@ -14,6 +14,8 @@ import { useDateFormat } from '@/hooks/use-date-format';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { subDays, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -46,6 +48,65 @@ const RealTimeClock = () => {
   );
 };
 
+const ReportPreviewDialog = ({ isOpen, onOpenChange, report, total, date, formatDate }: { isOpen: boolean, onOpenChange: (open: boolean) => void, report: any[], total: number, date: Date, formatDate: (d: Date | string, f?: string) => string }) => {
+    const totalsByCategory = report.reduce((acc, sale) => {
+        if (!acc[sale.category]) {
+            acc[sale.category] = 0;
+        }
+        acc[sale.category] += sale.bulkLiters;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const flTotal = totalsByCategory['FL'] || 0;
+    const imlTotal = totalsByCategory['IML'] || 0;
+    const beerTotal = totalsByCategory['BEER'] || 0;
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="text-primary text-center text-2xl font-bold">BHOLE BABA FL ON SHOP</DialogTitle>
+                    <DialogDescription className="text-center">BL Sale Report for {formatDate(date, 'dd/MM/yyyy')}</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                        {flTotal > 0 && (
+                            <div className="flex justify-between items-center">
+                                <p className="text-muted-foreground">FL (Foreign Liquor) BL:</p>
+                                <p className="font-semibold">{flTotal.toFixed(3)} Ltrs</p>
+                            </div>
+                        )}
+                        {imlTotal > 0 && (
+                             <div className="flex justify-between items-center">
+                                <p className="text-muted-foreground">IML (Indian Made Liquor) BL:</p>
+                                <p className="font-semibold">{imlTotal.toFixed(3)} Ltrs</p>
+                            </div>
+                        )}
+                        {beerTotal > 0 && (
+                             <div className="flex justify-between items-center">
+                                <p className="text-muted-foreground">BEER BL:</p>
+                                <p className="font-semibold">{beerTotal.toFixed(3)} Ltrs</p>
+                            </div>
+                        )}
+                    </div>
+                    <Separator />
+                     <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg">
+                        <p className="text-lg font-bold text-primary">Total Sale</p>
+                        <p className="text-lg font-bold text-primary flex items-center">
+                            <IndianRupee className="h-5 w-5 mr-1" />
+                            {total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                    </div>
+                </div>
+                 <DialogFooter>
+                    <Button onClick={() => onOpenChange(false)} variant="secondary">Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
 export default function DailySalePage() {
     const { toast } = useToast();
     const { formatDate } = useDateFormat();
@@ -54,6 +115,7 @@ export default function DailySalePage() {
 
     const { blReport, totalSalesValue, loading, getCategory } = useDailySaleReport(selectedDate);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     
     usePageLoading(loading);
 
@@ -73,7 +135,7 @@ export default function DailySalePage() {
         setExpandedRows(newSet);
     };
     
-    const generateAndShowPdf = (action: 'download' | 'preview') => {
+    const generatePdf = () => {
         const doc = new jsPDF() as jsPDFWithAutoTable;
         const reportDate = formatDate(selectedDate, 'dd/MM/yyyy');
         
@@ -134,16 +196,12 @@ export default function DailySalePage() {
         doc.setTextColor(255, 255, 255);
         doc.text("Total Sale", 22, yPos + 4);
         doc.text(totalString, doc.internal.pageSize.width - 22, yPos + 4, { align: 'right' });
-
-        if (action === 'download') {
-            doc.save(`BL_Sale_Report_${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
-            toast({
-                title: "Export Successful",
-                description: "Your BL Sale Report has been downloaded.",
-            });
-        } else {
-            doc.output('dataurlnewwindow');
-        }
+        
+        doc.save(`BL_Sale_Report_${format(selectedDate, 'yyyy-MM-dd')}.pdf`);
+        toast({
+            title: "Export Successful",
+            description: "Your BL Sale Report has been downloaded.",
+        });
     };
 
 
@@ -153,6 +211,14 @@ export default function DailySalePage() {
 
     return (
         <main className="flex-1 p-4 md:p-8">
+            <ReportPreviewDialog 
+                isOpen={isPreviewOpen}
+                onOpenChange={setIsPreviewOpen}
+                report={blReport}
+                total={totalSalesValue}
+                date={selectedDate}
+                formatDate={formatDate}
+            />
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">BL Sale Report</h1>
@@ -172,11 +238,11 @@ export default function DailySalePage() {
                             <SelectItem value="yesterday">Yesterday</SelectItem>
                         </SelectContent>
                     </Select>
-                     <Button onClick={() => generateAndShowPdf('preview')} disabled={blReport.length === 0} variant="outline">
+                     <Button onClick={() => setIsPreviewOpen(true)} disabled={blReport.length === 0} variant="outline">
                         <Eye className="mr-2 h-4 w-4" />
                         Preview
                     </Button>
-                    <Button onClick={() => generateAndShowPdf('download')} disabled={blReport.length === 0}>
+                    <Button onClick={generatePdf} disabled={blReport.length === 0}>
                         <Download className="mr-2 h-4 w-4" />
                         Export to PDF
                     </Button>
@@ -253,3 +319,5 @@ export default function DailySalePage() {
         </main>
     );
 }
+
+    
