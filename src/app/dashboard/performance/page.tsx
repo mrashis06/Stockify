@@ -343,13 +343,13 @@ export default function PerformancePage() {
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : <span>From date</span>}</Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => handleApplyCustomDate(d, 'from')} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={setFromDate} onApply={() => handleApplyCustomDate(fromDate, 'from')} onCancel={() => setIsFromOpen(false)} initialFocus /></PopoverContent>
                                 </Popover>
                                 <Popover open={isToOpen} onOpenChange={setIsToOpen}>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : <span>To date</span>}</Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => handleApplyCustomDate(d, 'to')} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={setToDate} onApply={() => handleApplyCustomDate(toDate, 'to')} onCancel={() => setIsToOpen(false)} initialFocus /></PopoverContent>
                                 </Popover>
                             </div>
                         )}
