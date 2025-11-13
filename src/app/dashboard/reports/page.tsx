@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -112,6 +111,9 @@ export default function ReportsPage() {
         return toParam && isValid(parseISO(toParam)) ? parseISO(toParam) : new Date();
     });
     
+    const [isFromOpen, setIsFromOpen] = useState(false);
+    const [isToOpen, setIsToOpen] = useState(false);
+
     const [reportType, setReportType] = useState<'offcounter' | 'onbar' | 'both'>('both');
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -193,9 +195,11 @@ export default function ReportsPage() {
         if (type === 'from') {
             newFrom = date;
             setFromDate(date);
+            setIsFromOpen(false);
         } else {
             newTo = date;
             setToDate(date);
+            setIsToOpen(false);
         }
         
         if (newFrom && newTo) {
@@ -563,17 +567,17 @@ export default function ReportsPage() {
 
                     {dateRangeOption === 'custom' && (
                         <div className="flex items-center gap-4">
-                            <Popover>
+                            <Popover open={isFromOpen} onOpenChange={setIsFromOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant={"outline"} className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : <span>From date</span>}</Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => setFromDate(d)} onApply={(d) => { handleApplyCustomDate(d, 'from'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => setFromDate(d)} onApply={handleApplyCustomDate.bind(null, fromDate, 'from')} onCancel={() => setIsFromOpen(false)} initialFocus /></PopoverContent>
                             </Popover>
-                            <Popover>
+                            <Popover open={isToOpen} onOpenChange={setIsToOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant={"outline"} className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : <span>To date</span>}</Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => setToDate(d)} onApply={(d) => { handleApplyCustomDate(d, 'to'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => setToDate(d)} onApply={handleApplyCustomDate.bind(null, toDate, 'to')} onCancel={() => setIsToOpen(false)} initialFocus /></PopoverContent>
                             </Popover>
                         </div>
                     )}
