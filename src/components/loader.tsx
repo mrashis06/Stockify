@@ -15,15 +15,27 @@ const GlassIcon = ({ progress }: { progress: number }) => {
             className="drop-shadow-lg w-32 h-auto text-foreground/80"
         >
             <defs>
-                <linearGradient id="glass-shimmer" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor="white" stopOpacity="0" />
-                    <stop offset="50%" stopColor="white" stopOpacity="0.3" />
-                    <stop offset="100%" stopColor="white" stopOpacity="0" />
-                </linearGradient>
                 <clipPath id="glass-clip">
                     <path d="M 30 210 L 40 10 L 160 10 L 170 210 H 30 Z" />
                 </clipPath>
+                <linearGradient id="liquid-gradient" x1="0.5" y1="0" x2="0.5" y2="1">
+                    <stop offset="0%" className="liquid-color-cycle-top" />
+                    <stop offset="100%" className="liquid-color-cycle-bottom" />
+                </linearGradient>
             </defs>
+
+            {/* Liquid Animation */}
+            <g clipPath="url(#glass-clip)">
+                <g className="animate-swirl">
+                    <path
+                        d="M -20,130 
+                           C 20,110 80,150 140,120 
+                           C 200,90 220,150 220,150 
+                           L 220,220 L -20,220 Z"
+                        fill="url(#liquid-gradient)"
+                    />
+                </g>
+            </g>
 
             {/* Main Glass Outline */}
             <path 
@@ -47,7 +59,8 @@ const GlassIcon = ({ progress }: { progress: number }) => {
                     y="0"
                     width="80"
                     height="250"
-                    fill="url(#glass-shimmer)"
+                    fill="white"
+                    fillOpacity="0.2"
                     className="animate-[shimmer-glass_4s_ease-in-out_infinite]"
                     style={{ transform: 'skewX(-20deg)' }}
                 />

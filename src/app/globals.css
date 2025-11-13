@@ -114,6 +114,16 @@
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
   }
+
+  .animate-swirl {
+    animation: swirl 8s ease-in-out infinite;
+  }
+  .liquid-color-cycle-top {
+    animation: cycle-liquid-color-top 16s ease-in-out infinite;
+  }
+  .liquid-color-cycle-bottom {
+    animation: cycle-liquid-color-bottom 16s ease-in-out infinite;
+  }
 }
 
 
@@ -178,6 +188,25 @@
         transform: translate(calc(Math.random() * 60 - 30px), calc(Math.random() * 60 - 30px));
         opacity: 0;
     }
+}
+
+@keyframes swirl {
+    0%, 100% { transform: rotate(0deg) scale(1.1); }
+    25% { transform: rotate(-3deg) scale(1.15); }
+    50% { transform: rotate(0deg) scale(1.1); }
+    75% { transform: rotate(3deg) scale(1.05); }
+}
+
+@keyframes cycle-liquid-color-top {
+    0%, 100% { stop-color: #B87333; } /* Amber */
+    33% { stop-color: #7C0A02; } /* Wine */
+    66% { stop-color: #F0E68C; } /* Gold/Rum */
+}
+
+@keyframes cycle-liquid-color-bottom {
+    0%, 100% { stop-color: #6B3E1F; } /* Dark Amber */
+    33% { stop-color: #4C0013; } /* Dark Wine */
+    66% { stop-color: #D2691E; } /* Dark Gold/Rum */
 }
 
 
