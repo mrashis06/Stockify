@@ -157,46 +157,29 @@
   }
 }
 
-@keyframes wave {
-  0% {
-    transform: translateX(0) translateY(0);
-  }
-  50% {
-    transform: translateX(-5px) translateY(-2px);
-  }
-  100% {
-    transform: translateX(0) translateY(0);
-  }
+@keyframes shimmer-glass {
+    from {
+      transform: translateX(-100px) skewX(-20deg);
+    }
+    to {
+      transform: translateX(300px) skewX(-20deg);
+    }
 }
 
-@keyframes smoke-fade {
-  from {
-    opacity: 0.3;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-40px) scale(1.5);
-  }
+@keyframes dust-motes {
+    0% {
+        transform: translate(0, 0);
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: translate(calc(Math.random() * 60 - 30px), calc(Math.random() * 60 - 30px));
+        opacity: 0;
+    }
 }
 
-@keyframes ray-fade {
-  0%, 100% {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  50% {
-    opacity: 0.1;
-    transform: scale(1);
-  }
-}
-
-@keyframes cycle-liquid-color {
-  0%, 100% { stop-color: #FFD700; } /* Amber */
-  25% { stop-color: #900C3F; } /* Red */
-  50% { stop-color: #2ECC71; } /* Green */
-  75% { stop-color: #EAECEE; } /* White/Transparent */
-}
 
 /* For aligning the custom SVG 'o' in the logo */
 .logo-container > svg {
