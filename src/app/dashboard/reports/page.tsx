@@ -167,18 +167,18 @@ export default function ReportsPage() {
             const yesterday = subDays(now, 1);
             newFromDate = yesterday;
             newToDate = yesterday;
-        } else if (value.endsWith('d')) {
-            const days = parseInt(value.replace('d', ''));
-            newFromDate = subDays(now, days - 1);
+        } else if (value === '30d') {
+            newFromDate = subDays(now, 29);
             newToDate = now;
-        } else if (value.endsWith('m')) {
-            const months = parseInt(value.replace('m', ''));
-            newFromDate = subMonths(now, months);
+        } else if (value === '60d') {
+            newFromDate = subDays(now, 59);
+            newToDate = now;
+        } else if (value === '90d') {
+            newFromDate = subDays(now, 89);
             newToDate = now;
         } else if (value === 'custom') {
-            // For custom, we just enable the inputs but don't fetch yet.
-            // Fetching happens on "Apply"
-            return;
+            newFromDate = now;
+            newToDate = now;
         }
         
         setFromDate(newFromDate);
@@ -552,7 +552,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
                  <div className="flex flex-col md:flex-row gap-6">
-                    <RadioGroup value={dateRangeOption} onValueChange={handleDateRangeOptionChange} className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <RadioGroup value={dateRangeOption} onValueChange={handleDateRangeOptionChange} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 flex-wrap">
                         <div className="flex items-center space-x-2"><RadioGroupItem value="today" id="today" /><Label htmlFor="today">Today</Label></div>
                         <div className="flex items-center space-x-2"><RadioGroupItem value="yesterday" id="yesterday" /><Label htmlFor="yesterday">Yesterday</Label></div>
                         <div className="flex items-center space-x-2"><RadioGroupItem value="30d" id="30d" /><Label htmlFor="30d">Last 30 days</Label></div>

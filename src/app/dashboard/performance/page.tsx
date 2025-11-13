@@ -76,8 +76,8 @@ export default function PerformancePage() {
     const { formatDate } = useDateFormat();
     const [loading, setLoading] = useState(true);
 
-    const [dateRangeOption, setDateRangeOption] = useState('30d');
-    const [fromDate, setFromDate] = useState<Date | undefined>(subDays(new Date(), 29));
+    const [dateRangeOption, setDateRangeOption] = useState('today');
+    const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
     const [toDate, setToDate] = useState<Date | undefined>(new Date());
     
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
@@ -186,7 +186,10 @@ export default function PerformancePage() {
             newFromDate = subMonths(now, months);
             newToDate = now;
         } else if (value === 'custom') {
-            return;
+            // For custom, we just enable the inputs but don't fetch yet.
+            // Fetching happens on "Apply"
+            newFromDate = now;
+            newToDate = now;
         }
         
         setFromDate(newFromDate);
@@ -323,12 +326,12 @@ export default function PerformancePage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="flex flex-col md:flex-row gap-6">
-                        <RadioGroup value={dateRangeOption} onValueChange={handleDateRangeOptionChange} className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <RadioGroup value={dateRangeOption} onValueChange={handleDateRangeOptionChange} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 flex-wrap">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="today" id="today" /><Label htmlFor="today">Today</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="yesterday" id="yesterday" /><Label htmlFor="yesterday">Yesterday</Label></div>
                             <div className="flex items-center space-x-2"><RadioGroupItem value="30d" id="30d" /><Label htmlFor="30d">Last 30 days</Label></div>
                             <div className="flex items-center space-x-2"><RadioGroupItem value="60d" id="60d" /><Label htmlFor="60d">Last 60 days</Label></div>
                             <div className="flex items-center space-x-2"><RadioGroupItem value="90d" id="90d" /><Label htmlFor="90d">Last 90 days</Label></div>
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="1m" id="1m" /><Label htmlFor="1m">Last month</Label></div>
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="3m" id="3m" /><Label htmlFor="3m">Last 3 months</Label></div>
                             <div className="flex items-center space-x-2"><RadioGroupItem value="custom" id="custom" /><Label htmlFor="custom">Custom date range</Label></div>
                         </RadioGroup>
                         {dateRangeOption === 'custom' && (
