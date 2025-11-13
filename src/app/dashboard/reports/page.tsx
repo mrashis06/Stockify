@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -118,7 +119,7 @@ export default function ReportsPage() {
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
 
-    usePageLoading(loading);
+    usePageLoading(false); // Disable full-page loader for this page
     
     const fetchReportData = useCallback(async (range: { from?: Date, to?: Date }) => {
         if (!range?.from) {
@@ -523,10 +524,6 @@ export default function ReportsPage() {
         });
     };
 
-    if (loading) {
-        return null;
-    }
-
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -596,9 +593,17 @@ export default function ReportsPage() {
         </Card>
         
         {loading ? (
-            <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Sales Details</CardTitle>
+                    <CardDescription>Fetching data for the selected period...</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex justify-center items-center h-64">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                </CardContent>
+            </Card>
         ) : (
         <>
             {reportType === 'offcounter' || reportType === 'both' ? (
@@ -745,3 +750,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
