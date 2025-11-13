@@ -26,7 +26,7 @@ const GlassIcon = ({ progress }: { progress: number }) => {
 
             {/* Liquid Animation */}
             <g clipPath="url(#glass-clip)">
-                <g className="animate-swirl">
+                <g className="animate-slosh">
                     <path
                         d="M -20,130 
                            C 20,110 80,150 140,120 

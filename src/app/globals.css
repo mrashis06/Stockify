@@ -115,8 +115,8 @@
     scrollbar-width: none;  /* Firefox */
   }
 
-  .animate-swirl {
-    animation: swirl 8s ease-in-out infinite;
+  .animate-slosh {
+    animation: slosh 3s ease-in-out infinite;
   }
   .liquid-color-cycle-top {
     animation: cycle-liquid-color-top 16s ease-in-out infinite;
@@ -190,11 +190,11 @@
     }
 }
 
-@keyframes swirl {
-    0%, 100% { transform: rotate(0deg) scale(1.1); }
-    25% { transform: rotate(-3deg) scale(1.15); }
-    50% { transform: rotate(0deg) scale(1.1); }
-    75% { transform: rotate(3deg) scale(1.05); }
+@keyframes slosh {
+    0%, 100% { transform: translate(0, 0) rotate(0); }
+    25% { transform: translate(-3px, 1px) rotate(-2deg); }
+    50% { transform: translate(2px, -1px) rotate(1deg); }
+    75% { transform: translate(-1px, 2px) rotate(-1deg); }
 }
 
 @keyframes cycle-liquid-color-top {
