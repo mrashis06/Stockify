@@ -3,7 +3,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut, GlassWater } from 'lucide-react';
+import Link from 'next/link';
+import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut, GlassWater, Warehouse, Archive } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -321,6 +322,22 @@ export default function InventoryPage() {
                 <RealTimeClock />
             </div>
         </div>
+        
+        <div className="md:hidden grid grid-cols-2 gap-2 mb-6">
+            <Button variant="outline" asChild>
+                <Link href="/dashboard/godown">
+                    <Archive className="mr-2 h-4 w-4" />
+                    Godown
+                </Link>
+            </Button>
+            <Button variant="outline" asChild>
+                <Link href="/dashboard/onbar">
+                    <GlassWater className="mr-2 h-4 w-4" />
+                    On-Bar
+                </Link>
+            </Button>
+        </div>
+        
         <Card>
             <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">

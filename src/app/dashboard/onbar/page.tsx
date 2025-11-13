@@ -2,7 +2,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee, Trash2, LogOut } from 'lucide-react';
+import Link from 'next/link';
+import { Minus, Plus, GlassWater, Loader2, Wine, Beer, IndianRupee, Trash2, LogOut, Warehouse, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -209,6 +210,21 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     </Button>
                 </div>
             </header>
+
+             <div className="md:hidden grid grid-cols-2 gap-2 mb-6">
+                <Button variant="outline" asChild>
+                    <Link href="/dashboard/godown">
+                        <Archive className="mr-2 h-4 w-4" />
+                        Godown
+                    </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                    <Link href="/dashboard/inventory">
+                        <Warehouse className="mr-2 h-4 w-4" />
+                        Off-Counter
+                    </Link>
+                </Button>
+            </div>
             
              <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
                 <CardHeader>

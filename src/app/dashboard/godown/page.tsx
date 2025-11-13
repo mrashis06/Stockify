@@ -2,7 +2,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater, ChevronDown, ChevronUp, Warehouse } from 'lucide-react';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -319,6 +320,30 @@ export default function GodownPage() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+        
+        <div className="mb-6">
+            <h1 className="text-2xl font-bold tracking-tight">Godown Stock</h1>
+            <div className="flex items-center gap-2">
+                <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
+                <RealTimeClock />
+            </div>
+        </div>
+
+        <div className="md:hidden grid grid-cols-2 gap-2 mb-6">
+            <Button variant="outline" asChild>
+                <Link href="/dashboard/inventory">
+                    <Warehouse className="mr-2 h-4 w-4" />
+                    Off-Counter
+                </Link>
+            </Button>
+            <Button variant="outline" asChild>
+                <Link href="/dashboard/onbar">
+                    <GlassWater className="mr-2 h-4 w-4" />
+                    On-Bar
+                </Link>
+            </Button>
+        </div>
 
         {unprocessedItems.length > 0 && (
             <Card className="mb-6 bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
@@ -368,14 +393,6 @@ export default function GodownPage() {
             </Card>
         )}
        
-        <div className="mb-6">
-            <h1 className="text-2xl font-bold tracking-tight">Godown Stock</h1>
-            <div className="flex items-center gap-2">
-                <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
-                <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
-                <RealTimeClock />
-            </div>
-        </div>
         <Card>
             <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
