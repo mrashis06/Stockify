@@ -48,7 +48,7 @@ const RealTimeClock = () => {
   );
 };
 
-const ReportPreviewDialog = ({ isOpen, onOpenChange, report, total, date, formatDate }: { isOpen: boolean, onOpenChange: (open: boolean) => void, report: any[], total: number, date: Date, formatDate: (d: Date | string, f?: string) => string }) => {
+const ReportPreviewDialog = ({ isOpen, onOpenChange, report, total, date, formatDate, onDownload }: { isOpen: boolean, onOpenChange: (open: boolean) => void, report: any[], total: number, date: Date, formatDate: (d: Date | string, f?: string) => string, onDownload: () => void }) => {
     const totalsByCategory = report.reduce((acc, sale) => {
         if (!acc[sale.category]) {
             acc[sale.category] = 0;
@@ -98,8 +98,12 @@ const ReportPreviewDialog = ({ isOpen, onOpenChange, report, total, date, format
                         </p>
                     </div>
                 </div>
-                 <DialogFooter>
+                 <DialogFooter className="grid grid-cols-2 gap-2">
                     <Button onClick={() => onOpenChange(false)} variant="secondary">Close</Button>
+                    <Button onClick={onDownload}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -218,6 +222,7 @@ export default function DailySalePage() {
                 total={totalSalesValue}
                 date={selectedDate}
                 formatDate={formatDate}
+                onDownload={generatePdf}
             />
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                 <div>
