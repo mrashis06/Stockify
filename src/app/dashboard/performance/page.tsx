@@ -186,8 +186,6 @@ export default function PerformancePage() {
             newFromDate = subMonths(now, months);
             newToDate = now;
         } else if (value === 'custom') {
-            // For custom, we just enable the inputs but don't fetch yet.
-            // Fetching happens on "Apply"
             newFromDate = now;
             newToDate = now;
         }
@@ -340,13 +338,13 @@ export default function PerformancePage() {
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : <span>From date</span>}</Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => setFromDate(d)} onApply={(d) => { handleApplyCustomDate(d, 'from'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={fromDate} onSelect={(d) => handleApplyCustomDate(d, 'from')} initialFocus /></PopoverContent>
                                 </Popover>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : <span>To date</span>}</Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => setToDate(d)} onApply={(d) => { handleApplyCustomDate(d, 'to'); (document.activeElement as HTMLElement)?.blur(); }} onCancel={() => (document.activeElement as HTMLElement)?.blur()} initialFocus /></PopoverContent>
+                                    <PopoverContent className="w-auto p-0"><Calendar captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear()} selected={toDate} onSelect={(d) => handleApplyCustomDate(d, 'to')} initialFocus /></PopoverContent>
                                 </Popover>
                             </div>
                         )}
