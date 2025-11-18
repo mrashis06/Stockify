@@ -266,7 +266,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                         return (
                         <Card key={item.id} className="flex flex-col h-full relative">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-lg truncate pr-8">{item.brand}</CardTitle>
+                                <CardTitle className="text-lg whitespace-normal break-words pr-8">{item.brand}</CardTitle>
                                 <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8" onClick={() => handleRemove(item.id)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
