@@ -120,7 +120,7 @@ export default function InventoryPage() {
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'added'> & {prevStock: number}) => {
         try {
             await addBrand(newItemData);
-            toast({ title: 'Success', description: 'New brand added successfully.' });
+            toast({ title: 'Brand Added', description: `${newItemData.brand} (${newItemData.size}) created.` });
         } catch (error) {
             console.error('Error adding brand:', error);
             const errorMessage = (error as Error).message || 'Failed to add new brand.';
@@ -135,8 +135,9 @@ export default function InventoryPage() {
 
     const handleUpdateBrand = async (id: string, data: Partial<Omit<InventoryItem, 'id'>>) => {
         try {
+            const item = inventory.find(i => i.id === id);
             await updateBrand(id, data);
-            toast({ title: 'Success', description: 'Brand updated successfully.' });
+            toast({ title: 'Brand Updated', description: `Details for ${item?.brand} updated.` });
         } catch (error) {
             console.error('Error updating brand:', error);
             toast({ title: 'Error', description: 'Failed to update brand.', variant: 'destructive' });
@@ -158,7 +159,21 @@ export default function InventoryPage() {
        
         try {
             await updateItemField(id, field, processedValue);
-            toast({ title: 'Success', description: `Item ${field} updated.`});
+            let description = '';
+            switch(field) {
+                case 'sales':
+                    description = `Sales for ${originalItem.brand} (${originalItem.size}) updated to ${processedValue} units.`;
+                    break;
+                case 'added':
+                    description = `Added stock for ${originalItem.brand} (${originalItem.size}) updated to ${processedValue} units.`;
+                    break;
+                case 'price':
+                    description = `Price for ${originalItem.brand} (${originalItem.size}) updated to ₹${processedValue}.`;
+                    break;
+                default:
+                    description = `Item ${field} updated.`;
+            }
+            toast({ title: 'Update Successful', description });
         } catch (error) {
             console.error(`Error updating ${field}:`, error);
             const errorMessage = (error as Error).message || `Failed to update ${field}.`;

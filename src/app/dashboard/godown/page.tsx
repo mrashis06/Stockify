@@ -138,8 +138,10 @@ export default function GodownPage() {
 
     const handleTransferToShop = async (productId: string, quantity: number, price?: number) => {
         try {
+            const item = inventory.find(i => i.id === productId);
+            if (!item) throw new Error("Product not found");
             await transferToShop(productId, quantity, price);
-            toast({ title: 'Success', description: `${quantity} units transferred to shop.` });
+            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item.brand} transferred to shop.` });
             setIsTransferShopOpen(false);
         } catch (error) {
             console.error('Error transferring to shop:', error);
@@ -152,7 +154,7 @@ export default function GodownPage() {
         try {
             await transferToOnBar(productId, quantity, pegPrices);
             const item = inventory.find(i => i.id === productId);
-            toast({ title: 'Success', description: `${item?.brand} transferred to On-Bar.` });
+            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item?.brand} transferred to On-Bar.` });
             setIsTransferOnBarOpen(false);
         } catch (error) {
             console.error('Error transferring to on-bar:', error);
@@ -167,7 +169,7 @@ export default function GodownPage() {
             // This is a safe-delete, only clearing godown stock
             const promises = Array.from(selectedRows).map(id => updateBrand(id, { stockInGodown: 0 }));
             await Promise.all(promises);
-            toast({ title: 'Success', description: 'Selected products removed from Godown.' });
+            toast({ title: 'Stock Removed', description: 'Stock for selected products set to zero in Godown.' });
             setSelectedRows(new Set());
         } catch (error) {
             console.error('Error removing products from Godown:', error);
@@ -187,6 +189,8 @@ export default function GodownPage() {
     };
 
     const handleGodownStockChange = async (id: string, value: string) => {
+        const item = inventory.find(i => i.id === id);
+        if (!item) return;
         const newStock = Number(value);
         if (isNaN(newStock) || newStock < 0) {
             toast({ title: 'Invalid Input', description: 'Please enter a valid non-negative number.', variant: 'destructive' });
@@ -195,7 +199,7 @@ export default function GodownPage() {
 
         try {
             await updateGodownStock(id, newStock);
-            toast({ title: 'Success', description: `Godown stock updated.` });
+            toast({ title: 'Stock Updated', description: `Godown stock for ${item.brand} (${item.size}) updated to ${newStock} units.` });
         } catch (error) {
             console.error(`Error updating godown stock:`, error);
             const errorMessage = (error as Error).message || `Failed to update stock.`;

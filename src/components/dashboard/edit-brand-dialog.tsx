@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -74,11 +75,11 @@ export default function EditBrandDialog({ isOpen, onOpenChange, brandData, onUpd
   }, [brandData, form]);
 
   const onSubmit = (data: EditBrandFormValues) => {
-    // Because brand and size form the ID, we don't allow editing them
-    // to prevent data integrity issues. We only update price and category.
     const updateData = {
         price: data.price,
         category: data.category,
+        brand: data.brand,
+        size: data.size,
     };
     onUpdateBrand(brandData.id, updateData);
     onOpenChange(false);
@@ -89,6 +90,9 @@ export default function EditBrandDialog({ isOpen, onOpenChange, brandData, onUpd
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Brand</DialogTitle>
+          <DialogDescription>
+            Update the details for this brand. Brand Name and Size cannot be changed after creation.
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
@@ -99,7 +103,7 @@ export default function EditBrandDialog({ isOpen, onOpenChange, brandData, onUpd
                 <FormItem>
                   <FormLabel>Brand Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Old Monk" {...field} disabled />
+                    <Input placeholder="e.g., Old Monk" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -112,7 +116,7 @@ export default function EditBrandDialog({ isOpen, onOpenChange, brandData, onUpd
                 <FormItem>
                   <FormLabel>Size</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 750ml" {...field} disabled />
+                    <Input placeholder="e.g., 750ml" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

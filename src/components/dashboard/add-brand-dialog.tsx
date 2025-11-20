@@ -71,7 +71,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     if(addAnother) {
         toast({
           title: 'Brand Added',
-          description: `${data.brand} (${data.size}) has been saved.`,
+          description: `${data.brand} (${data.size}) created.`,
         });
         form.reset({
           brand: '',

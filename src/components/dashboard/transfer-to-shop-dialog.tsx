@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import type { InventoryItem } from '@/hooks/use-inventory';
+import { useInventory as useInventoryStore } from '@/hooks/use-inventory';
 
 type TransferToShopDialogProps = {
   isOpen: boolean;
@@ -38,8 +39,9 @@ type TransferToShopDialogProps = {
 
 export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTransfer }: TransferToShopDialogProps) {
   
-  // A product is considered "new" to the shop if it has no price set.
-  const isNewProduct = item && item.price === 0;
+  const inventory = useInventoryStore(state => state.inventory);
+  const liveItem = inventory.find(i => i.id === item.id);
+  const isNewProduct = liveItem ? liveItem.price === 0 : item.price === 0;
 
   const formSchema = z.object({
     quantity: z.coerce.number().int()
@@ -56,18 +58,18 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
     resolver: zodResolver(formSchema),
     defaultValues: {
       quantity: '' as any,
-      price: item?.price > 0 ? item.price : ('' as any),
+      price: liveItem && liveItem.price > 0 ? liveItem.price : ('' as any),
     },
   });
 
   useEffect(() => {
-    if (item) {
+    if (liveItem) {
       form.reset({
         quantity: '' as any,
-        price: item.price > 0 ? item.price : ('' as any),
+        price: liveItem.price > 0 ? liveItem.price : ('' as any),
       });
     }
-  }, [item, form]);
+  }, [liveItem, form]);
 
   const onSubmit = (data: TransferFormValues) => {
     onTransfer(item.id, data.quantity, data.price);
