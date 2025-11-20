@@ -102,16 +102,17 @@ export default function ReportsPage() {
     const searchParams = useSearchParams();
     const { inventory: masterInventory } = useInventory();
     
-    const [dateRangeOption, setDateRangeOption] = useState('today');
     const [fromDate, setFromDate] = useState<Date | undefined>(() => {
         const fromParam = searchParams.get('from');
-        return fromParam && isValid(parseISO(fromParam)) ? parseISO(fromParam) : new Date();
+        return fromParam && isValid(parseISO(fromParam)) ? startOfDay(parseISO(fromParam)) : startOfDay(new Date());
     });
     const [toDate, setToDate] = useState<Date | undefined>(() => {
         const toParam = searchParams.get('to');
-        return toParam && isValid(parseISO(toParam)) ? parseISO(toParam) : new Date();
+        return toParam && isValid(parseISO(toParam)) ? startOfDay(parseISO(toParam)) : startOfDay(new Date());
     });
     
+    const [dateRangeOption, setDateRangeOption] = useState('today');
+
     const [isFromOpen, setIsFromOpen] = useState(false);
     const [isToOpen, setIsToOpen] = useState(false);
 
@@ -154,8 +155,37 @@ export default function ReportsPage() {
     }, []);
 
     useEffect(() => {
-       fetchReportData({ from: fromDate, to: toDate });
-    }, []); 
+        const fromParam = searchParams.get('from');
+        const toParam = searchParams.get('to');
+        
+        const initialFrom = fromParam && isValid(parseISO(fromParam)) ? startOfDay(parseISO(fromParam)) : startOfDay(new Date());
+        const initialTo = toParam && isValid(parseISO(toParam)) ? startOfDay(parseISO(toParam)) : initialFrom;
+
+        setFromDate(initialFrom);
+        setToDate(initialTo);
+        
+        const today = startOfDay(new Date());
+        const yesterday = startOfDay(subDays(today, 1));
+        const last30 = startOfDay(subDays(today, 29));
+        const last60 = startOfDay(subDays(today, 59));
+        const last90 = startOfDay(subDays(today, 89));
+
+        if (isSameDay(initialFrom, today) && isSameDay(initialTo, today)) {
+            setDateRangeOption('today');
+        } else if (isSameDay(initialFrom, yesterday) && isSameDay(initialTo, yesterday)) {
+            setDateRangeOption('yesterday');
+        } else if (isSameDay(initialFrom, last30) && isSameDay(initialTo, today)) {
+            setDateRangeOption('30d');
+        } else if (isSameDay(initialFrom, last60) && isSameDay(initialTo, today)) {
+            setDateRangeOption('60d');
+        } else if (isSameDay(initialFrom, last90) && isSameDay(initialTo, today)) {
+            setDateRangeOption('90d');
+        } else {
+            setDateRangeOption('custom');
+        }
+
+       fetchReportData({ from: initialFrom, to: initialTo });
+    }, [searchParams, fetchReportData]); 
 
     const handleDateRangeOptionChange = (value: string) => {
         setDateRangeOption(value);
@@ -751,4 +781,3 @@ export default function ReportsPage() {
   );
 }
 
-    
