@@ -141,7 +141,7 @@ export default function GodownPage() {
             const item = inventory.find(i => i.id === productId);
             if (!item) throw new Error("Product not found");
             await transferToShop(productId, quantity, price);
-            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item.brand} transferred to shop.` });
+            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item.brand} (${item.size}) transferred to shop.` });
             setIsTransferShopOpen(false);
         } catch (error) {
             console.error('Error transferring to shop:', error);
@@ -154,7 +154,7 @@ export default function GodownPage() {
         try {
             await transferToOnBar(productId, quantity, pegPrices);
             const item = inventory.find(i => i.id === productId);
-            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item?.brand} transferred to On-Bar.` });
+            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item?.brand} (${item?.size}) transferred to On-Bar.` });
             setIsTransferOnBarOpen(false);
         } catch (error) {
             console.error('Error transferring to on-bar:', error);
@@ -164,12 +164,13 @@ export default function GodownPage() {
     }
 
     const handleRemoveSelected = async () => {
+        const numSelected = selectedRows.size;
         setIsDeleteDialogOpen(false);
         try {
             // This is a safe-delete, only clearing godown stock
             const promises = Array.from(selectedRows).map(id => updateBrand(id, { stockInGodown: 0 }));
             await Promise.all(promises);
-            toast({ title: 'Stock Removed', description: 'Stock for selected products set to zero in Godown.' });
+            toast({ title: 'Stock Removed', description: `Stock for ${numSelected} selected product(s) set to zero in Godown.` });
             setSelectedRows(new Set());
         } catch (error) {
             console.error('Error removing products from Godown:', error);
@@ -178,10 +179,11 @@ export default function GodownPage() {
     };
     
     const handleDeleteUnprocessed = async () => {
+        const numSelected = selectedUnprocessedRows.size;
         setIsDeleteUnprocessedOpen(false);
         try {
             await deleteUnprocessedItems(Array.from(selectedUnprocessedRows));
-            toast({ title: 'Success', description: 'Selected unprocessed items removed.' });
+            toast({ title: 'Success', description: `Removed ${numSelected} unprocessed item(s).` });
             setSelectedUnprocessedRows(new Set());
         } catch (error) {
              toast({ title: 'Error', description: (error as Error).message || 'Failed to remove items.', variant: 'destructive' });

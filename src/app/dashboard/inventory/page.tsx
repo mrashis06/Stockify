@@ -183,9 +183,10 @@ export default function InventoryPage() {
 
 
     const handleDeleteSelected = async () => {
+        const numSelected = selectedRows.size;
         try {
             await Promise.all(Array.from(selectedRows).map(id => deleteProduct(id)));
-            toast({ title: 'Success', description: 'Selected brands removed.' });
+            toast({ title: 'Success', description: `${numSelected} brand(s) have been removed.` });
             setSelectedRows(new Set());
         } catch (error) {
             console.error('Error removing brands:', error);

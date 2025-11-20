@@ -125,8 +125,9 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
 
     const handleRemove = async (id: string) => {
          try {
+            const item = onBarInventory.find(i => i.id === id);
             await removeOnBarItem(id);
-            toast({ title: 'Success', description: 'Bottle removed from bar.' });
+            toast({ title: 'Item Removed', description: `${item?.brand} (${item?.size}) removed from bar.` });
         } catch (error) {
             console.error('Error removing item:', error);
             const errorMessage = (error as Error).message || 'Failed to remove item.';
