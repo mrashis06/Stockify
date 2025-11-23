@@ -10,6 +10,7 @@ import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut,
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -714,5 +715,3 @@ export default function InventoryPage() {
     </main>
   );
 }
-
-    
