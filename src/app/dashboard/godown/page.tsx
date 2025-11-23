@@ -4,6 +4,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater, ChevronDown, ChevronUp, Warehouse } from 'lucide-react';
 import Link from 'next/link';
+import { useMediaQuery } from 'react-responsive';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -50,6 +51,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDateFormat } from '@/hooks/use-date-format';
 import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
 import type { AddGodownItemFormValues } from '@/components/dashboard/add-godown-item-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -81,6 +85,7 @@ const RealTimeClock = () => {
 
 export default function GodownPage() {
     const { formatDate } = useDateFormat();
+    const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
     const { 
         inventory,
         unprocessedItems,
@@ -152,9 +157,10 @@ export default function GodownPage() {
     
     const handleTransferToOnBar = async (productId: string, quantity: number, pegPrices?: { '30ml': number, '60ml': number }) => {
         try {
-            await transferToOnBar(productId, quantity, pegPrices);
             const item = inventory.find(i => i.id === productId);
-            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item?.brand} (${item?.size}) transferred to On-Bar.` });
+            if (!item) throw new Error("Product not found.");
+            await transferToOnBar(productId, quantity, pegPrices);
+            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item.brand} (${item.size}) transferred to On-Bar.` });
             setIsTransferOnBarOpen(false);
         } catch (error) {
             console.error('Error transferring to on-bar:', error);
@@ -377,13 +383,12 @@ export default function GodownPage() {
                     <ScrollArea className="h-48 w-full">
                         <div className="space-y-3">
                         {unprocessedItems.map(item => (
-                             <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                             <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-background/50">
                                 <div className="flex items-center gap-4">
-                                     <input
-                                        type="checkbox"
-                                        className="h-4 w-4"
+                                     <Checkbox
+                                        id={`unprocessed-${item.id}`}
                                         checked={selectedUnprocessedRows.has(item.id)}
-                                        onChange={() => handleUnprocessedRowSelect(item.id)}
+                                        onCheckedChange={() => handleUnprocessedRowSelect(item.id)}
                                     />
                                     <div>
                                         <p className="font-semibold">{item.brand}</p>
@@ -433,55 +438,28 @@ export default function GodownPage() {
                         </Button>
                     </div>
                 </div>
-
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-12"></TableHead>
-                            <TableHead className="font-bold text-foreground">Brand</TableHead>
-                            <TableHead className="font-bold text-foreground">Size</TableHead>
-                            <TableHead className="font-bold text-foreground">Godown Stock</TableHead>
-                            <TableHead className="text-right font-bold text-foreground w-32">Actions</TableHead>
-                        </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                
+                {isMobile ? (
+                    <div className="space-y-3">
                         {filteredInventory.length > 0 ? (
-                            filteredInventory.map(item => (
-                                <React.Fragment key={item.id}>
-                                    <TableRow data-state={selectedRows.has(item.id) ? "selected" : ""}>
-                                         <TableCell className="text-center">
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => toggleRowExpansion(item.id)}
-                                                    className="h-8 w-8"
-                                                >
-                                                    {expandedRows.has(item.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                                </Button>
-                                                <input
-                                                    type="checkbox"
-                                                    className="h-4 w-4"
+                             filteredInventory.map(item => {
+                                const isExpanded = expandedRows.has(item.id);
+                                return (
+                                    <Card key={item.id} className="p-4 space-y-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex items-start gap-3">
+                                                 <Checkbox
+                                                    id={`select-${item.id}`}
+                                                    className="mt-1"
                                                     checked={selectedRows.has(item.id)}
-                                                    onChange={() => handleRowSelect(item.id)}
+                                                    onCheckedChange={() => handleRowSelect(item.id)}
                                                 />
+                                                <div>
+                                                    <h3 className="font-bold">{item.brand}</h3>
+                                                    <p className="text-sm text-muted-foreground">{item.size}</p>
+                                                </div>
                                             </div>
-                                        </TableCell>
-                                        <TableCell className="font-medium">{item.brand}</TableCell>
-                                        <TableCell>{item.size}</TableCell>
-                                        <TableCell>
-                                            <Input
-                                                key={item.id + '-' + item.stockInGodown}
-                                                type="number"
-                                                className="h-8 w-24 bg-card"
-                                                defaultValue={item.stockInGodown || 0}
-                                                onBlur={(e) => handleGodownStockChange(item.id, e.target.value)}
-                                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
+                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="outline" size="sm" disabled={(item.stockInGodown || 0) <= 0}>
                                                         Actions
@@ -499,42 +477,151 @@ export default function GodownPage() {
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                    {expandedRows.has(item.id) && (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="p-0">
-                                                <div className="bg-muted/50 p-4 grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <p className="font-semibold text-sm">Date Added</p>
-                                                        <p className="text-sm text-muted-foreground">{item.dateAddedToGodown ? formatDate(item.dateAddedToGodown.toDate()) : 'N/A'}</p>
-                                                    </div>
-                                                     <div>
-                                                        <p className="font-semibold text-sm">Last Transferred</p>
-                                                        {item.lastTransferred && item.lastTransferred.date ? (
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {item.lastTransferred.quantity} units to {item.lastTransferred.destination} on {formatDate(item.lastTransferred.date.toDate())}
-                                                            </p>
-                                                        ) : (
-                                                            <p className="text-sm text-muted-foreground">N/A</p>
-                                                        )}
-                                                    </div>
+                                        </div>
+                                         <div className="space-y-1">
+                                            <Label htmlFor={`stock-${item.id}`} className="text-xs">Godown Stock</Label>
+                                            <Input
+                                                id={`stock-${item.id}`}
+                                                key={item.id + '-' + item.stockInGodown}
+                                                type="number"
+                                                className="h-9"
+                                                defaultValue={item.stockInGodown || 0}
+                                                onBlur={(e) => handleGodownStockChange(item.id, e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                            />
+                                        </div>
+                                        <button onClick={() => toggleRowExpansion(item.id)} className="w-full text-sm text-muted-foreground flex items-center justify-center pt-2">
+                                             {isExpanded ? 'Hide' : 'Show'} Details {isExpanded ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
+                                        </button>
+                                        {isExpanded && (
+                                            <div className="border-t pt-4 mt-4 space-y-2 text-sm">
+                                                <div className="flex justify-between">
+                                                    <span className="font-semibold">Date Added:</span>
+                                                    <span className="text-muted-foreground">{item.dateAddedToGodown ? formatDate(item.dateAddedToGodown.toDate()) : 'N/A'}</span>
+                                                </div>
+                                                 <div className="flex justify-between">
+                                                    <span className="font-semibold">Last Transfer:</span>
+                                                    {item.lastTransferred && item.lastTransferred.date ? (
+                                                        <span className="text-muted-foreground text-right">
+                                                            {item.lastTransferred.quantity} units to {item.lastTransferred.destination} on {formatDate(item.lastTransferred.date.toDate())}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">N/A</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </Card>
+                                )
+                             })
+                        ) : (
+                            <div className="h-24 text-center flex items-center justify-center text-muted-foreground">
+                                No stock found in Godown.
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-12"></TableHead>
+                                <TableHead className="font-bold text-foreground">Brand</TableHead>
+                                <TableHead className="font-bold text-foreground">Size</TableHead>
+                                <TableHead className="font-bold text-foreground">Godown Stock</TableHead>
+                                <TableHead className="text-right font-bold text-foreground w-32">Actions</TableHead>
+                            </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                            {filteredInventory.length > 0 ? (
+                                filteredInventory.map(item => (
+                                    <React.Fragment key={item.id}>
+                                        <TableRow data-state={selectedRows.has(item.id) ? "selected" : ""}>
+                                             <TableCell className="text-center">
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => toggleRowExpansion(item.id)}
+                                                        className="h-8 w-8"
+                                                    >
+                                                        {expandedRows.has(item.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                    </Button>
+                                                    <Checkbox
+                                                        id={`desktop-select-${item.id}`}
+                                                        checked={selectedRows.has(item.id)}
+                                                        onCheckedChange={() => handleRowSelect(item.id)}
+                                                    />
                                                 </div>
                                             </TableCell>
+                                            <TableCell className="font-medium">{item.brand}</TableCell>
+                                            <TableCell>{item.size}</TableCell>
+                                            <TableCell>
+                                                <Input
+                                                    key={item.id + '-' + item.stockInGodown}
+                                                    type="number"
+                                                    className="h-8 w-24 bg-card"
+                                                    defaultValue={item.stockInGodown || 0}
+                                                    onBlur={(e) => handleGodownStockChange(item.id, e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                />
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="outline" size="sm" disabled={(item.stockInGodown || 0) <= 0}>
+                                                            Actions
+                                                            <ChevronDown className="h-4 w-4 ml-2" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                        <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'shop')}>
+                                                            <Archive className="mr-2 h-4 w-4" />
+                                                            Transfer to Shop
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'onbar')} disabled={item.category === 'IML'}>
+                                                             <GlassWater className="mr-2 h-4 w-4" />
+                                                            Transfer to On-Bar
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
                                         </TableRow>
-                                    )}
-                                </React.Fragment>
-                            ))
-                        ) : (
-                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
-                                    No stock found in Godown. Use 'Scan Bill' to add new deliveries.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        </TableBody>
-                    </Table>
-                </div>
+                                        {expandedRows.has(item.id) && (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="p-0">
+                                                    <div className="bg-muted/50 p-4 grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <p className="font-semibold text-sm">Date Added</p>
+                                                            <p className="text-sm text-muted-foreground">{item.dateAddedToGodown ? formatDate(item.dateAddedToGodown.toDate()) : 'N/A'}</p>
+                                                        </div>
+                                                         <div>
+                                                            <p className="font-semibold text-sm">Last Transferred</p>
+                                                            {item.lastTransferred && item.lastTransferred.date ? (
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {item.lastTransferred.quantity} units to {item.lastTransferred.destination} on {formatDate(item.lastTransferred.date.toDate())}
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-sm text-muted-foreground">N/A</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </React.Fragment>
+                                ))
+                            ) : (
+                                 <TableRow>
+                                    <TableCell colSpan={5} className="h-24 text-center">
+                                        No stock found in Godown. Use 'Scan Bill' to add new deliveries.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
             </CardContent>
         </Card>
     </main>
