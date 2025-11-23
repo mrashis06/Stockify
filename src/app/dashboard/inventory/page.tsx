@@ -122,7 +122,7 @@ export default function InventoryPage() {
         }
     }, [searchParams]);
 
-    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'added'> & {initialStock: number}) => {
+    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown'> & {initialStock: number}) => {
         try {
             await addBrand(newItemData);
             toast({ title: 'Brand Added', description: `${newItemData.brand} (${newItemData.size}) created.` });
@@ -439,22 +439,26 @@ export default function InventoryPage() {
 
                                     return (
                                         <Card key={item.id} className={`p-4 space-y-4 ${isLowStock ? 'bg-destructive/10' : ''}`}>
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Checkbox
-                                                            id={`select-${item.id}`}
-                                                            checked={selectedRows.has(item.id)}
-                                                            onCheckedChange={() => handleRowSelect(item.id)}
-                                                        />
-                                                        <h3 className="font-bold">{item.brand}</h3>
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditBrand(item)}>
-                                                            <Pencil className="h-3 w-3" />
-                                                        </Button>
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex items-start gap-3 flex-1">
+                                                    <Checkbox
+                                                        id={`select-${item.id}`}
+                                                        checked={selectedRows.has(item.id)}
+                                                        onCheckedChange={() => handleRowSelect(item.id)}
+                                                        className="mt-1"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-1">
+                                                            <h3 className="font-bold leading-tight">{item.brand}</h3>
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleEditBrand(item)}>
+                                                                <Pencil className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground">{item.size}</p>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground ml-6">{item.size}</p>
                                                 </div>
-                                                <div className="text-right">
+
+                                                <div className="text-right shrink-0">
                                                     <p className="font-bold text-lg">{item.closing}</p>
                                                     <p className="text-xs text-muted-foreground">Closing</p>
                                                 </div>
@@ -715,3 +719,5 @@ export default function InventoryPage() {
     </main>
   );
 }
+
+    
