@@ -95,7 +95,7 @@ type InventoryState = {
   
   // Actions
   initListeners: () => () => void;
-  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {prevStock: number}) => Promise<void>;
+  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {initialStock: number}) => Promise<void>;
   addGodownItem: (data: AddGodownItemFormValues) => Promise<void>;
   processScannedBill: (billDataUri: string, fileName: string, force?: boolean) => Promise<{ status: 'success' | 'already_processed'; matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
@@ -307,44 +307,60 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
   addBrand: async (newItemData) => {
     get()._setSaving(true);
     try {
-        const id = `manual_${uuidv4()}`;
-        const docRef = doc(db, 'inventory', id);
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const dailyRef = doc(db, 'dailyInventory', today);
+        await runTransaction(db, async (transaction) => {
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const dailyRef = doc(db, 'dailyInventory', today);
+            
+            const normalizedBrand = newItemData.brand.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const normalizedSize = newItemData.size.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const id = `manual_${normalizedBrand}_${normalizedSize}`;
+            
+            const docRef = doc(db, 'inventory', id);
 
-        const masterItemData = {
-            brand: newItemData.brand,
-            size: newItemData.size,
-            price: Number(newItemData.price),
-            category: newItemData.category,
-            stockInGodown: 0,
-            barcodeId: null,
-            prevStock: 0 // Master prev stock should be considered carefully. Let's start it at 0.
-        };
-        
-        const dailyItemData = {
-            brand: newItemData.brand,
-            size: newItemData.size,
-            price: Number(newItemData.price),
-            category: newItemData.category,
-            prevStock: Number(newItemData.prevStock),
-            added: 0,
-            sales: 0
-        }
+            const [dailyDoc, masterDoc] = await Promise.all([
+                transaction.get(dailyRef),
+                transaction.get(docRef)
+            ]);
+            const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
 
-        const batch = writeBatch(db);
-        batch.set(docRef, masterItemData);
-        batch.set(dailyRef, { [id]: dailyItemData }, { merge: true });
+            if (masterDoc.exists()) {
+                // If product exists, just add stock to today's record.
+                const currentDaily = dailyData[id] || { added: 0 };
+                currentDaily.added = (currentDaily.added || 0) + (newItemData.initialStock || 0);
+                transaction.set(dailyRef, { [id]: currentDaily }, { merge: true });
+            } else {
+                // If product is new, create it in master and daily records.
+                const masterItemData = {
+                    brand: newItemData.brand,
+                    size: newItemData.size,
+                    price: Number(newItemData.price),
+                    category: newItemData.category,
+                    stockInGodown: 0,
+                    barcodeId: null,
+                    prevStock: 0,
+                };
+                
+                const dailyItemData = {
+                    brand: newItemData.brand,
+                    size: newItemData.size,
+                    price: Number(newItemData.price),
+                    category: newItemData.category,
+                    prevStock: 0,
+                    added: newItemData.initialStock || 0,
+                    sales: 0
+                }
 
-        await batch.commit();
-
+                transaction.set(docRef, masterItemData);
+                transaction.set(dailyRef, { [id]: dailyItemData }, { merge: true });
+            }
+        });
     } catch (error) {
         console.error('Error adding brand:', error);
         throw error;
     } finally {
         get()._setSaving(false);
     }
-  },
+},
 
   addGodownItem: async (data: AddGodownItemFormValues) => {
     get()._setSaving(true);
@@ -1152,3 +1168,5 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
+
+    

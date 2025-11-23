@@ -39,7 +39,7 @@ const formSchema = z.object({
   size: z.string().min(1, 'Size is required'),
   price: z.coerce.number().min(0, 'Price must be a positive number'),
   category: z.string().min(1, 'Category is required'),
-  prevStock: z.coerce.number().int().min(0, 'Initial stock must be a non-negative integer'),
+  initialStock: z.coerce.number().int().min(0, 'Initial stock must be a non-negative integer'),
   barcodeId: z.string().optional(),
 });
 
@@ -48,7 +48,7 @@ export type AddBrandFormValues = z.infer<typeof formSchema>;
 type AddBrandDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onAddBrand: (data: Omit<AddBrandFormValues, 'barcodeId'>) => void;
+  onAddBrand: (data: AddBrandFormValues) => void;
 };
 
 const categories = ['Whiskey', 'Rum', 'Beer', 'Vodka', 'Wine', 'Gin', 'Tequila', 'IML'];
@@ -61,7 +61,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
       size: '',
       price: 0,
       category: '',
-      prevStock: 0,
+      initialStock: 0,
       barcodeId: '',
     },
   });
@@ -78,7 +78,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
           size: '',
           price: 0,
           category: data.category, // Keep category for next item
-          prevStock: 0,
+          initialStock: 0,
           barcodeId: '',
         });
     } else {
@@ -180,7 +180,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
                 />
                 <FormField
                   control={form.control}
-                  name="prevStock"
+                  name="initialStock"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Initial Stock</FormLabel>
@@ -207,3 +207,5 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     </Dialog>
   );
 }
+
+    

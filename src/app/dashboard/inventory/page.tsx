@@ -4,7 +4,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut, GlassWater, Warehouse, Archive } from 'lucide-react';
+import { useMediaQuery } from 'react-responsive';
+import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut, GlassWater, Warehouse, Archive, ChevronDown, ChevronUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -51,6 +52,7 @@ import {
 import { usePageLoading } from '@/hooks/use-loading';
 import { Separator } from '@/components/ui/separator';
 import { useDateFormat } from '@/hooks/use-date-format';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -83,6 +85,7 @@ const RealTimeClock = () => {
 export default function InventoryPage() {
     const { formatDate } = useDateFormat();
     const searchParams = useSearchParams();
+    const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
     
     const { 
         inventory,
@@ -108,6 +111,7 @@ export default function InventoryPage() {
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
+    const [expandedMobileRows, setExpandedMobileRows] = useState<Set<string>>(new Set());
     const { toast } = useToast();
     
     useEffect(() => {
@@ -117,7 +121,7 @@ export default function InventoryPage() {
         }
     }, [searchParams]);
 
-    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'added'> & {prevStock: number}) => {
+    const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'added'> & {initialStock: number}) => {
         try {
             await addBrand(newItemData);
             toast({ title: 'Brand Added', description: `${newItemData.brand} (${newItemData.size}) created.` });
@@ -162,10 +166,10 @@ export default function InventoryPage() {
             let description = '';
             switch(field) {
                 case 'sales':
-                    description = `Sales for ${originalItem.brand} (${originalItem.size}) updated to ${processedValue} units.`;
+                    description = `Sold ${processedValue} units of ${originalItem.brand} (${originalItem.size}).`;
                     break;
                 case 'added':
-                    description = `Added stock for ${originalItem.brand} (${originalItem.size}) updated to ${processedValue} units.`;
+                    description = `Added ${processedValue} units of ${originalItem.brand} (${originalItem.size}) to shop.`;
                     break;
                 case 'price':
                     description = `Price for ${originalItem.brand} (${originalItem.size}) updated to ₹${processedValue}.`;
@@ -244,16 +248,22 @@ export default function InventoryPage() {
         });
     }, [inventory]);
 
+    const recentlyAddedIds = useMemo(() => {
+        return new Set(inventory.filter(item => item.id.startsWith('manual_') && (item.added > 0 || item.prevStock > 0)).map(item => item.id));
+    }, [inventory]);
 
     const filteredInventory = useMemo(() => {
         return processedInventory.filter(item => {
-            if ((item.opening ?? 0) <= 0 && (item.closing ?? 0) <= 0 && (item.sales ?? 0) <= 0) return false;
+            // Show if it has any stock/sales activity OR if it was just manually added.
+            const hasActivity = (item.opening ?? 0) > 0 || (item.closing ?? 0) > 0 || (item.sales ?? 0) > 0;
+            const isRecentlyAdded = recentlyAddedIds.has(item.id);
+            if (!hasActivity && !isRecentlyAdded) return false;
 
             const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
             const matchesCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
             return matchesSearch && matchesCategory;
         });
-    }, [processedInventory, searchQuery, categoryFilter]);
+    }, [processedInventory, searchQuery, categoryFilter, recentlyAddedIds]);
 
     const allCategories = useMemo(() => {
         const cats = new Set(inventory.filter(i => (Number(i.prevStock || 0) + Number(i.added || 0)) > 0).map(i => i.category).filter(Boolean));
@@ -377,30 +387,32 @@ export default function InventoryPage() {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="w-full sm:w-auto">
-                                    <ListFilter className="mr-2 h-4 w-4" />
-                                    Columns
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuCheckboxItem
-                                    checked={showOpening}
-                                    onCheckedChange={setShowOpening}
-                                >
-                                    Opening Stock
-                                </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem
-                                    checked={showClosing}
-                                    onCheckedChange={setShowClosing}
-                                >
-                                    Closing Stock
-                                </DropdownMenuCheckboxItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        {!isMobile && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="w-full sm:w-auto">
+                                        <ListFilter className="mr-2 h-4 w-4" />
+                                        Columns
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuCheckboxItem
+                                        checked={showOpening}
+                                        onCheckedChange={setShowOpening}
+                                    >
+                                        Opening Stock
+                                    </DropdownMenuCheckboxItem>
+                                    <DropdownMenuCheckboxItem
+                                        checked={showClosing}
+                                        onCheckedChange={setShowClosing}
+                                    >
+                                        Closing Stock
+                                    </DropdownMenuCheckboxItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                         <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={() => setIsAddBrandOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Brand
                         </Button>
@@ -415,125 +427,209 @@ export default function InventoryPage() {
                     </Button>
                 </div>
 
-                <div className="overflow-x-auto mt-4">
-                    
-                    <Table>
-                        <TableHeader>
-                        <TableRow>
-                            <TableHead className="font-bold text-foreground"></TableHead>
-                            <TableHead className="font-bold text-foreground">Brand</TableHead>
-                            <TableHead className="font-bold text-foreground">Size</TableHead>
-                            <TableHead className="font-bold text-foreground">Price</TableHead>
-                            <TableHead className="font-bold text-foreground">Prev. Stock</TableHead>
-                            <TableHead className="font-bold text-foreground">Added</TableHead>
-                            {showOpening && <TableHead className="font-bold text-foreground">Opening</TableHead>}
-                            <TableHead className="font-bold text-foreground">Sales</TableHead>
-                            {showClosing && <TableHead className="font-bold text-foreground">Closing</TableHead>}
-                            <TableHead className="font-bold text-foreground">Amount</TableHead>
-                        </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                        {filteredInventory.length > 0 ? (
-                            filteredInventory.map(item => {
-                                const isLowStock = (item.closing ?? 0) < 10;
-                                const amount = (item.sales ?? 0) * item.price;
+                <div className="mt-4">
+                    {isMobile ? (
+                        <div className="space-y-3">
+                            {filteredInventory.length > 0 ? (
+                                filteredInventory.map(item => {
+                                    const isLowStock = (item.closing ?? 0) < 10;
+                                    const amount = (item.sales ?? 0) * item.price;
+                                    const isExpanded = expandedMobileRows.has(item.id);
 
-                                return (
-                                    <TableRow 
-                                        key={item.id} 
-                                        className={isLowStock ? 'bg-destructive/10 hover:bg-destructive/20' : ''}
-                                        data-state={selectedRows.has(item.id) ? "selected" : ""}
-                                    >
-                                        <TableCell className="text-center">
-                                            <input
-                                                type="checkbox"
-                                                className="h-4 w-4"
-                                                checked={selectedRows.has(item.id)}
-                                                onChange={() => handleRowSelect(item.id)}
-                                            />
-                                        </TableCell>
-                                        <TableCell className="font-medium flex items-center">
-                                            {item.brand}
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-2" onClick={() => handleEditBrand(item)}>
-                                                <Pencil className="h-3 w-3" />
-                                            </Button>
-                                        </TableCell>
-                                        <TableCell>
-                                        {item.size}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center">
-                                                <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                                <Input
-                                                    key={`${item.id}-price`}
-                                                    type="number"
-                                                    className="h-8 w-24 bg-card"
-                                                    defaultValue={item.price}
-                                                    onBlur={(e) => handleFieldChange(item.id, 'price', e.target.value)}
-                                                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                                                />
+                                    return (
+                                        <Card key={item.id} className={`p-4 space-y-4 ${isLowStock ? 'bg-destructive/10' : ''}`}>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            id={`select-${item.id}`}
+                                                            checked={selectedRows.has(item.id)}
+                                                            onCheckedChange={() => handleRowSelect(item.id)}
+                                                        />
+                                                        <h3 className="font-bold">{item.brand}</h3>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditBrand(item)}>
+                                                            <Pencil className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                    <p className="text-sm text-muted-foreground ml-6">{item.size}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-lg">{item.closing}</p>
+                                                    <p className="text-xs text-muted-foreground">Closing</p>
+                                                </div>
                                             </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <Label htmlFor={`added-${item.id}`} className="text-xs">Added</Label>
+                                                    <Input
+                                                        id={`added-${item.id}`}
+                                                        key={`${item.id}-added`}
+                                                        type="number"
+                                                        className="h-9"
+                                                        defaultValue={item.added || ''}
+                                                        placeholder="0"
+                                                        onBlur={(e) => handleFieldChange(item.id, 'added', e.target.value || '0')}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                    />
+                                                </div>
+                                                 <div className="space-y-1">
+                                                    <Label htmlFor={`sales-${item.id}`} className="text-xs">Sales</Label>
+                                                    <Input
+                                                        id={`sales-${item.id}`}
+                                                        key={`${item.id}-sales`}
+                                                        type="number"
+                                                        className="h-9"
+                                                        defaultValue={item.sales || ''}
+                                                        placeholder="0"
+                                                        onBlur={(e) => handleFieldChange(item.id, 'sales', e.target.value || '0')}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                    />
+                                                </div>
+                                            </div>
+                                             <button onClick={() => setExpandedMobileRows(prev => {
+                                                 const newSet = new Set(prev);
+                                                 if (newSet.has(item.id)) newSet.delete(item.id);
+                                                 else newSet.add(item.id);
+                                                 return newSet;
+                                             })} className="w-full text-sm text-muted-foreground flex items-center justify-center pt-2">
+                                                 {isExpanded ? 'Hide' : 'Show'} Details {isExpanded ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
+                                             </button>
+
+                                             {isExpanded && (
+                                                <div className="border-t pt-4 mt-4 space-y-2 text-sm">
+                                                    <div className="flex justify-between"><span>Price:</span> <span className="font-medium">₹{item.price}</span></div>
+                                                    <div className="flex justify-between"><span>Prev. Stock:</span> <span>{item.prevStock ?? 0}</span></div>
+                                                    <div className="flex justify-between"><span>Opening:</span> <span>{item.opening}</span></div>
+                                                    <div className="flex justify-between"><span>Amount:</span> <span className="font-medium">₹{amount.toLocaleString('en-IN')}</span></div>
+                                                </div>
+                                             )}
+                                        </Card>
+                                    )
+                                })
+                            ) : (
+                                <div className="h-24 text-center flex items-center justify-center text-muted-foreground">
+                                    No stock found in the shop.
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                <TableRow>
+                                    <TableHead className="font-bold text-foreground"></TableHead>
+                                    <TableHead className="font-bold text-foreground">Brand</TableHead>
+                                    <TableHead className="font-bold text-foreground">Size</TableHead>
+                                    <TableHead className="font-bold text-foreground">Price</TableHead>
+                                    <TableHead className="font-bold text-foreground">Prev. Stock</TableHead>
+                                    <TableHead className="font-bold text-foreground">Added</TableHead>
+                                    {showOpening && <TableHead className="font-bold text-foreground">Opening</TableHead>}
+                                    <TableHead className="font-bold text-foreground">Sales</TableHead>
+                                    {showClosing && <TableHead className="font-bold text-foreground">Closing</TableHead>}
+                                    <TableHead className="font-bold text-foreground">Amount</TableHead>
+                                </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                {filteredInventory.length > 0 ? (
+                                    filteredInventory.map(item => {
+                                        const isLowStock = (item.closing ?? 0) < 10;
+                                        const amount = (item.sales ?? 0) * item.price;
+
+                                        return (
+                                            <TableRow 
+                                                key={item.id} 
+                                                className={isLowStock ? 'bg-destructive/10 hover:bg-destructive/20' : ''}
+                                                data-state={selectedRows.has(item.id) ? "selected" : ""}
+                                            >
+                                                <TableCell className="text-center">
+                                                    <Checkbox
+                                                        checked={selectedRows.has(item.id)}
+                                                        onCheckedChange={() => handleRowSelect(item.id)}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="font-medium flex items-center">
+                                                    {item.brand}
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-2" onClick={() => handleEditBrand(item)}>
+                                                        <Pencil className="h-3 w-3" />
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell>
+                                                {item.size}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center">
+                                                        <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                                        <Input
+                                                            key={`${item.id}-price`}
+                                                            type="number"
+                                                            className="h-8 w-24 bg-card"
+                                                            defaultValue={item.price}
+                                                            onBlur={(e) => handleFieldChange(item.id, 'price', e.target.value)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                        />
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>{item.prevStock ?? 0}</TableCell>
+                                                <TableCell>
+                                                    <Input
+                                                        key={`${item.id}-added`}
+                                                        type="number"
+                                                        className="h-8 w-20 bg-card"
+                                                        defaultValue={item.added || ''}
+                                                        placeholder="0"
+                                                        onBlur={(e) => handleFieldChange(item.id, 'added', e.target.value || '0')}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                    />
+                                                </TableCell>
+                                                {showOpening && <TableCell>{item.opening}</TableCell>}
+                                                <TableCell>
+                                                    <Input
+                                                        key={`${item.id}-sales`}
+                                                        type="number"
+                                                        className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
+                                                        defaultValue={item.sales || ''}
+                                                        placeholder="0"
+                                                        onBlur={(e) => handleFieldChange(item.id, 'sales', e.target.value || '0')}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                    />
+                                                </TableCell>
+                                                {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{item.closing}</TableCell>}
+                                                <TableCell>
+                                                    <div className="flex items-center">
+                                                        <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
+                                                        {amount.toLocaleString('en-IN')}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={10} className="h-24 text-center">
+                                            No stock found in the shop. Transfer items from your Godown to get started.
                                         </TableCell>
-                                        <TableCell>{item.prevStock ?? 0}</TableCell>
-                                        <TableCell>
-                                            <Input
-                                                key={`${item.id}-added`}
-                                                type="number"
-                                                className="h-8 w-20 bg-card"
-                                                defaultValue={item.added || ''}
-                                                placeholder="0"
-                                                onBlur={(e) => handleFieldChange(item.id, 'added', e.target.value || '0')}
-                                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                                            />
-                                        </TableCell>
-                                        {showOpening && <TableCell>{item.opening}</TableCell>}
-                                        <TableCell>
-                                            <Input
-                                                key={`${item.id}-sales`}
-                                                type="number"
-                                                className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
-                                                defaultValue={item.sales || ''}
-                                                placeholder="0"
-                                                onBlur={(e) => handleFieldChange(item.id, 'sales', e.target.value || '0')}
-                                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                                            />
-                                        </TableCell>
-                                        {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{item.closing}</TableCell>}
-                                        <TableCell>
+                                    </TableRow>
+                                )}
+                                </TableBody>
+                                <TableFooter>
+                                    <TableRow className="bg-muted/50 font-medium">
+                                        <TableCell colSpan={4} className="text-right">Off-Counter Totals</TableCell>
+                                        <TableCell className="font-bold">{filteredInventory.reduce((sum, item) => sum + Number(item.prevStock || 0), 0)}</TableCell>
+                                        <TableCell className="font-bold">{totalAdded}</TableCell>
+                                        {showOpening && <TableCell className="font-bold">{totalOpening}</TableCell>}
+                                        <TableCell className="font-bold">{totalSalesUnits}</TableCell>
+                                        {showClosing && <TableCell className="font-bold">{totalClosing}</TableCell>}
+                                        <TableCell className="font-bold">
                                             <div className="flex items-center">
                                                 <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                                {amount.toLocaleString('en-IN')}
+                                                {totalOffCounterAmount.toLocaleString('en-IN')}
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                )
-                            })
-                        ) : (
-                             <TableRow>
-                                <TableCell colSpan={10} className="h-24 text-center">
-                                    No stock found in the shop. Transfer items from your Godown to get started.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        </TableBody>
-                         <TableFooter>
-                             <TableRow className="bg-muted/50 font-medium">
-                                <TableCell colSpan={4} className="text-right">Off-Counter Totals</TableCell>
-                                <TableCell className="font-bold">{filteredInventory.reduce((sum, item) => sum + Number(item.prevStock || 0), 0)}</TableCell>
-                                <TableCell className="font-bold">{totalAdded}</TableCell>
-                                {showOpening && <TableCell className="font-bold">{totalOpening}</TableCell>}
-                                <TableCell className="font-bold">{totalSalesUnits}</TableCell>
-                                {showClosing && <TableCell className="font-bold">{totalClosing}</TableCell>}
-                                <TableCell className="font-bold">
-                                    <div className="flex items-center">
-                                        <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                        {totalOffCounterAmount.toLocaleString('en-IN')}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                    
+                                </TableFooter>
+                            </Table>
+                        </div>
+                    )}
                 </div>
 
                 {dailyOnBarSales.length > 0 && (
@@ -618,3 +714,5 @@ export default function InventoryPage() {
     </main>
   );
 }
+
+    
