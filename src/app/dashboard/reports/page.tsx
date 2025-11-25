@@ -10,6 +10,7 @@ import { db } from '@/lib/firebase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { useSearchParams } from 'next/navigation';
+import { useMediaQuery } from 'react-responsive';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -101,6 +102,7 @@ export default function ReportsPage() {
     const { formatDate } = useDateFormat();
     const searchParams = useSearchParams();
     const { inventory: masterInventory } = useInventory();
+    const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
     
     const [fromDate, setFromDate] = useState<Date | undefined>(() => {
         const fromParam = searchParams.get('from');
@@ -119,8 +121,13 @@ export default function ReportsPage() {
     const [reportType, setReportType] = useState<'offcounter' | 'onbar' | 'both'>('both');
     const [reportData, setReportData] = useState<ReportDataEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isClient, setIsClient] = useState(false);
 
     usePageLoading(false); // Disable full-page loader for this page
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
     
     const fetchReportData = useCallback(async (range: { from?: Date, to?: Date }) => {
         if (!range?.from) {
@@ -636,112 +643,171 @@ export default function ReportsPage() {
             </Card>
         ) : (
         <>
-            {reportType === 'offcounter' || reportType === 'both' ? (
+            {(reportType === 'offcounter' || reportType === 'both') && (
             <Card>
                 <CardHeader>
                     <CardTitle>Off-Counter Sales Details</CardTitle>
                     <CardDescription>An aggregated summary of sales for the selected period.</CardDescription>
                 </CardHeader>
                 <CardContent>
+                    {isClient && isMobile ? (
+                        <div className="space-y-3">
+                            {offCounterSalesData.length > 0 ? (
+                                offCounterSalesData.map(item => (
+                                    <Card key={item.productId} className="p-4 space-y-3">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-bold">{item.brand}</h3>
+                                                <p className="text-sm text-muted-foreground">{item.size} &bull; {item.category}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-base text-primary flex items-center justify-end">
+                                                  <IndianRupee className="h-4 w-4" />
+                                                  {item.totalAmount.toLocaleString('en-IN')}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">Total Amount</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-between items-center text-sm border-t pt-3 mt-3">
+                                            <span>Units Sold: <span className="font-semibold">{item.unitsSold}</span></span>
+                                            <span>Price/Unit: <span className="font-semibold">₹{item.price.toFixed(2)}</span></span>
+                                        </div>
+                                    </Card>
+                                ))
+                            ) : (
+                                <p className="text-center text-muted-foreground py-8">No Off-Counter sales data for this period.</p>
+                            )}
+                        </div>
+                    ) : (
                         <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Brand</TableHead>
-                                    <TableHead>Size</TableHead>
-                                    <TableHead>Category</TableHead>
-                                    <TableHead className="text-right">Price</TableHead>
-                                    <TableHead className="text-right">Units Sold</TableHead>
-                                    <TableHead className="text-right">Total Amount</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {offCounterSalesData.length > 0 ? (
-                                    offCounterSalesData.map(item => (
-                                        <TableRow key={item.productId}>
-                                            <TableCell className="font-medium">{item.brand}</TableCell>
-                                            <TableCell>{item.size}</TableCell>
-                                            <TableCell>{item.category}</TableCell>
-                                            <TableCell className="text-right">{Number(item.price).toFixed(2)}</TableCell>
-                                            <TableCell className="text-right">{item.unitsSold}</TableCell>
-                                            <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">
-                                            No Off-Counter sales data for this period.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                            <TableFooter>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-bold text-right text-base">Off-Counter Total</TableCell>
-                                    <TableCell className="font-bold text-right text-base">{offCounterTotals.totalUnits}</TableCell>
-                                    <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
-                                        <IndianRupee className="h-4 w-4" />
-                                        {offCounterTotals.totalAmount.toFixed(2)}
-                                    </TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
-            ) : null}
-            
-            {reportType === 'onbar' || reportType === 'both' ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>On-Bar Sales Details</CardTitle>
-                        <CardDescription>An aggregated summary of on-bar sales for the selected period.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                            <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Brand</TableHead>
                                         <TableHead>Size</TableHead>
                                         <TableHead>Category</TableHead>
-                                        <TableHead className="text-right">Units/Volume Sold</TableHead>
+                                        <TableHead className="text-right">Price</TableHead>
+                                        <TableHead className="text-right">Units Sold</TableHead>
                                         <TableHead className="text-right">Total Amount</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {onBarSalesData.length > 0 ? (
-                                        onBarSalesData.map(item => (
+                                    {offCounterSalesData.length > 0 ? (
+                                        offCounterSalesData.map(item => (
                                             <TableRow key={item.productId}>
                                                 <TableCell className="font-medium">{item.brand}</TableCell>
                                                 <TableCell>{item.size}</TableCell>
                                                 <TableCell>{item.category}</TableCell>
-                                                <TableCell className="text-right">{`${item.unitsSold} ${item.category === 'Beer' ? 'units' : 'ml'}`}</TableCell>
+                                                <TableCell className="text-right">{Number(item.price).toFixed(2)}</TableCell>
+                                                <TableCell className="text-right">{item.unitsSold}</TableCell>
                                                 <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">
-                                                No On-Bar sales data for this period.
+                                            <TableCell colSpan={6} className="h-24 text-center">
+                                                No Off-Counter sales data for this period.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>
                                 <TableFooter>
                                     <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-bold text-right text-base">On-Bar Total</TableCell>
+                                        <TableCell colSpan={4} className="font-bold text-right text-base">Off-Counter Total</TableCell>
+                                        <TableCell className="font-bold text-right text-base">{offCounterTotals.totalUnits}</TableCell>
                                         <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
                                             <IndianRupee className="h-4 w-4" />
-                                            {onBarTotals.totalAmount.toFixed(2)}
+                                            {offCounterTotals.totalAmount.toFixed(2)}
                                         </TableCell>
                                     </TableRow>
                                 </TableFooter>
                             </Table>
                         </div>
+                    )}
+                </CardContent>
+            </Card>
+            )}
+            
+            {(reportType === 'onbar' || reportType === 'both') && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>On-Bar Sales Details</CardTitle>
+                        <CardDescription>An aggregated summary of on-bar sales for the selected period.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {isClient && isMobile ? (
+                            <div className="space-y-3">
+                                {onBarSalesData.length > 0 ? (
+                                     onBarSalesData.map(item => (
+                                        <Card key={item.productId} className="p-4 space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h3 className="font-bold">{item.brand}</h3>
+                                                    <p className="text-sm text-muted-foreground">{item.size} &bull; {item.category}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-base text-primary flex items-center justify-end">
+                                                      <IndianRupee className="h-4 w-4" />
+                                                      {item.totalAmount.toLocaleString('en-IN')}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">Total Amount</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center text-sm border-t pt-3 mt-3">
+                                                <span>Volume Sold: <span className="font-semibold">{`${item.unitsSold} ${item.category === 'Beer' ? 'units' : 'ml'}`}</span></span>
+                                            </div>
+                                        </Card>
+                                    ))
+                                ) : (
+                                    <p className="text-center text-muted-foreground py-8">No On-Bar sales data for this period.</p>
+                                )}
+                            </div>
+                        ) : (
+                             <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Brand</TableHead>
+                                            <TableHead>Size</TableHead>
+                                            <TableHead>Category</TableHead>
+                                            <TableHead className="text-right">Units/Volume Sold</TableHead>
+                                            <TableHead className="text-right">Total Amount</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {onBarSalesData.length > 0 ? (
+                                            onBarSalesData.map(item => (
+                                                <TableRow key={item.productId}>
+                                                    <TableCell className="font-medium">{item.brand}</TableCell>
+                                                    <TableCell>{item.size}</TableCell>
+                                                    <TableCell>{item.category}</TableCell>
+                                                    <TableCell className="text-right">{`${item.unitsSold} ${item.category === 'Beer' ? 'units' : 'ml'}`}</TableCell>
+                                                    <TableCell className="text-right font-medium">{item.totalAmount.toFixed(2)}</TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="h-24 text-center">
+                                                    No On-Bar sales data for this period.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                    <TableFooter>
+                                        <TableRow className="bg-muted/50">
+                                            <TableCell colSpan={4} className="font-bold text-right text-base">On-Bar Total</TableCell>
+                                            <TableCell className="font-bold text-right text-base flex items-center justify-end gap-1">
+                                                <IndianRupee className="h-4 w-4" />
+                                                {onBarTotals.totalAmount.toFixed(2)}
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
-            ) : null}
+            )}
 
              {reportType === 'both' && (offCounterSalesData.length > 0 || onBarSalesData.length > 0) && (
                 <div className="mt-6 flex justify-end">
@@ -780,4 +846,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
