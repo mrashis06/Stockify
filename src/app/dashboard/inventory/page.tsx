@@ -461,6 +461,11 @@ export default function InventoryPage() {
                                                 <div className="text-right shrink-0">
                                                     <p className="font-bold text-lg">{item.closing}</p>
                                                     <p className="text-xs text-muted-foreground">Closing</p>
+                                                    <p className="font-bold text-base text-primary flex items-center justify-end mt-1">
+                                                      <IndianRupee className="h-4 w-4" />
+                                                      {amount.toLocaleString('en-IN')}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">Amount</p>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
@@ -505,7 +510,6 @@ export default function InventoryPage() {
                                                     <div className="flex justify-between"><span>Price:</span> <span className="font-medium">₹{item.price}</span></div>
                                                     <div className="flex justify-between"><span>Prev. Stock:</span> <span>{item.prevStock ?? 0}</span></div>
                                                     <div className="flex justify-between"><span>Opening:</span> <span>{item.opening}</span></div>
-                                                    <div className="flex justify-between"><span>Amount:</span> <span className="font-medium">₹{amount.toLocaleString('en-IN')}</span></div>
                                                 </div>
                                              )}
                                         </Card>
