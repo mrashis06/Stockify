@@ -447,7 +447,7 @@ export default function InventoryPage() {
                                                         onCheckedChange={() => handleRowSelect(item.id)}
                                                         className="mt-1"
                                                     />
-                                                    <div className="flex-1">
+                                                    <div>
                                                         <div className="flex items-center gap-1">
                                                             <h3 className="font-bold leading-tight">{item.brand}</h3>
                                                             <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleEditBrand(item)}>
@@ -457,17 +457,22 @@ export default function InventoryPage() {
                                                         <p className="text-sm text-muted-foreground">{item.size}</p>
                                                     </div>
                                                 </div>
-
-                                                <div className="text-right shrink-0">
+                                            </div>
+                                            
+                                            <div className="flex items-center justify-between text-center border-y py-3">
+                                                <div>
                                                     <p className="font-bold text-lg">{item.closing}</p>
                                                     <p className="text-xs text-muted-foreground">Closing</p>
-                                                    <p className="font-bold text-base text-primary flex items-center justify-end mt-1">
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-base text-primary flex items-center justify-end">
                                                       <IndianRupee className="h-4 w-4" />
                                                       {amount.toLocaleString('en-IN')}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">Amount</p>
                                                 </div>
                                             </div>
+
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-1">
                                                     <Label htmlFor={`added-${item.id}`} className="text-xs">Added</Label>
@@ -723,5 +728,3 @@ export default function InventoryPage() {
     </main>
   );
 }
-
-    
