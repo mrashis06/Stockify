@@ -112,7 +112,7 @@ export default function InventoryPage() {
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
-    const [expandedMobileRows, setExpandedMobileRows] = useState<Set<string>>(new Set());
+    const [expandedMobileRow, setExpandedMobileRow] = useState<string | null>(null);
     const { toast } = useToast();
     
     useEffect(() => {
@@ -227,6 +227,10 @@ export default function InventoryPage() {
                 variant: 'destructive',
             });
         }
+    };
+    
+    const toggleMobileRowExpansion = (itemId: string) => {
+        setExpandedMobileRow(prev => prev === itemId ? null : itemId);
     };
     
     const processedInventory = useMemo(() => {
@@ -435,7 +439,7 @@ export default function InventoryPage() {
                                 filteredInventory.map(item => {
                                     const isLowStock = (item.closing ?? 0) < 10;
                                     const amount = (item.sales ?? 0) * item.price;
-                                    const isExpanded = expandedMobileRows.has(item.id);
+                                    const isExpanded = expandedMobileRow === item.id;
 
                                     return (
                                         <Card key={item.id} className={`p-4 space-y-4 ${isLowStock ? 'bg-destructive/10' : ''}`}>
@@ -501,12 +505,7 @@ export default function InventoryPage() {
                                                     />
                                                 </div>
                                             </div>
-                                             <button onClick={() => setExpandedMobileRows(prev => {
-                                                 const newSet = new Set(prev);
-                                                 if (newSet.has(item.id)) newSet.delete(item.id);
-                                                 else newSet.add(item.id);
-                                                 return newSet;
-                                             })} className="w-full text-sm text-muted-foreground flex items-center justify-center pt-2">
+                                             <button onClick={() => toggleMobileRowExpansion(item.id)} className="w-full text-sm text-muted-foreground flex items-center justify-center pt-2">
                                                  {isExpanded ? 'Hide' : 'Show'} Details {isExpanded ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
                                              </button>
 

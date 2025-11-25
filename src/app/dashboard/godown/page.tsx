@@ -114,7 +114,7 @@ export default function GodownPage() {
     const [selectedUnprocessedRows, setSelectedUnprocessedRows] = useState<Set<string>>(new Set());
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleteUnprocessedOpen, setIsDeleteUnprocessedOpen] = useState(false);
-    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+    const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const { toast } = useToast();
     
     const handleOpenTransferDialog = (item: InventoryItem, destination: 'shop' | 'onbar') => {
@@ -236,13 +236,7 @@ export default function GodownPage() {
     };
 
     const toggleRowExpansion = (itemId: string) => {
-        const newSet = new Set(expandedRows);
-        if (newSet.has(itemId)) {
-            newSet.delete(itemId);
-        } else {
-            newSet.add(itemId);
-        }
-        setExpandedRows(newSet);
+        setExpandedRow(prev => prev === itemId ? null : itemId);
     };
 
     const filteredInventory = useMemo(() => {
@@ -443,7 +437,7 @@ export default function GodownPage() {
                     <div className="space-y-3">
                         {filteredInventory.length > 0 ? (
                              filteredInventory.map(item => {
-                                const isExpanded = expandedRows.has(item.id);
+                                const isExpanded = expandedRow === item.id;
                                 return (
                                     <Card key={item.id} className="p-4 space-y-4">
                                         <div className="flex justify-between items-start">
@@ -545,7 +539,7 @@ export default function GodownPage() {
                                                         onClick={() => toggleRowExpansion(item.id)}
                                                         className="h-8 w-8"
                                                     >
-                                                        {expandedRows.has(item.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                                        {expandedRow === item.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                                     </Button>
                                                     <Checkbox
                                                         id={`desktop-select-${item.id}`}
@@ -587,7 +581,7 @@ export default function GodownPage() {
                                                 </DropdownMenu>
                                             </TableCell>
                                         </TableRow>
-                                        {expandedRows.has(item.id) && (
+                                        {expandedRow === item.id && (
                                             <TableRow>
                                                 <TableCell colSpan={5} className="p-0">
                                                     <div className="bg-muted/50 p-4 grid grid-cols-2 gap-4">
