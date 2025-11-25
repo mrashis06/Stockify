@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -8,6 +9,7 @@ import { DateRange } from 'react-day-picker';
 import { Calendar as CalendarIcon, Filter, Loader2, Download, PackagePlus, MinusCircle, TrendingUp, ChevronsUpDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { useMediaQuery } from 'react-responsive';
 
 import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
@@ -74,6 +76,7 @@ export default function PerformancePage() {
     const { inventory: masterInventory, loading: inventoryLoading } = useInventory();
     const { formatDate } = useDateFormat();
     const [loading, setLoading] = useState(true);
+    const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
 
     const [dateRangeOption, setDateRangeOption] = useState('today');
     const [fromDate, setFromDate] = useState<Date | undefined>(new Date());
@@ -386,6 +389,35 @@ export default function PerformancePage() {
                      {loading ? (
                         <div className="flex justify-center items-center h-64">
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                     ) : isMobile ? (
+                        <div className="space-y-3">
+                            {performanceData.length > 0 ? (
+                                performanceData.map(item => (
+                                    <Card key={item.productId} className="p-4">
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div>
+                                                <h3 className="font-bold">{item.brand}</h3>
+                                                <p className="text-sm text-muted-foreground">{item.size} &bull; {item.category}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-lg text-destructive">{item.unitsSold}</p>
+                                                <p className="text-xs text-muted-foreground">Units Sold</p>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                ))
+                            ) : (
+                                <p className="text-center text-muted-foreground py-8">No data found for the selected filters.</p>
+                            )}
+                             {performanceData.length > 1 && (
+                                <Card className="mt-4 p-4 font-bold bg-muted/50">
+                                    <div className="flex justify-between items-center text-base">
+                                        <span>Grand Total Units Sold:</span>
+                                        <span className="text-destructive">{performanceData.reduce((sum, item) => sum + item.unitsSold, 0)}</span>
+                                    </div>
+                                </Card>
+                             )}
                         </div>
                      ) : (
                         <div className="overflow-x-auto">
