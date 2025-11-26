@@ -12,20 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableFooter,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 import AddBrandDialog from '@/components/dashboard/add-brand-dialog';
 import EditBrandDialog from '@/components/dashboard/edit-brand-dialog';
@@ -103,7 +96,7 @@ export default function InventoryPage() {
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
 
     const [searchQuery, setSearchQuery] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('All Categories');
+    const [selectedCategories, setSelectedCategories] = useState<string[]>(['All Categories']);
     const [isAddBrandOpen, setIsAddBrandOpen] = useState(false);
     const [isEditBrandOpen, setIsEditBrandOpen] = useState(false);
     const [editingBrand, setEditingBrand] = useState<InventoryItem | null>(null);
@@ -118,7 +111,7 @@ export default function InventoryPage() {
     useEffect(() => {
         const category = searchParams.get('category');
         if (category) {
-            setCategoryFilter(decodeURIComponent(category));
+            setSelectedCategories([decodeURIComponent(category)]);
         }
     }, [searchParams]);
 
@@ -259,16 +252,15 @@ export default function InventoryPage() {
 
     const filteredInventory = useMemo(() => {
         return processedInventory.filter(item => {
-            // Show if it has any stock/sales activity OR if it was just manually added.
             const hasActivity = (item.opening ?? 0) > 0 || (item.closing ?? 0) > 0 || (item.sales ?? 0) > 0;
             const isRecentlyAdded = recentlyAddedIds.has(item.id);
             if (!hasActivity && !isRecentlyAdded) return false;
 
             const matchesSearch = item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesCategory = categoryFilter === 'All Categories' || item.category === categoryFilter;
+            const matchesCategory = selectedCategories.includes('All Categories') || selectedCategories.includes(item.category);
             return matchesSearch && matchesCategory;
         });
-    }, [processedInventory, searchQuery, categoryFilter, recentlyAddedIds]);
+    }, [processedInventory, searchQuery, selectedCategories, recentlyAddedIds]);
 
     const allCategories = useMemo(() => {
         const cats = new Set(inventory.filter(i => (Number(i.prevStock || 0) + Number(i.added || 0)) > 0).map(i => i.category).filter(Boolean));
@@ -290,6 +282,21 @@ export default function InventoryPage() {
     }, [filteredInventory]);
     
     const grandTotalSales = totalOffCounterAmount + totalOnBarSales;
+    
+    const handleCategorySelect = (category: string) => {
+        setSelectedCategories(prev => {
+            if (category === 'All Categories') {
+                return ['All Categories'];
+            }
+            const newSelection = prev.filter(c => c !== 'All Categories');
+            if (newSelection.includes(category)) {
+                const filtered = newSelection.filter(c => c !== category);
+                return filtered.length === 0 ? ['All Categories'] : filtered;
+            } else {
+                return [...newSelection, category];
+            }
+        });
+    };
 
 
   if (loading) {
@@ -382,16 +389,34 @@ export default function InventoryPage() {
                          />
                     </div>
                     <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                            <SelectTrigger className="w-full sm:w-[180px]">
-                                <SelectValue placeholder="All Categories" />
-                            </SelectTrigger>
-                            <SelectContent>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="w-full sm:w-[200px] justify-between">
+                                    <span className="truncate">
+                                        {selectedCategories.length === 1 && selectedCategories[0] !== 'All Categories' 
+                                            ? selectedCategories[0] 
+                                            : selectedCategories.includes('All Categories')
+                                            ? 'All Categories'
+                                            : `${selectedCategories.length} selected`}
+                                    </span>
+                                    <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                                <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
                                 {allCategories.map(cat => (
-                                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                    <DropdownMenuCheckboxItem
+                                        key={cat}
+                                        checked={selectedCategories.includes(cat)}
+                                        onSelect={(e) => e.preventDefault()} // Prevent closing
+                                        onCheckedChange={() => handleCategorySelect(cat)}
+                                    >
+                                        {cat}
+                                    </DropdownMenuCheckboxItem>
                                 ))}
-                            </SelectContent>
-                        </Select>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         {!isMobile && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -461,20 +486,20 @@ export default function InventoryPage() {
                                                         <p className="text-sm text-muted-foreground">{item.size}</p>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center justify-between text-center border-y py-3">
-                                                <div>
+                                                <div className="text-right flex-shrink-0">
                                                     <p className="font-bold text-lg">{item.closing}</p>
                                                     <p className="text-xs text-muted-foreground">Closing</p>
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-base text-primary flex items-center justify-end">
+                                            </div>
+                                            
+                                            <div className="flex items-center justify-between text-center border-y py-3">
+                                                 <div className="flex-1 text-left">
+                                                     <p className="font-bold text-base text-primary flex items-center">
                                                       <IndianRupee className="h-4 w-4" />
                                                       {amount.toLocaleString('en-IN')}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">Amount</p>
-                                                </div>
+                                                 </div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
@@ -727,3 +752,5 @@ export default function InventoryPage() {
     </main>
   );
 }
+
+    

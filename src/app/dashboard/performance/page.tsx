@@ -6,7 +6,7 @@ import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firesto
 import { db } from '@/lib/firebase';
 import { eachDayOfInterval, startOfDay, subMonths, subDays, format, isSameDay, parse, isValid } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { Calendar as CalendarIcon, Filter, Loader2, Download, PackagePlus, MinusCircle, TrendingUp, ChevronsUpDown } from 'lucide-react';
+import { Calendar as CalendarIcon, Filter, Loader2, Download, PackagePlus, MinusCircle, TrendingUp, ChevronsUpDown, ChevronDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { useMediaQuery } from 'react-responsive';
@@ -16,7 +16,6 @@ import { useDateFormat } from '@/hooks/use-date-format';
 import { useInventory } from '@/hooks/use-inventory';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
@@ -25,6 +24,8 @@ import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -85,14 +86,14 @@ export default function PerformancePage() {
     const [isFromOpen, setIsFromOpen] = useState(false);
     const [isToOpen, setIsToOpen] = useState(false);
 
-    const [categoryFilter, setCategoryFilter] = useState('All Categories');
+    const [selectedCategories, setSelectedCategories] = useState<string[]>(['All Categories']);
     const [productFilter, setProductFilter] = useState('All Products');
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
 
     usePageLoading(loading || inventoryLoading);
     
-    const fetchPerformanceData = useCallback(async (range: {from?: Date, to?:Date}, category: string, product: string, sort: 'desc' | 'asc') => {
+    const fetchPerformanceData = useCallback(async (range: {from?: Date, to?:Date}, categories: string[], product: string, sort: 'desc' | 'asc') => {
         if (!range?.from) return;
         setLoading(true);
 
@@ -111,7 +112,9 @@ export default function PerformancePage() {
                         const itemLog = dailyLog[productId];
                         const masterItemRef = masterInventory.find(i => i.id === productId);
 
-                        if (category !== 'All Categories' && masterItemRef?.category !== category) continue;
+                        const categoryMatch = categories.includes('All Categories') || (masterItemRef && categories.includes(masterItemRef.category));
+                        if (!categoryMatch) continue;
+                        
                         if (product !== 'All Products' && productId !== product) continue;
                         
                         const current = salesMap.get(productId) || { sold: 0, added: 0 };
@@ -150,7 +153,7 @@ export default function PerformancePage() {
 
     useEffect(() => {
         if(masterInventory.length > 0) {
-            fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, sortOrder);
+            fetchPerformanceData({from: fromDate, to: toDate}, selectedCategories, productFilter, sortOrder);
         }
     }, [masterInventory.length]);
 
@@ -161,13 +164,13 @@ export default function PerformancePage() {
     }, [masterInventory]);
     
     const filteredProductsForDropdown = useMemo(() => {
-        if (categoryFilter === 'All Categories') return [];
-        return masterInventory.filter(item => item.category === categoryFilter);
-    }, [masterInventory, categoryFilter]);
+        if (selectedCategories.includes('All Categories')) return masterInventory;
+        return masterInventory.filter(item => selectedCategories.includes(item.category));
+    }, [masterInventory, selectedCategories]);
     
     useEffect(() => {
         setProductFilter('All Products');
-    }, [categoryFilter]);
+    }, [selectedCategories]);
 
     const handleDateRangeOptionChange = (value: string) => {
         setDateRangeOption(value);
@@ -198,7 +201,7 @@ export default function PerformancePage() {
         
         setFromDate(newFromDate);
         setToDate(newToDate);
-        fetchPerformanceData({from: newFromDate, to: newToDate}, categoryFilter, productFilter, sortOrder);
+        fetchPerformanceData({from: newFromDate, to: newToDate}, selectedCategories, productFilter, sortOrder);
     };
     
     const handleApplyCustomDate = (date: Date | undefined, type: 'from' | 'to') => {
@@ -215,9 +218,28 @@ export default function PerformancePage() {
             setIsToOpen(false);
         }
         if (newFrom && newTo) {
-             fetchPerformanceData({from: newFrom, to: newTo}, categoryFilter, productFilter, sortOrder);
+             fetchPerformanceData({from: newFrom, to: newTo}, selectedCategories, productFilter, sortOrder);
         }
     };
+    
+    const handleCategorySelect = (category: string) => {
+        const newSelection = selectedCategories.includes('All Categories') ? [] : [...selectedCategories];
+        if (category === 'All Categories') {
+            setSelectedCategories(['All Categories']);
+        } else {
+            const index = newSelection.indexOf(category);
+            if (index > -1) {
+                newSelection.splice(index, 1);
+            } else {
+                newSelection.push(category);
+            }
+            setSelectedCategories(newSelection.length === 0 ? ['All Categories'] : newSelection);
+        }
+    };
+
+    useEffect(() => {
+        fetchPerformanceData({from: fromDate, to: toDate}, selectedCategories, productFilter, sortOrder);
+    }, [selectedCategories, productFilter, sortOrder, fromDate, toDate, fetchPerformanceData]);
     
     const fetchSingleProductHistory = useCallback(async (range: {from?: Date, to?: Date}, productId: string): Promise<DailyRecord[]> => {
         if (!range?.from || !productId) return [];
@@ -288,7 +310,7 @@ export default function PerformancePage() {
             doc.text('Product Performance Report', 14, 25);
             doc.setFontSize(10);
             doc.text(`Period: ${from} to ${to}`, 14, 32);
-            doc.text(`Category: ${categoryFilter}`, 14, 38);
+            doc.text(`Categories: ${selectedCategories.join(', ')}`, 14, 38);
 
             doc.autoTable({
                 startY: 45,
@@ -358,15 +380,41 @@ export default function PerformancePage() {
                         )}
                     </div>
                      <div className="flex flex-col md:flex-row items-center gap-4 w-full flex-wrap">
-                        <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); fetchPerformanceData({from: fromDate, to: toDate}, v, productFilter, sortOrder); }}>
-                            <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Select Category" /></SelectTrigger>
-                            <SelectContent>{allCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}</SelectContent>
-                        </Select>
-                        <Select value={productFilter} onValueChange={(v) => { setProductFilter(v); fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, v, sortOrder); }} disabled={categoryFilter === 'All Categories'}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="w-full md:w-[220px] justify-between">
+                                    <span className="truncate">
+                                         {selectedCategories.length === 1 && selectedCategories[0] !== 'All Categories' 
+                                            ? selectedCategories[0] 
+                                            : selectedCategories.includes('All Categories')
+                                            ? 'All Categories'
+                                            : `${selectedCategories.length} selected`}
+                                    </span>
+                                    <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                                <DropdownMenuLabel>Filter by Category</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {allCategories.map(cat => (
+                                    <DropdownMenuCheckboxItem
+                                        key={cat}
+                                        checked={selectedCategories.includes(cat)}
+                                        onSelect={(e) => e.preventDefault()}
+                                        onCheckedChange={() => handleCategorySelect(cat)}
+                                    >
+                                        {cat}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <Select value={productFilter} onValueChange={setProductFilter} disabled={selectedCategories.includes('All Categories') && filteredProductsForDropdown.length > 50}>
                             <SelectTrigger className="w-full md:w-[220px]"><SelectValue placeholder="Select Product" /></SelectTrigger>
                             <SelectContent><SelectItem value="All Products">All Products</SelectItem>{filteredProductsForDropdown.map(p => (<SelectItem key={p.id} value={p.id}>{p.brand} ({p.size})</SelectItem>))}</SelectContent>
                         </Select>
-                        <Select value={sortOrder} onValueChange={(v: 'desc' | 'asc') => { setSortOrder(v); fetchPerformanceData({from: fromDate, to: toDate}, categoryFilter, productFilter, v); }}>
+                        
+                        <Select value={sortOrder} onValueChange={(v: 'desc' | 'asc') => setSortOrder(v)}>
                             <SelectTrigger className="w-full md:w-[220px]"><ChevronsUpDown className="mr-2 h-4 w-4" /><SelectValue placeholder="Sort by..." /></SelectTrigger>
                             <SelectContent><SelectItem value="desc">Highest Units Sold</SelectItem><SelectItem value="asc">Lowest Units Sold</SelectItem></SelectContent>
                         </Select>
@@ -472,3 +520,5 @@ export default function PerformancePage() {
         </div>
     );
 }
+
+    
