@@ -119,9 +119,8 @@ const extractBillFlow = ai.defineFlow(
 
     } catch (e) {
         console.error("Error during bill extraction:", e);
-        // Catch the error and re-throw it as a standard Error object to avoid crashing the server process.
         // This makes sure a clear, string-based message is sent to the client.
-        const errorMessage = e instanceof Error ? e.message : String(e);
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during AI processing.";
         throw new Error("Failed to process bill with AI. " + errorMessage);
     }
   }

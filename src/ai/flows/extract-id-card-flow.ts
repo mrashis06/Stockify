@@ -95,7 +95,7 @@ const extractIdCardFlow = ai.defineFlow(
 
     } catch (e) {
         console.error("Error during ID card extraction:", e);
-        const errorMessage = e instanceof Error ? e.message : String(e);
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during AI processing.";
         throw new Error("Failed to process ID card with AI. " + errorMessage);
     }
   }
