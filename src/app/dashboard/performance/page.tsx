@@ -87,13 +87,13 @@ export default function PerformancePage() {
     const [isToOpen, setIsToOpen] = useState(false);
 
     const [selectedCategories, setSelectedCategories] = useState<string[]>(['All Categories']);
-    const [productFilter, setProductFilter] = useState('All Products');
+    const [selectedProducts, setSelectedProducts] = useState<string[]>(['All Products']);
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
     const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
 
     usePageLoading(loading || inventoryLoading);
     
-    const fetchPerformanceData = useCallback(async (range: {from?: Date, to?:Date}, categories: string[], product: string, sort: 'desc' | 'asc') => {
+    const fetchPerformanceData = useCallback(async (range: {from?: Date, to?:Date}, categories: string[], products: string[], sort: 'desc' | 'asc') => {
         if (!range?.from) return;
         setLoading(true);
 
@@ -115,7 +115,8 @@ export default function PerformancePage() {
                         const categoryMatch = categories.includes('All Categories') || (masterItemRef && categories.includes(masterItemRef.category));
                         if (!categoryMatch) continue;
                         
-                        if (product !== 'All Products' && productId !== product) continue;
+                        const productMatch = products.includes('All Products') || products.includes(productId);
+                        if (!productMatch) continue;
                         
                         const current = salesMap.get(productId) || { sold: 0, added: 0 };
                         if (itemLog.sales) current.sold += itemLog.sales;
@@ -153,7 +154,7 @@ export default function PerformancePage() {
 
     useEffect(() => {
         if(masterInventory.length > 0) {
-            fetchPerformanceData({from: fromDate, to: toDate}, selectedCategories, productFilter, sortOrder);
+            fetchPerformanceData({from: fromDate, to: toDate}, selectedCategories, selectedProducts, sortOrder);
         }
     }, [masterInventory.length]);
 
@@ -169,7 +170,8 @@ export default function PerformancePage() {
     }, [masterInventory, selectedCategories]);
     
     useEffect(() => {
-        setProductFilter('All Products');
+        // Reset product filter when category changes
+        setSelectedProducts(['All Products']);
     }, [selectedCategories]);
 
     const handleDateRangeOptionChange = (value: string) => {
@@ -201,7 +203,7 @@ export default function PerformancePage() {
         
         setFromDate(newFromDate);
         setToDate(newToDate);
-        fetchPerformanceData({from: newFromDate, to: newToDate}, selectedCategories, productFilter, sortOrder);
+        fetchPerformanceData({from: newFromDate, to: newToDate}, selectedCategories, selectedProducts, sortOrder);
     };
     
     const handleApplyCustomDate = (date: Date | undefined, type: 'from' | 'to') => {
@@ -218,28 +220,44 @@ export default function PerformancePage() {
             setIsToOpen(false);
         }
         if (newFrom && newTo) {
-             fetchPerformanceData({from: newFrom, to: newTo}, selectedCategories, productFilter, sortOrder);
+             fetchPerformanceData({from: newFrom, to: newTo}, selectedCategories, selectedProducts, sortOrder);
         }
     };
     
     const handleCategorySelect = (category: string) => {
-        const newSelection = selectedCategories.includes('All Categories') ? [] : [...selectedCategories];
-        if (category === 'All Categories') {
-            setSelectedCategories(['All Categories']);
-        } else {
-            const index = newSelection.indexOf(category);
-            if (index > -1) {
-                newSelection.splice(index, 1);
-            } else {
-                newSelection.push(category);
+        setSelectedCategories(prev => {
+            if (category === 'All Categories') {
+                return ['All Categories'];
             }
-            setSelectedCategories(newSelection.length === 0 ? ['All Categories'] : newSelection);
-        }
+            const newSelection = prev.filter(c => c !== 'All Categories');
+            if (newSelection.includes(category)) {
+                const filtered = newSelection.filter(c => c !== category);
+                return filtered.length === 0 ? ['All Categories'] : filtered;
+            } else {
+                return [...newSelection, category];
+            }
+        });
+    };
+    
+    const handleProductSelect = (productId: string) => {
+        setSelectedProducts(prev => {
+            if (productId === 'All Products') {
+                return ['All Products'];
+            }
+            const newSelection = prev.filter(p => p !== 'All Products');
+            if (newSelection.includes(productId)) {
+                const filtered = newSelection.filter(p => p !== productId);
+                return filtered.length === 0 ? ['All Products'] : filtered;
+            } else {
+                return [...newSelection, productId];
+            }
+        });
     };
 
+
     useEffect(() => {
-        fetchPerformanceData({from: fromDate, to: toDate}, selectedCategories, productFilter, sortOrder);
-    }, [selectedCategories, productFilter, sortOrder, fromDate, toDate, fetchPerformanceData]);
+        fetchPerformanceData({from: fromDate, to: toDate}, selectedCategories, selectedProducts, sortOrder);
+    }, [selectedCategories, selectedProducts, sortOrder, fromDate, toDate, fetchPerformanceData]);
     
     const fetchSingleProductHistory = useCallback(async (range: {from?: Date, to?: Date}, productId: string): Promise<DailyRecord[]> => {
         if (!range?.from || !productId) return [];
@@ -278,11 +296,11 @@ export default function PerformancePage() {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
 
-        if (productFilter !== 'All Products') {
-             const selectedProduct = masterInventory.find(p => p.id === productFilter);
+        if (selectedProducts.length === 1 && selectedProducts[0] !== 'All Products') {
+             const selectedProduct = masterInventory.find(p => p.id === selectedProducts[0]);
              if (!selectedProduct) return;
 
-             const history = await fetchSingleProductHistory({from: fromDate, to: toDate}, productFilter);
+             const history = await fetchSingleProductHistory({from: fromDate, to: toDate}, selectedProducts[0]);
              
              doc.setFontSize(14);
              doc.text(`Sales History for ${selectedProduct.brand} (${selectedProduct.size})`, 14, 25);
@@ -310,10 +328,16 @@ export default function PerformancePage() {
             doc.text('Product Performance Report', 14, 25);
             doc.setFontSize(10);
             doc.text(`Period: ${from} to ${to}`, 14, 32);
+            
+            const productText = selectedProducts.includes('All Products') 
+                ? 'All Products' 
+                : `${selectedProducts.length} selected`;
             doc.text(`Categories: ${selectedCategories.join(', ')}`, 14, 38);
+            doc.text(`Products: ${productText}`, 14, 44);
+
 
             doc.autoTable({
-                startY: 45,
+                startY: 50,
                 head: [['Brand', 'Size', 'Category', 'Units Sold']],
                 body: performanceData.map(item => [item.brand, item.size, item.category, item.unitsSold]),
                 foot: [[
@@ -409,10 +433,42 @@ export default function PerformancePage() {
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <Select value={productFilter} onValueChange={setProductFilter} disabled={selectedCategories.includes('All Categories') && filteredProductsForDropdown.length > 50}>
-                            <SelectTrigger className="w-full md:w-[220px]"><SelectValue placeholder="Select Product" /></SelectTrigger>
-                            <SelectContent><SelectItem value="All Products">All Products</SelectItem>{filteredProductsForDropdown.map(p => (<SelectItem key={p.id} value={p.id}>{p.brand} ({p.size})</SelectItem>))}</SelectContent>
-                        </Select>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="w-full md:w-[220px] justify-between">
+                                    <span className="truncate">
+                                         {selectedProducts.length === 1 && selectedProducts[0] !== 'All Products' 
+                                            ? (masterInventory.find(p => p.id === selectedProducts[0])?.brand || '')
+                                            : selectedProducts.includes('All Products')
+                                            ? 'All Products'
+                                            : `${selectedProducts.length} products selected`}
+                                    </span>
+                                    <ChevronDown className="h-4 w-4 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64">
+                                <DropdownMenuLabel>Filter by Product</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuCheckboxItem
+                                    checked={selectedProducts.includes('All Products')}
+                                    onSelect={(e) => e.preventDefault()}
+                                    onCheckedChange={() => handleProductSelect('All Products')}
+                                >
+                                    All Products
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuSeparator />
+                                {filteredProductsForDropdown.map(p => (
+                                    <DropdownMenuCheckboxItem
+                                        key={p.id}
+                                        checked={selectedProducts.includes(p.id)}
+                                        onSelect={(e) => e.preventDefault()}
+                                        onCheckedChange={() => handleProductSelect(p.id)}
+                                    >
+                                        {p.brand} ({p.size})
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         
                         <Select value={sortOrder} onValueChange={(v: 'desc' | 'asc') => setSortOrder(v)}>
                             <SelectTrigger className="w-full md:w-[220px]"><ChevronsUpDown className="mr-2 h-4 w-4" /><SelectValue placeholder="Sort by..." /></SelectTrigger>
@@ -521,4 +577,3 @@ export default function PerformancePage() {
     );
 }
 
-    
