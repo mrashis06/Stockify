@@ -26,6 +26,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -449,6 +450,7 @@ export default function PerformancePage() {
                             <DropdownMenuContent className="w-64">
                                 <DropdownMenuLabel>Filter by Product</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
+                                <ScrollArea className="h-64">
                                 <DropdownMenuCheckboxItem
                                     checked={selectedProducts.includes('All Products')}
                                     onSelect={(e) => e.preventDefault()}
@@ -467,6 +469,7 @@ export default function PerformancePage() {
                                         {p.brand} ({p.size})
                                     </DropdownMenuCheckboxItem>
                                 ))}
+                                </ScrollArea>
                             </DropdownMenuContent>
                         </DropdownMenu>
                         
@@ -576,4 +579,3 @@ export default function PerformancePage() {
         </div>
     );
 }
-
