@@ -197,7 +197,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
                     <div className="flex items-center gap-2">
-                        <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                        <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd-MMM-yyyy, EEEE')}</p>
                         <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                         <RealTimeClock />
                     </div>
@@ -339,3 +339,5 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
+
+    

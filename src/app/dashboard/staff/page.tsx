@@ -299,7 +299,7 @@ export default function StaffPage() {
         return (
              <main className="flex-1 p-4 md:p-8">
                  <h1 className="text-3xl font-bold tracking-tight mb-6">Staff Management</h1>
-                 <p className="text-muted-foreground font-bold mb-6">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                 <p className="text-muted-foreground font-bold mb-6">{formatDate(new Date(), 'dd-MMM-yyyy, EEEE')}</p>
                  <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-xl"><KeyRound className="h-5 w-5 text-primary"/> Create Your Shop</CardTitle>
@@ -368,7 +368,7 @@ export default function StaffPage() {
             <div className="mb-8">
                 <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
                 <div className="flex items-center gap-2">
-                    <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd/MM/yyyy')}</p>
+                    <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd-MMM-yyyy, EEEE')}</p>
                     <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                     <RealTimeClock />
                 </div>
@@ -566,3 +566,5 @@ export default function StaffPage() {
         </main>
     );
 }
+
+    
