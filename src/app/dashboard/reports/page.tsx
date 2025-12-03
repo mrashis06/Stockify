@@ -256,12 +256,14 @@ export default function ReportsPage() {
         const onBarMap = new Map<string, OnBarSoldItem>();
 
         reportData.forEach(entry => {
+            const isToday = isSameDay(parseISO(entry.date), new Date());
             for (const productId in entry.log) {
                 const item = entry.log[productId] as any;
                 
                 if (item && item.sales > 0 && !productId.startsWith('on-bar-')) { 
                     const masterItem = masterInventoryMap.get(productId);
-                    const itemPrice = Number(item.price || masterItem?.price || 0); // Fallback to master price
+                    // **THE FIX**: Use the price from the daily log for past dates. Use master price for today.
+                    const itemPrice = isToday ? (masterItem?.price || 0) : (Number(item.price || masterItem?.price || 0));
 
                     if (itemPrice > 0) {
                         const existing = offCounterMap.get(productId);
@@ -847,4 +849,3 @@ export default function ReportsPage() {
   );
 }
 
-    
