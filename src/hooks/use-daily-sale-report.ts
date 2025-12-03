@@ -28,19 +28,19 @@ export function useDailySaleReport(date: Date) {
     useEffect(() => {
         setLoading(true);
 
-        const fetchMasterInventory = async () => {
-            const inventorySnapshot = await getDocs(collection(db, 'inventory'));
+        const invSub = onSnapshot(collection(db, "inventory"), (snapshot) => {
             const inventory: InventoryItem[] = [];
-            inventorySnapshot.forEach(doc => {
+            snapshot.forEach(doc => {
                 inventory.push({ id: doc.id, ...doc.data() } as InventoryItem);
             });
             setMasterInventory(inventory);
-        };
+        }, (error) => {
+             console.error("Error fetching master inventory:", error);
+        });
 
-        fetchMasterInventory();
 
         const dailyDocRef = doc(db, 'dailyInventory', dateString);
-        const unsubscribe = onSnapshot(dailyDocRef, (docSnap) => {
+        const dailySub = onSnapshot(dailyDocRef, (docSnap) => {
             setDailyData(docSnap.exists() ? docSnap.data() : {});
             setLoading(false);
         }, (error) => {
@@ -48,7 +48,10 @@ export function useDailySaleReport(date: Date) {
             setLoading(false);
         });
 
-        return () => unsubscribe();
+        return () => {
+            invSub();
+            dailySub();
+        };
     }, [dateString]);
 
     const getCategory = (itemCategory: string): AggregatedSale['category'] | null => {
@@ -82,7 +85,8 @@ export function useDailySaleReport(date: Date) {
                          existing.breakdown.push(itemLog.sales);
                          salesMap.set(key, existing);
                      }
-                     totalValue += (itemLog.sales * (itemLog.price || masterItem.price || 0));
+                     // Use the live price from master inventory for accurate calculation
+                     totalValue += (itemLog.sales * (masterItem.price || 0));
                  }
             }
             
