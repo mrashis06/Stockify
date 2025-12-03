@@ -49,12 +49,23 @@ export function useEndOfDay() {
         tomorrowData[item.id].prevStock = finalClosingStock;
       });
       
-      // Update today's record with final closing numbers
+      // Update today's record with final closing numbers AND THE FINAL PRICE
       const todayUpdatePayload: { [key: string]: any } = { lastEOD: serverTimestamp() };
       finalInventoryState.forEach(item => {
           const finalClosingStock = Math.max(0, item.closing ?? 0);
-          const key = `${item.id}.closing`;
-          todayUpdatePayload[key] = finalClosingStock;
+          
+          // Construct the key for the item object
+          const itemKey = item.id;
+          
+          // Get the existing data for this item, or initialize it
+          const itemData = (todayUpdatePayload[itemKey] || {});
+
+          // Set the final closing stock and the final price
+          itemData.closing = finalClosingStock;
+          itemData.price = item.price; // THE CRITICAL FIX: Save the final price.
+
+          // Place the updated item data back into the payload
+          todayUpdatePayload[itemKey] = itemData;
       });
       batch.set(todayDailyRef, todayUpdatePayload, { merge: true });
 
