@@ -66,6 +66,8 @@ export function useDailySaleReport(date: Date) {
     const { blReport, totalSalesValue } = useMemo(() => {
         const salesMap = new Map<string, AggregatedSale>();
         let totalValue = 0;
+        const todayString = format(new Date(), 'yyyy-MM-dd');
+        const isToday = dateString === todayString;
 
         for (const productId in dailyData) {
             const itemLog = dailyData[productId];
@@ -85,8 +87,9 @@ export function useDailySaleReport(date: Date) {
                          existing.breakdown.push(itemLog.sales);
                          salesMap.set(key, existing);
                      }
-                     // Use the live price from master inventory for accurate calculation
-                     totalValue += (itemLog.sales * (masterItem.price || 0));
+                     // **THE FIX**: Use live price for today, historical price for past days.
+                     const priceToUse = isToday ? masterItem.price : (itemLog.price || masterItem.price);
+                     totalValue += (itemLog.sales * (priceToUse || 0));
                  }
             }
             
@@ -130,7 +133,7 @@ export function useDailySaleReport(date: Date) {
         });
 
         return { blReport: report, totalSalesValue: totalValue };
-    }, [dailyData, masterInventory]);
+    }, [dailyData, masterInventory, dateString]);
 
 
     return { blReport, totalSalesValue, loading, getCategory };
