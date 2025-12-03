@@ -7,7 +7,7 @@ import 'jspdf-autotable';
 import { useDailySaleReport } from '@/hooks/use-daily-sale-report';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { IndianRupee, Download, ChevronDown, ChevronRight, Eye } from 'lucide-react';
+import { IndianRupee, Download, ChevronDown, ChevronRight, Eye, ChevronUp } from 'lucide-react';
 import { usePageLoading } from '@/hooks/use-loading';
 import { Button } from '@/components/ui/button';
 import { useDateFormat } from '@/hooks/use-date-format';
@@ -16,6 +16,7 @@ import { subDays, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
+import { useMediaQuery } from 'react-responsive';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -114,10 +115,11 @@ const ReportPreviewDialog = ({ isOpen, onOpenChange, report, total, date, format
 export default function DailySalePage() {
     const { toast } = useToast();
     const { formatDate } = useDateFormat();
+    const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
 
-    const { blReport, totalSalesValue, loading, getCategory } = useDailySaleReport(selectedDate);
+    const { blReport, totalSalesValue, loading } = useDailySaleReport(selectedDate);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     
@@ -259,71 +261,127 @@ export default function DailySalePage() {
                     <CardDescription>This report summarizes sales for the selected day, converted into bulk liters for excise purposes.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-12"></TableHead>
-                                <TableHead className="font-bold text-foreground">Category</TableHead>
-                                <TableHead className="font-bold text-foreground">Size (ml)</TableHead>
-                                <TableHead className="font-bold text-foreground text-right">Units Sold</TableHead>
-                                <TableHead className="font-bold text-foreground text-right">Bulk Liters (BL)</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                    {isMobile ? (
+                        <div className="space-y-3">
                             {blReport.length > 0 ? (
                                 blReport.map(row => {
                                     const rowKey = `${row.category}-${row.size}`;
                                     const isExpanded = expandedRows.has(rowKey);
                                     return (
-                                        <React.Fragment key={rowKey}>
-                                            <TableRow>
-                                                <TableCell>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleRowExpansion(rowKey)}>
-                                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                                    </Button>
-                                                </TableCell>
-                                                <TableCell className="font-medium">{row.category}</TableCell>
-                                                <TableCell>{row.size}</TableCell>
-                                                <TableCell className="text-right">{row.unitsSold.toFixed(3)}</TableCell>
-                                                <TableCell className="text-right font-semibold">{row.bulkLiters.toFixed(3)}</TableCell>
-                                            </TableRow>
+                                        <Card key={rowKey} className="overflow-hidden">
+                                            <div className="p-4" onClick={() => toggleRowExpansion(rowKey)}>
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h3 className="font-bold">{row.category}</h3>
+                                                        <p className="text-sm text-muted-foreground">{row.size}ml</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-bold text-lg text-primary">{row.bulkLiters.toFixed(3)}</p>
+                                                        <p className="text-xs text-muted-foreground">Bulk Liters</p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             {isExpanded && (
-                                                <TableRow>
-                                                    <TableCell colSpan={5} className="p-0">
-                                                        <div className="bg-muted/50 px-6 py-3 text-sm text-muted-foreground">
-                                                            <span className="font-semibold text-foreground">Breakdown:</span> {row.breakdown.map(n => n.toFixed(2)).join(' + ')}
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
+                                                <div className="bg-muted/50 px-4 py-3 border-t">
+                                                    <div className="flex justify-between items-center text-sm mb-2">
+                                                        <span className="text-muted-foreground">Units Sold:</span>
+                                                        <span className="font-semibold">{row.unitsSold.toFixed(3)}</span>
+                                                    </div>
+                                                     <div className="flex justify-between items-start text-sm">
+                                                        <span className="text-muted-foreground pt-1">Breakdown:</span>
+                                                        <p className="font-semibold text-right break-words max-w-[70%]">
+                                                            {row.breakdown.map(n => n.toFixed(2)).join(' + ')}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             )}
-                                        </React.Fragment>
+                                            <div className="w-full flex justify-center py-1 bg-muted/30 cursor-pointer" onClick={() => toggleRowExpansion(rowKey)}>
+                                                {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                                            </div>
+                                        </Card>
                                     )
                                 })
                             ) : (
+                                <div className="h-24 text-center flex items-center justify-center text-muted-foreground">
+                                    No sales recorded for the selected day.
+                                </div>
+                            )}
+                            <Card className="mt-4 bg-muted/50">
+                                <CardContent className="p-4">
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-lg font-bold">Total Sale Amount</p>
+                                        <div className="text-lg font-bold flex items-center">
+                                            <IndianRupee className="h-5 w-5 mr-1" />
+                                            {totalSalesValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
-                                        No sales recorded for the selected day.
+                                    <TableHead className="w-12"></TableHead>
+                                    <TableHead className="font-bold text-foreground">Category</TableHead>
+                                    <TableHead className="font-bold text-foreground">Size (ml)</TableHead>
+                                    <TableHead className="font-bold text-foreground text-right">Units Sold</TableHead>
+                                    <TableHead className="font-bold text-foreground text-right">Bulk Liters (BL)</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {blReport.length > 0 ? (
+                                    blReport.map(row => {
+                                        const rowKey = `${row.category}-${row.size}`;
+                                        const isExpanded = expandedRows.has(rowKey);
+                                        return (
+                                            <React.Fragment key={rowKey}>
+                                                <TableRow>
+                                                    <TableCell>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleRowExpansion(rowKey)}>
+                                                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                                        </Button>
+                                                    </TableCell>
+                                                    <TableCell className="font-medium">{row.category}</TableCell>
+                                                    <TableCell>{row.size}</TableCell>
+                                                    <TableCell className="text-right">{row.unitsSold.toFixed(3)}</TableCell>
+                                                    <TableCell className="text-right font-semibold">{row.bulkLiters.toFixed(3)}</TableCell>
+                                                </TableRow>
+                                                {isExpanded && (
+                                                    <TableRow>
+                                                        <TableCell colSpan={5} className="p-0">
+                                                            <div className="bg-muted/50 px-6 py-3 text-sm text-muted-foreground">
+                                                                <span className="font-semibold text-foreground">Breakdown:</span> {row.breakdown.map(n => n.toFixed(2)).join(' + ')}
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </React.Fragment>
+                                        )
+                                    })
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center">
+                                            No sales recorded for the selected day.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                             <TableFooter>
+                                <TableRow className="bg-muted/50 font-bold">
+                                    <TableCell colSpan={4} className="text-right text-lg">Total Sale Amount</TableCell>
+                                    <TableCell className="text-right text-lg">
+                                        <div className="flex items-center justify-end">
+                                            <IndianRupee className="h-5 w-5 mr-1" />
+                                            {totalSalesValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
                                     </TableCell>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                         <TableFooter>
-                            <TableRow className="bg-muted/50 font-bold">
-                                <TableCell colSpan={4} className="text-right text-lg">Total Sale Amount</TableCell>
-                                <TableCell className="text-right text-lg">
-                                    <div className="flex items-center justify-end">
-                                        <IndianRupee className="h-5 w-5 mr-1" />
-                                        {totalSalesValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
+                            </TableFooter>
+                        </Table>
+                    )}
                 </CardContent>
             </Card>
         </main>
     );
 }
-
-    
-    
