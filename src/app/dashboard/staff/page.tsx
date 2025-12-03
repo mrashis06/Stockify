@@ -428,53 +428,6 @@ export default function StaffPage() {
                         </CardContent>
                     </Card>
                 </div>
-
-                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-xl">Broadcast to Staff</CardTitle>
-                        <CardDescription>Send a notification to all active staff members.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Form {...broadcastForm}>
-                            <form onSubmit={broadcastForm.handleSubmit(handleBroadcast)} className="space-y-4">
-                                <FormField control={broadcastForm.control} name="message" render={({ field }) => (
-                                     <FormItem>
-                                        <FormLabel>Message</FormLabel>
-                                        <FormControl><Textarea placeholder="Your message here..." {...field} rows={4} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}/>
-                                <Button type="submit" disabled={broadcastForm.formState.isSubmitting} className="w-full">
-                                    {broadcastForm.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4"/>}
-                                    Send Message
-                                </Button>
-                            </form>
-                        </Form>
-                         <Separator className="my-6" />
-                        <div className="space-y-4">
-                            <h3 className="text-sm font-medium text-muted-foreground">Recent Broadcasts</h3>
-                            {recentBroadcasts.length > 0 ? (
-                                <div className="space-y-3">
-                                {recentBroadcasts.map(b => (
-                                    <div key={b.id} className="flex justify-between items-start gap-4 p-3 border rounded-lg">
-                                        <div>
-                                            <p className="text-sm">{b.description}</p>
-                                            {b.createdAt && (
-                                                <p className="text-xs text-muted-foreground mt-1">{formatDate(b.createdAt.toDate(), 'dd-MM-yyyy hh:mm a')}</p>
-                                            )}
-                                        </div>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => confirmDeleteBroadcast(b)}>
-                                            <Trash2 className="h-4 w-4 text-destructive/80" />
-                                        </Button>
-                                    </div>
-                                ))}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">No recent broadcasts.</p>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
             </div>
             
             <div className="mt-8">
@@ -566,5 +519,3 @@ export default function StaffPage() {
         </main>
     );
 }
-
-    
