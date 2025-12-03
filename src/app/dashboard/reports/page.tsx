@@ -258,46 +258,51 @@ export default function ReportsPage() {
         reportData.forEach(entry => {
             const isToday = isSameDay(parseISO(entry.date), new Date());
             for (const productId in entry.log) {
-                const item = entry.log[productId] as any;
+                const itemLog = entry.log[productId] as any;
                 
-                if (item && item.sales > 0 && !productId.startsWith('on-bar-')) { 
+                if (itemLog && itemLog.sales > 0 && !productId.startsWith('on-bar-')) { 
                     const masterItem = masterInventoryMap.get(productId);
-                    // **THE FIX**: Use the price from the daily log for past dates. Use master price for today.
-                    const itemPrice = isToday ? (masterItem?.price || 0) : (Number(item.price || masterItem?.price || 0));
+                    
+                    // **THE FIX**: Prioritize the historical price saved in the daily log for past dates.
+                    const priceToUse = isToday ? (masterItem?.price || 0) : (Number(itemLog.price || masterItem?.price || 0));
 
-                    if (itemPrice > 0) {
+                    if (priceToUse > 0) {
                         const existing = offCounterMap.get(productId);
                         if (existing) {
-                            existing.unitsSold += item.sales;
-                            existing.totalAmount += item.sales * itemPrice;
+                            existing.unitsSold += itemLog.sales;
+                            // Recalculate total amount with the correct historical average price if needed
+                            const newTotalAmount = existing.totalAmount + (itemLog.sales * priceToUse);
+                            existing.totalAmount = newTotalAmount;
+                            // Update price to be the average if it varies across days in a range.
+                            existing.price = newTotalAmount / existing.unitsSold;
                         } else {
-                            const brand = item.brand || masterItem?.brand || 'Unknown';
+                            const brand = itemLog.brand || masterItem?.brand || 'Unknown';
                             offCounterMap.set(productId, {
                                 productId, 
                                 brand,
-                                size: item.size || masterItem?.size || '', 
-                                category: item.category || masterItem?.category || '',
-                                price: itemPrice, 
-                                unitsSold: item.sales, 
-                                totalAmount: item.sales * itemPrice,
+                                size: itemLog.size || masterItem?.size || '', 
+                                category: itemLog.category || masterItem?.category || '',
+                                price: priceToUse, 
+                                unitsSold: itemLog.sales, 
+                                totalAmount: itemLog.sales * priceToUse,
                             });
                         }
                     }
-                } else if (item && item.salesValue > 0 && productId.startsWith('on-bar-')) { // OnBar
+                } else if (itemLog && itemLog.salesValue > 0 && productId.startsWith('on-bar-')) { // OnBar
                      const existing = onBarMap.get(productId);
                      if (existing) {
-                         existing.unitsSold += item.salesVolume;
-                         existing.totalAmount += item.salesValue;
+                         existing.unitsSold += itemLog.salesVolume;
+                         existing.totalAmount += itemLog.salesValue;
                      } else {
                         const masterItem = masterInventoryMap.get(productId.replace('on-bar-', ''));
-                        const brand = item.brand || masterItem?.brand || 'Unknown';
+                        const brand = itemLog.brand || masterItem?.brand || 'Unknown';
                          onBarMap.set(productId, {
                              productId, 
                              brand, 
-                             size: item.size || masterItem?.size || '', 
-                             category: item.category || masterItem?.category || '',
-                             unitsSold: item.salesVolume, 
-                             totalAmount: item.salesValue
+                             size: itemLog.size || masterItem?.size || '', 
+                             category: itemLog.category || masterItem?.category || '',
+                             unitsSold: itemLog.salesVolume, 
+                             totalAmount: itemLog.salesValue
                          });
                      }
                 }
@@ -395,19 +400,20 @@ export default function ReportsPage() {
                 let dayTotalOnBar = { amount: 0 };
 
                 for (const productId in entry.log) {
-                    const item = entry.log[productId] as any;
-                    if (item && item.sales > 0 && !productId.startsWith('on-bar-')) {
+                    const itemLog = entry.log[productId] as any;
+                    if (itemLog && itemLog.sales > 0 && !productId.startsWith('on-bar-')) {
                         const masterItem = masterInventoryMap.get(productId);
-                        const price = Number(item.price || masterItem?.price || 0);
+                        // **THE FIX** Always use historical price from the log.
+                        const price = Number(itemLog.price || masterItem?.price || 0);
                         if (price > 0) {
-                            const totalAmount = item.sales * price;
-                            dailyOffCounter.push([item.brand, item.size, item.category, price.toFixed(2), item.sales, totalAmount.toFixed(2)]);
-                            dayTotalOffCounter.units += item.sales;
+                            const totalAmount = itemLog.sales * price;
+                            dailyOffCounter.push([itemLog.brand, itemLog.size, itemLog.category, price.toFixed(2), itemLog.sales, totalAmount.toFixed(2)]);
+                            dayTotalOffCounter.units += itemLog.sales;
                             dayTotalOffCounter.amount += totalAmount;
                         }
-                    } else if (item && item.salesValue > 0 && productId.startsWith('on-bar-')) {
-                        dailyOnBar.push([item.brand, item.size, item.category, `${item.salesVolume} ${item.category === 'Beer' ? 'units' : 'ml'}`, item.salesValue.toFixed(2)]);
-                        dayTotalOnBar.amount += item.salesValue;
+                    } else if (itemLog && itemLog.salesValue > 0 && productId.startsWith('on-bar-')) {
+                        dailyOnBar.push([itemLog.brand, itemLog.size, itemLog.category, `${itemLog.salesVolume} ${itemLog.category === 'Beer' ? 'units' : 'ml'}`, itemLog.salesValue.toFixed(2)]);
+                        dayTotalOnBar.amount += itemLog.salesValue;
                     }
                 }
                 
@@ -848,4 +854,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, doc, getDoc, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format } from 'date-fns';
+import { format, isToday as isTodayDateFns } from 'date-fns';
 import type { InventoryItem } from './use-inventory';
 
 const IML_CATEGORIES = ['iml'];
@@ -66,8 +66,9 @@ export function useDailySaleReport(date: Date) {
     const { blReport, totalSalesValue } = useMemo(() => {
         const salesMap = new Map<string, AggregatedSale>();
         let totalValue = 0;
-        const todayString = format(new Date(), 'yyyy-MM-dd');
-        const isToday = dateString === todayString;
+        
+        // This check is now robust and determines if we should use live or historical prices.
+        const isReportForToday = isTodayDateFns(date);
 
         for (const productId in dailyData) {
             const itemLog = dailyData[productId];
@@ -87,8 +88,9 @@ export function useDailySaleReport(date: Date) {
                          existing.breakdown.push(itemLog.sales);
                          salesMap.set(key, existing);
                      }
-                     // **THE FIX**: Use live price for today, historical price for past days.
-                     const priceToUse = isToday ? masterItem.price : (itemLog.price || masterItem.price);
+
+                     // **THE FIX**: Prioritize the historical price saved in the daily log for past dates.
+                     const priceToUse = isReportForToday ? masterItem.price : (itemLog.price || masterItem.price);
                      totalValue += (itemLog.sales * (priceToUse || 0));
                  }
             }
@@ -133,7 +135,7 @@ export function useDailySaleReport(date: Date) {
         });
 
         return { blReport: report, totalSalesValue: totalValue };
-    }, [dailyData, masterInventory, dateString]);
+    }, [dailyData, masterInventory, date, isTodayDateFns]);
 
 
     return { blReport, totalSalesValue, loading, getCategory };
