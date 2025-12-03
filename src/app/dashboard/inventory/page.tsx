@@ -47,6 +47,7 @@ import { usePageLoading } from '@/hooks/use-loading';
 import { Separator } from '@/components/ui/separator';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { Checkbox } from '@/components/ui/checkbox';
+import SelectionActionBar from '@/components/dashboard/selection-action-bar';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -305,6 +306,13 @@ export default function InventoryPage() {
 
   return (
     <main className="flex-1 p-4 md:p-8">
+        <SelectionActionBar
+            count={selectedRows.size}
+            onClear={() => setSelectedRows(new Set())}
+            onAction={() => setIsDeleteDialogOpen(true)}
+            actionLabel="Remove"
+            actionIcon={<Trash2 />}
+        />
         <AddBrandDialog
             isOpen={isAddBrandOpen}
             onOpenChange={setIsAddBrandOpen}
@@ -445,9 +453,6 @@ export default function InventoryPage() {
                         )}
                         <Button variant="outline" className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={() => setIsAddBrandOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Brand
-                        </Button>
-                        <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)} className="w-full sm:w-auto">
-                            <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedRows.size})
                         </Button>
                     </div>
                 </div>

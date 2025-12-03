@@ -53,6 +53,7 @@ import AddGodownItemDialog from '@/components/dashboard/add-godown-item-dialog';
 import type { AddGodownItemFormValues } from '@/components/dashboard/add-godown-item-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import SelectionActionBar from '@/components/dashboard/selection-action-bar';
 
 
 const RealTimeClock = () => {
@@ -261,6 +262,20 @@ export default function GodownPage() {
 
   return (
     <main className="flex-1 p-4 md:p-8">
+        <SelectionActionBar
+            count={selectedRows.size}
+            onClear={() => setSelectedRows(new Set())}
+            onAction={() => setIsDeleteDialogOpen(true)}
+            actionLabel="Remove"
+            actionIcon={<Trash2 />}
+        />
+        <SelectionActionBar
+            count={selectedUnprocessedRows.size}
+            onClear={() => setSelectedUnprocessedRows(new Set())}
+            onAction={() => setIsDeleteUnprocessedOpen(true)}
+            actionLabel="Delete"
+            actionIcon={<Trash2 />}
+        />
         {selectedItem && (
             <TransferToShopDialog
                 isOpen={isTransferShopOpen}
@@ -363,14 +378,6 @@ export default function GodownPage() {
                                 You have {unprocessedItems.length} item types from scanned bills that need to be mapped to your inventory.
                             </CardDescription>
                         </div>
-                         <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            disabled={selectedUnprocessedRows.size === 0} 
-                            onClick={() => setIsDeleteUnprocessedOpen(true)}
-                        >
-                            <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedUnprocessedRows.size})
-                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -426,9 +433,6 @@ export default function GodownPage() {
                         </Button>
                         <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsScanBillOpen(true)}>
                             <FileScan className="mr-2 h-4 w-4" /> Scan Bill
-                        </Button>
-                        <Button variant="destructive" disabled={selectedRows.size === 0} onClick={() => setIsDeleteDialogOpen(true)} className="w-full sm:w-auto">
-                            <Trash2 className="mr-2 h-4 w-4" /> Remove ({selectedRows.size})
                         </Button>
                     </div>
                 </div>
