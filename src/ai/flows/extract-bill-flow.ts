@@ -68,7 +68,7 @@ const billExtractionPrompt = ai.definePrompt({
   prompt: `
 You are an expert data entry and matching agent for a liquor store. Your task is to extract all line items from the provided bill and match them against the user's existing inventory with very high accuracy.
 
-INSTRUCTIONS:
+CRITICAL INSTRUCTIONS:
 
 1.  **Process ALL Pages:** If the document is a multi-page PDF, you MUST process every single page to ensure all items are extracted.
 
@@ -76,15 +76,19 @@ INSTRUCTIONS:
     *   **brand:** The brand name (e.g., "Old Monk", "Kingfisher Ultra").
     *   **size:** Extract ONLY the numeric value of the size. Discard units like "ml", "ML". (e.g., "750ml" -> "750").
     *   **quantity:** The number of units.
-    *   **category:** The type of liquor (Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML).
 
-3.  **Strictly Match Against Inventory:** For each extracted item, compare it to the \`existingInventory\` list.
+3.  **Determine Category (VERY IMPORTANT):**
+    *   **PRIORITY #1: Use the 'Kind of Liquor' or 'Category' Column.** First, look for a specific column on the bill/transport pass labeled 'Kind of Liquor' or 'Category'. The value in this column is the TRUE category.
+    *   **If this column says 'IML', the category MUST be 'IML',** regardless of what the brand name says (e.g., if Brand is "Royal Stag Premier Whisky" but the 'Kind of Liquor' column is "IML", the category is "IML").
+    *   **PRIORITY #2: Fallback.** ONLY if a 'Kind of Liquor' or 'Category' column is NOT present, you may infer the category from the brand name (e.g., if the name contains 'Whisky', use 'Whiskey'). The valid categories are: Whiskey, Rum, Beer, Vodka, Wine, Gin, Tequila, IML.
+
+4.  **Strictly Match Against Inventory:** For each extracted item, compare it to the \`existingInventory\` list.
     *   A **MATCH** occurs ONLY IF the brand and size from the bill are a **near-perfect match** to an item in the inventory.
     *   Common abbreviations ARE acceptable (e.g., bill says "I Blue" and inventory has "Imperial Blue").
     *   Descriptive words are fine if they don't conflict (e.g., bill says "Seagrams Royal Stag Whiskey" and inventory has "Royal Stag").
     *   A **MISMATCH** occurs if there are conflicting words. For example, if the inventory has "Royal Stag **Barrel**" but the bill just says "Royal Stag", that is a MISMATCH. The extra word "Barrel" in the inventory item makes it a different product.
 
-4.  **Categorize Results:**
+5.  **Categorize Results:**
     *   If a **strict match** is found: Add the item to the \`matchedItems\` array. You must provide the \`productId\` from the \`existingInventory\` and the \`quantity\` from the bill.
     *   If **no strict match** is found: This is a new or different product. Add its full extracted details (brand, size, quantity, category) to the \`unmatchedItems\` array for manual user review.
 
@@ -125,3 +129,5 @@ const extractBillFlow = ai.defineFlow(
     }
   }
 );
+
+    
