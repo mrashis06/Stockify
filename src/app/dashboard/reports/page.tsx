@@ -568,6 +568,16 @@ export default function ReportsPage() {
             description: "Your Sales Statement has been downloaded as a CSV file.",
         });
     };
+    
+    const headerDate = useMemo(() => {
+        if (!fromDate) return '';
+        const start = formatDate(fromDate, 'dd-MMM-yyyy');
+        if (!toDate || isSameDay(fromDate, toDate)) {
+            return start;
+        }
+        const end = formatDate(toDate, 'dd-MMM-yyyy');
+        return `${start} to ${end}`;
+    }, [fromDate, toDate, formatDate]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -575,7 +585,7 @@ export default function ReportsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sales Statement</h1>
           <div className="flex items-center gap-2">
-            <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd-MMM-yyyy, EEEE')}</p>
+            <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{headerDate}</p>
             <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
             <RealTimeClock />
           </div>

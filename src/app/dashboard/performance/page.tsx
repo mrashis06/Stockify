@@ -358,6 +358,16 @@ export default function PerformancePage() {
         });
     };
 
+    const headerDate = useMemo(() => {
+        if (!fromDate) return '';
+        const start = formatDate(fromDate, 'dd-MMM-yyyy');
+        if (!toDate || isSameDay(fromDate, toDate)) {
+            return start;
+        }
+        const end = formatDate(toDate, 'dd-MMM-yyyy');
+        return `${start} to ${end}`;
+    }, [fromDate, toDate, formatDate]);
+
     if (inventoryLoading) {
         return null;
     }
@@ -366,8 +376,8 @@ export default function PerformancePage() {
         <div className="flex flex-col gap-8">
             <header>
                 <h1 className="text-2xl font-bold tracking-tight">Product Performance</h1>
-                <div className="flex items-center gap-2">
-                    <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd-MMM-yyyy, EEEE')}</p>
+                 <div className="flex items-center gap-2">
+                    <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{headerDate}</p>
                     <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                     <RealTimeClock />
                 </div>
@@ -579,5 +589,3 @@ export default function PerformancePage() {
         </div>
     );
 }
-
-    
