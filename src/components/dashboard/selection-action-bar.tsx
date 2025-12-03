@@ -32,14 +32,13 @@ const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 100, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           className={cn(
-            "fixed bottom-4 z-50 w-auto max-w-[calc(100%-2rem)]", // Ensure it doesn't overflow on small screens
-            "left-1/2 -translate-x-1/2", // Centering trick
-            "md:left-1/2 md:-translate-x-1/2", // Centered on desktop
-            "sm:w-auto" // Auto width on larger screens
+            "fixed bottom-4 left-4 right-4 z-50 flex items-center justify-center",
+            "sm:left-1/2 sm:right-auto sm:w-auto sm:-translate-x-1/2"
           )}
         >
-          <div className="flex items-center gap-4 rounded-full border bg-background/80 p-2 pl-4 shadow-lg backdrop-blur-md">
+          <div className="flex w-full items-center gap-4 rounded-full border bg-background/80 p-2 pl-4 shadow-lg backdrop-blur-md sm:w-auto">
             <Button
               variant="ghost"
               size="icon"
@@ -49,7 +48,7 @@ const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
               <X className="h-4 w-4" />
               <span className="sr-only">Clear selection</span>
             </Button>
-            <p className="text-sm font-medium">
+            <p className="flex-1 text-sm font-medium sm:flex-initial">
               {count} selected
             </p>
             <Button
