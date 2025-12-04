@@ -123,6 +123,8 @@ export default function BulkTransferToOnBarDialog({ isOpen, onOpenChange, items,
     }
   };
 
+  const hasLiquorItems = fields.some(field => LIQUOR_CATEGORIES.includes(field.category));
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
@@ -207,8 +209,7 @@ export default function BulkTransferToOnBarDialog({ isOpen, onOpenChange, items,
                       <TableHead>Brand</TableHead>
                       <TableHead>Available</TableHead>
                       <TableHead className="w-28">Quantity</TableHead>
-                      <TableHead className="w-32">30ml Price</TableHead>
-                      <TableHead className="w-32">60ml Price</TableHead>
+                      <TableHead className="w-48 text-center" colSpan={hasLiquorItems ? 2 : 1}>Price</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -227,38 +228,38 @@ export default function BulkTransferToOnBarDialog({ isOpen, onOpenChange, items,
                                 )}
                               />
                           </TableCell>
-                          <TableCell>
-                            {isLiquor ? (
-                               <FormField
-                                  control={form.control}
-                                  name={`items.${index}.pegPrice30ml`}
-                                  render={({ field: priceField }) => (
-                                    <FormItem>
-                                       <div className="relative"><IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" /><FormControl><Input type="number" placeholder="e.g., 100" {...priceField} className="h-8 pl-6"/></FormControl></div>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                            ) : (
-                               <span className="text-muted-foreground flex items-center justify-center">₹{field.price}/unit</span>
-                            )}
-                          </TableCell>
-                           <TableCell>
-                            {isLiquor ? (
-                               <FormField
-                                  control={form.control}
-                                  name={`items.${index}.pegPrice60ml`}
-                                  render={({ field: priceField }) => (
-                                    <FormItem>
-                                        <div className="relative"><IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" /><FormControl><Input type="number" placeholder="Auto x2" {...priceField} className="h-8 pl-6"/></FormControl></div>
-                                        <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                            ) : (
-                                <span className="text-muted-foreground text-center">-</span>
-                            )}
-                          </TableCell>
+                          {isLiquor ? (
+                            <>
+                                <TableCell>
+                                    <FormField
+                                    control={form.control}
+                                    name={`items.${index}.pegPrice30ml`}
+                                    render={({ field: priceField }) => (
+                                        <FormItem>
+                                            <div className="relative"><IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" /><FormLabel className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">30ml</FormLabel><FormControl><Input type="number" placeholder="e.g., 100" {...priceField} className="h-8 pl-6"/></FormControl></div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                    />
+                                </TableCell>
+                                <TableCell>
+                                    <FormField
+                                    control={form.control}
+                                    name={`items.${index}.pegPrice60ml`}
+                                    render={({ field: priceField }) => (
+                                        <FormItem>
+                                            <div className="relative"><IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" /><FormLabel className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">60ml</FormLabel><FormControl><Input type="number" placeholder="Auto x2" {...priceField} className="h-8 pl-6"/></FormControl></div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                    />
+                                </TableCell>
+                            </>
+                          ) : (
+                                <TableCell colSpan={hasLiquorItems ? 2 : 1}>
+                                    <span className="text-muted-foreground flex items-center justify-center">₹{field.price}/unit</span>
+                                </TableCell>
+                          )}
                         </TableRow>
                       )
                     })}
@@ -276,5 +277,3 @@ export default function BulkTransferToOnBarDialog({ isOpen, onOpenChange, items,
     </Dialog>
   );
 }
-
-    
