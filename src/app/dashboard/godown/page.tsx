@@ -44,6 +44,7 @@ import {
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
 import TransferToOnBarDialog from '@/components/dashboard/transfer-to-onbar-dialog';
 import BulkTransferDialog from '@/components/dashboard/bulk-transfer-dialog';
+import BulkTransferToOnBarDialog from '@/components/dashboard/bulk-transfer-to-onbar-dialog';
 import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useInventory, InventoryItem, UnprocessedItem } from '@/hooks/use-inventory';
@@ -109,7 +110,8 @@ export default function GodownPage() {
     const [isAddDeliveryOpen, setIsAddDeliveryOpen] = useState(false);
     const [isTransferShopOpen, setIsTransferShopOpen] = useState(false);
     const [isTransferOnBarOpen, setIsTransferOnBarOpen] = useState(false);
-    const [isBulkTransferOpen, setIsBulkTransferOpen] = useState(false);
+    const [isBulkTransferToShopOpen, setIsBulkTransferToShopOpen] = useState(false);
+    const [isBulkTransferToOnBarOpen, setIsBulkTransferToOnBarOpen] = useState(false);
     const [isProcessDeliveryOpen, setIsProcessDeliveryOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [processingItem, setProcessingItem] = useState<any | null>(null);
@@ -273,9 +275,21 @@ export default function GodownPage() {
                 count={selectedRows.size}
                 onClear={() => setSelectedRows(new Set())}
             >
-                <Button onClick={() => setIsBulkTransferOpen(true)} size="sm">
-                    <PackageOpen className="mr-2 h-4 w-4" /> Transfer Selected
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button size="sm">
+                            <PackageOpen className="mr-2 h-4 w-4" /> Transfer Selected
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onSelect={() => setIsBulkTransferToShopOpen(true)}>
+                            <Warehouse className="mr-2 h-4 w-4" /> To Shop
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setIsBulkTransferToOnBarOpen(true)}>
+                            <GlassWater className="mr-2 h-4 w-4" /> To On-Bar
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
                  <Button onClick={() => setIsDeleteDialogOpen(true)} size="sm" variant="destructive">
                     <Trash2 className="mr-2 h-4 w-4" /> Remove Stock
                 </Button>
@@ -308,17 +322,36 @@ export default function GodownPage() {
                 onTransfer={handleTransferToOnBar}
             />
         )}
-        {isBulkTransferOpen && (
+        {isBulkTransferToShopOpen && (
             <BulkTransferDialog
-                isOpen={isBulkTransferOpen}
-                onOpenChange={setIsBulkTransferOpen}
+                isOpen={isBulkTransferToShopOpen}
+                onOpenChange={setIsBulkTransferToShopOpen}
                 items={selectedItemsForBulkTransfer}
                 onBulkTransfer={async (items) => {
                     try {
                         const promises = items.map(item => transferToShop(item.productId, item.quantity, item.price));
                         await Promise.all(promises);
                         toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to shop.`});
-                        setIsBulkTransferOpen(false);
+                        setIsBulkTransferToShopOpen(false);
+                        setSelectedRows(new Set());
+                    } catch(e) {
+                         const errorMessage = (e as Error).message || 'An unexpected error occurred.';
+                         toast({ title: 'Bulk Transfer Failed', description: errorMessage, variant: 'destructive' });
+                    }
+                }}
+            />
+        )}
+         {isBulkTransferToOnBarOpen && (
+            <BulkTransferToOnBarDialog
+                isOpen={isBulkTransferToOnBarOpen}
+                onOpenChange={setIsBulkTransferToOnBarOpen}
+                items={selectedItemsForBulkTransfer}
+                onBulkTransfer={async (items) => {
+                    try {
+                        const promises = items.map(item => transferToOnBar(item.productId, item.quantity, item.pegPrices));
+                        await Promise.all(promises);
+                        toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to On-Bar.`});
+                        setIsBulkTransferToOnBarOpen(false);
                         setSelectedRows(new Set());
                     } catch(e) {
                          const errorMessage = (e as Error).message || 'An unexpected error occurred.';
@@ -660,5 +693,7 @@ export default function GodownPage() {
     </main>
   );
 }
+
+    
 
     
