@@ -24,6 +24,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import type { InventoryItem } from '@/hooks/use-inventory';
 import { useMediaQuery } from 'react-responsive';
+import { Card } from '../ui/card';
 
 type BulkTransferItem = {
   productId: string;
