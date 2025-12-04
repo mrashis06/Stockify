@@ -202,7 +202,8 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         let unprocessed: UnprocessedItem[] = [];
 
         const combineAndSetState = () => {
-             if (initialOpeningStocks.size === 0 && masterInv.length > 0) return; // Don't run until we have opening stocks for the master list
+             // Guard against running before all data is ready
+            if (initialOpeningStocks.size === 0 && masterInv.length > 0) return;
 
             const items: InventoryItem[] = masterInv.map(masterItem => {
                 const openingStock = initialOpeningStocks.get(masterItem.id) ?? 0;
@@ -211,7 +212,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 
                 return {
                     ...masterItem,
-                    prevStock: openingStock, // prevStock now holds the stable opening stock for the day
+                    prevStock: openingStock, // This now holds the STABLE opening stock for the day.
                     added,
                     sales,
                     opening: openingStock + added,
@@ -250,7 +251,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
         const invSub = onSnapshot(query(collection(db, "inventory")), (snapshot) => {
             masterInv = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
-            if (initialOpeningStocks.size > 0) {
+            if (initialOpeningStocks.size > 0) { // If opening stocks are ready, update state
                 combineAndSetState();
             }
         });
@@ -270,14 +271,14 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             combineAndSetState();
         });
         
-        // Fetch opening stock data ONCE.
+        // Fetch opening stock data ONCE when listeners are initialized.
         const fetchInitialData = async () => {
             try {
-                // First get all master inventory items.
+                // Get master inventory to have a full list of products.
                 const inventorySnapshot = await getDocs(collection(db, 'inventory'));
                 masterInv = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
 
-                // Then fetch yesterday's closing data.
+                // Then fetch yesterday's closing data which is today's opening.
                 const yesterdayDoc = await getDoc(doc(db, 'dailyInventory', yesterday));
                 const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
 
@@ -289,7 +290,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 });
                 initialOpeningStocks = openingStocksMap;
 
-                // Now that we have the stable opening stock, combine state.
                 combineAndSetState();
             } catch (error) {
                 console.error("Error fetching initial stock data:", error);
@@ -1168,5 +1168,3 @@ if (typeof window !== 'undefined' && !listenersInitialized) {
 }
 
 export const useInventory = useInventoryStore;
-
-    
