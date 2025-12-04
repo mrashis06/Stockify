@@ -513,7 +513,7 @@ export default function GodownPage() {
                                 return (
                                     <Card key={item.id} className="p-4 space-y-4">
                                         <div className="flex justify-between items-start">
-                                            <div className="flex items-start gap-3">
+                                            <div className="flex items-start gap-3 flex-1">
                                                  <Checkbox
                                                     id={`select-${item.id}`}
                                                     className="mt-1"
@@ -525,37 +525,20 @@ export default function GodownPage() {
                                                     <p className="text-sm text-muted-foreground">{item.size}</p>
                                                 </div>
                                             </div>
-                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="outline" size="sm" disabled={(item.stockInGodown || 0) <= 0}>
-                                                        Actions
-                                                        <ChevronDown className="h-4 w-4 ml-2" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'shop')}>
-                                                        <Archive className="mr-2 h-4 w-4" />
-                                                        Transfer to Shop
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'onbar')} disabled={item.category === 'IML'}>
-                                                         <GlassWater className="mr-2 h-4 w-4" />
-                                                        Transfer to On-Bar
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <div className="text-right">
+                                                <Label htmlFor={`stock-${item.id}`} className="text-xs">Godown Stock</Label>
+                                                <Input
+                                                    id={`stock-${item.id}`}
+                                                    key={item.id + '-' + item.stockInGodown}
+                                                    type="number"
+                                                    className="h-9 w-24 text-right mt-1"
+                                                    defaultValue={item.stockInGodown || 0}
+                                                    onBlur={(e) => handleGodownStockChange(item.id, e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                />
+                                            </div>
                                         </div>
-                                         <div className="space-y-1">
-                                            <Label htmlFor={`stock-${item.id}`} className="text-xs">Godown Stock</Label>
-                                            <Input
-                                                id={`stock-${item.id}`}
-                                                key={item.id + '-' + item.stockInGodown}
-                                                type="number"
-                                                className="h-9"
-                                                defaultValue={item.stockInGodown || 0}
-                                                onBlur={(e) => handleGodownStockChange(item.id, e.target.value)}
-                                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                                            />
-                                        </div>
+                                         
                                         <button onClick={() => toggleRowExpansion(item.id)} className="w-full text-sm text-muted-foreground flex items-center justify-center pt-2">
                                              {isExpanded ? 'Hide' : 'Show'} Details {isExpanded ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
                                         </button>
@@ -595,7 +578,6 @@ export default function GodownPage() {
                                 <TableHead className="font-bold text-foreground">Brand</TableHead>
                                 <TableHead className="font-bold text-foreground">Size</TableHead>
                                 <TableHead className="font-bold text-foreground">Godown Stock</TableHead>
-                                <TableHead className="text-right font-bold text-foreground w-32">Actions</TableHead>
                             </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -632,30 +614,10 @@ export default function GodownPage() {
                                                     onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                                                 />
                                             </TableCell>
-                                            <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="outline" size="sm" disabled={(item.stockInGodown || 0) <= 0}>
-                                                            Actions
-                                                            <ChevronDown className="h-4 w-4 ml-2" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent>
-                                                        <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'shop')}>
-                                                            <Archive className="mr-2 h-4 w-4" />
-                                                            Transfer to Shop
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => handleOpenTransferDialog(item, 'onbar')} disabled={item.category === 'IML'}>
-                                                             <GlassWater className="mr-2 h-4 w-4" />
-                                                            Transfer to On-Bar
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
                                         </TableRow>
                                         {expandedRow === item.id && (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="p-0">
+                                                <TableCell colSpan={4} className="p-0">
                                                     <div className="bg-muted/50 p-4 grid grid-cols-2 gap-4">
                                                         <div>
                                                             <p className="font-semibold text-sm">Date Added</p>
@@ -679,7 +641,7 @@ export default function GodownPage() {
                                 ))
                             ) : (
                                  <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
+                                    <TableCell colSpan={4} className="h-24 text-center">
                                         No stock found in Godown. Use 'Scan Bill' to add new deliveries.
                                     </TableCell>
                                 </TableRow>
