@@ -33,7 +33,7 @@ type BulkTransferItem = {
   stockInGodown: number;
   isNewProduct: boolean;
   price?: number;
-  quantity: number;
+  quantity: number | '';
 };
 
 const itemSchema = z.object({
@@ -88,7 +88,7 @@ export default function BulkTransferDialog({ isOpen, onOpenChange, items, onBulk
         stockInGodown: item.stockInGodown,
         isNewProduct: item.price === 0,
         price: item.price > 0 ? item.price : undefined,
-        quantity: 0,
+        quantity: '',
       }));
       replace(formItems);
     }
@@ -156,7 +156,7 @@ export default function BulkTransferDialog({ isOpen, onOpenChange, items, onBulk
                           render={({ field: qtyField }) => (
                             <FormItem className={!field.isNewProduct ? "col-span-2" : ""}>
                               <FormLabel>Quantity</FormLabel>
-                              <FormControl><Input type="number" placeholder="Transfer Qty" {...qtyField} className="h-9"/></FormControl>
+                              <FormControl><Input type="number" placeholder="0" {...qtyField} className="h-9"/></FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
