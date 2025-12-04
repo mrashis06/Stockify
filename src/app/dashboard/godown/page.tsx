@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater, ChevronDown, ChevronUp, Warehouse } from 'lucide-react';
+import { Plus, Search, Trash2, Loader2, PackagePlus, ArrowRightLeft, FileScan, Unplug, MoreVertical, Archive, GlassWater, ChevronDown, ChevronUp, Warehouse, PackageOpen } from 'lucide-react';
 import Link from 'next/link';
 import { useMediaQuery } from 'react-responsive';
 
@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import TransferToShopDialog from '@/components/dashboard/transfer-to-shop-dialog';
 import TransferToOnBarDialog from '@/components/dashboard/transfer-to-onbar-dialog';
+import BulkTransferDialog from '@/components/dashboard/bulk-transfer-dialog';
 import ScanBillDialog from '@/components/dashboard/scan-bill-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useInventory, InventoryItem, UnprocessedItem } from '@/hooks/use-inventory';
@@ -108,6 +109,7 @@ export default function GodownPage() {
     const [isAddDeliveryOpen, setIsAddDeliveryOpen] = useState(false);
     const [isTransferShopOpen, setIsTransferShopOpen] = useState(false);
     const [isTransferOnBarOpen, setIsTransferOnBarOpen] = useState(false);
+    const [isBulkTransferOpen, setIsBulkTransferOpen] = useState(false);
     const [isProcessDeliveryOpen, setIsProcessDeliveryOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [processingItem, setProcessingItem] = useState<any | null>(null);
@@ -255,6 +257,10 @@ export default function GodownPage() {
         const cats = new Set(inventory.filter(i => (i.stockInGodown || 0) > 0).map(i => i.category).filter(Boolean));
         return ['All Categories', ...Array.from(cats).sort()];
     }, [inventory]);
+
+    const selectedItemsForBulkTransfer = useMemo(() => {
+        return inventory.filter(item => selectedRows.has(item.id));
+    }, [inventory, selectedRows]);
     
   if (loading) {
       return null;
@@ -262,20 +268,30 @@ export default function GodownPage() {
 
   return (
     <main className="flex-1 p-4 md:p-8">
-        <SelectionActionBar
-            count={selectedRows.size}
-            onClear={() => setSelectedRows(new Set())}
-            onAction={() => setIsDeleteDialogOpen(true)}
-            actionLabel="Remove"
-            actionIcon={<Trash2 />}
-        />
-        <SelectionActionBar
-            count={selectedUnprocessedRows.size}
-            onClear={() => setSelectedUnprocessedRows(new Set())}
-            onAction={() => setIsDeleteUnprocessedOpen(true)}
-            actionLabel="Delete"
-            actionIcon={<Trash2 />}
-        />
+        {selectedRows.size > 0 && (
+            <SelectionActionBar
+                count={selectedRows.size}
+                onClear={() => setSelectedRows(new Set())}
+            >
+                <Button onClick={() => setIsBulkTransferOpen(true)} size="sm">
+                    <PackageOpen className="mr-2 h-4 w-4" /> Transfer Selected
+                </Button>
+                 <Button onClick={() => setIsDeleteDialogOpen(true)} size="sm" variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Remove Stock
+                </Button>
+            </SelectionActionBar>
+        )}
+        {selectedUnprocessedRows.size > 0 && (
+             <SelectionActionBar
+                count={selectedUnprocessedRows.size}
+                onClear={() => setSelectedUnprocessedRows(new Set())}
+            >
+                <Button onClick={() => setIsDeleteUnprocessedOpen(true)} size="sm" variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete Selected
+                </Button>
+            </SelectionActionBar>
+        )}
+        
         {selectedItem && (
             <TransferToShopDialog
                 isOpen={isTransferShopOpen}
@@ -290,6 +306,25 @@ export default function GodownPage() {
                 onOpenChange={setIsTransferOnBarOpen}
                 item={selectedItem}
                 onTransfer={handleTransferToOnBar}
+            />
+        )}
+        {isBulkTransferOpen && (
+            <BulkTransferDialog
+                isOpen={isBulkTransferOpen}
+                onOpenChange={setIsBulkTransferOpen}
+                items={selectedItemsForBulkTransfer}
+                onBulkTransfer={async (items) => {
+                    try {
+                        const promises = items.map(item => transferToShop(item.productId, item.quantity, item.price));
+                        await Promise.all(promises);
+                        toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to shop.`});
+                        setIsBulkTransferOpen(false);
+                        setSelectedRows(new Set());
+                    } catch(e) {
+                         const errorMessage = (e as Error).message || 'An unexpected error occurred.';
+                         toast({ title: 'Bulk Transfer Failed', description: errorMessage, variant: 'destructive' });
+                    }
+                }}
             />
         )}
         {processingItem && (

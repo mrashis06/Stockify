@@ -10,17 +10,13 @@ import { cn } from '@/lib/utils';
 type SelectionActionBarProps = {
   count: number;
   onClear: () => void;
-  onAction: () => void;
-  actionLabel?: string;
-  actionIcon?: React.ReactNode;
+  children: React.ReactNode;
 };
 
 const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
   count,
   onClear,
-  onAction,
-  actionLabel = 'Delete',
-  actionIcon,
+  children
 }) => {
   const hasSelection = count > 0;
 
@@ -38,7 +34,7 @@ const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
             "sm:left-1/2 sm:right-auto sm:w-auto sm:-translate-x-1/2"
           )}
         >
-          <div className="flex w-full items-center gap-4 rounded-full border bg-background/80 p-2 pl-4 shadow-lg backdrop-blur-md sm:w-auto">
+          <div className="flex w-full items-center gap-2 rounded-full border bg-background/80 p-2 pl-4 shadow-lg backdrop-blur-md sm:w-auto">
             <Button
               variant="ghost"
               size="icon"
@@ -51,15 +47,9 @@ const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
             <p className="flex-1 text-sm font-medium sm:flex-initial">
               {count} selected
             </p>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={onAction}
-              className="rounded-full"
-            >
-              {actionIcon}
-              <span className="ml-2">{actionLabel}</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              {children}
+            </div>
           </div>
         </motion.div>
       )}
