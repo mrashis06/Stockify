@@ -181,7 +181,7 @@ export default function GodownPage() {
             // This is a safe-delete, only clearing godown stock
             const promises = Array.from(selectedRows).map(id => updateBrand(id, { stockInGodown: 0 }));
             await Promise.all(promises);
-            toast({ title: 'Stock Removed', description: `Stock for ${numSelected} selected product(s) set to zero in Godown.` });
+            toast({ title: 'Stock Cleared', description: `Godown stock for ${numSelected} selected product(s) has been cleared.` });
             setSelectedRows(new Set());
         } catch (error) {
             console.error('Error removing products from Godown:', error);
@@ -331,7 +331,7 @@ export default function GodownPage() {
                     try {
                         const promises = items.map(item => transferToShop(item.productId, item.quantity, item.price));
                         await Promise.all(promises);
-                        toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to shop.`});
+                        toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to Shop.`});
                         setIsBulkTransferToShopOpen(false);
                         setSelectedRows(new Set());
                     } catch(e) {
@@ -382,13 +382,13 @@ export default function GodownPage() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will remove the selected product(s) from your Godown by setting their stock to zero. This action does not delete the product from your main inventory.
+                        This will set the godown stock for the selected product(s) to zero. This action does not delete the product from your main inventory list.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleRemoveSelected} className="bg-destructive hover:bg-destructive/90">
-                        Remove Stock
+                        Clear Stock
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -505,6 +505,7 @@ export default function GodownPage() {
                     </div>
                 </div>
                 
+                <div className={selectedRows.size > 0 ? 'pb-24 md:pb-0' : ''}>
                 {isMobile ? (
                     <div className="space-y-3">
                         {filteredInventory.length > 0 ? (
@@ -650,6 +651,7 @@ export default function GodownPage() {
                         </Table>
                     </div>
                 )}
+                </div>
             </CardContent>
         </Card>
     </main>
@@ -659,3 +661,4 @@ export default function GodownPage() {
     
 
     
+
