@@ -32,7 +32,7 @@ const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           className="fixed bottom-4 left-4 right-4 z-50 flex items-center justify-center"
         >
-          <div className="w-full max-w-sm sm:max-w-none rounded-2xl border bg-background/80 p-3 shadow-lg backdrop-blur-md">
+          <div className="w-full max-w-sm sm:max-w-md rounded-2xl border bg-background/80 p-3 shadow-lg backdrop-blur-md">
             <div className="flex w-full flex-col gap-3">
               <div className="flex items-center gap-2 px-1">
                  <Button

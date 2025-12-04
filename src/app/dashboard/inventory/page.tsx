@@ -309,10 +309,12 @@ export default function InventoryPage() {
         <SelectionActionBar
             count={selectedRows.size}
             onClear={() => setSelectedRows(new Set())}
-            onAction={() => setIsDeleteDialogOpen(true)}
-            actionLabel="Remove"
-            actionIcon={<Trash2 />}
-        />
+        >
+            <Button onClick={() => setIsDeleteDialogOpen(true)} size="sm" variant="destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Remove ({selectedRows.size})
+            </Button>
+        </SelectionActionBar>
         <AddBrandDialog
             isOpen={isAddBrandOpen}
             onOpenChange={setIsAddBrandOpen}
@@ -757,6 +759,3 @@ export default function InventoryPage() {
     </main>
   );
 }
-
-    
-    
