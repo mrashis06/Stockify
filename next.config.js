@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const withPWA = require('@ducanh2912/next-pwa');
+const withPWA = require('@ducanh2912/next-pwa').default;
 
 const nextConfig = {
   /* config options here */
