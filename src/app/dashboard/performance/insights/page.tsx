@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { eachDayOfInterval, startOfDay, subDays, format, isSameDay, parseISO, isValid, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachWeek, eachMonth, subWeeks, subMonths } from 'date-fns';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts"
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Cell } from "recharts"
 import { useMediaQuery } from 'react-responsive';
 
 import { usePageLoading } from '@/hooks/use-loading';
@@ -13,7 +13,7 @@ import { useDateFormat } from '@/hooks/use-date-format';
 import { useInventory } from '@/hooks/use-inventory';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IndianRupee, Combine, Package, GlassWater, TrendingUp, DollarSign, BarChart2 } from 'lucide-react';
+import { IndianRupee, Combine, Package, GlassWater, TrendingUp, BarChart2 } from 'lucide-react';
 import { ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { toast } from '@/hooks/use-toast';
 
@@ -69,6 +69,7 @@ export default function InsightsPage() {
     const [productFilter, setProductFilter] = useState('all');
     const [reportType, setReportType] = useState<ReportType>('both');
     const [chartData, setChartData] = useState<ChartData[]>([]);
+    const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
     usePageLoading(loading || inventoryLoading);
 
@@ -249,7 +250,19 @@ export default function InsightsPage() {
                      {loading ? (<div className="h-[400px] flex items-center justify-center text-muted-foreground">Loading chart data...</div>) :
                       chartData.length > 0 ? (
                         <ChartContainer config={chartConfig} className="min-h-[400px] w-full">
-                          <BarChart data={chartData} margin={{ top: 20, right: isMobile ? 0 : 20, bottom: 20, left: isMobile ? -20 : 20 }}>
+                          <BarChart 
+                            data={chartData} 
+                            margin={{ top: 20, right: isMobile ? 0 : 20, bottom: 20, left: isMobile ? -20 : 20 }}
+                            onClick={(state) => {
+                                if (isMobile) {
+                                    if (state && state.activeTooltipIndex !== undefined) {
+                                        setActiveIndex(state.activeTooltipIndex === activeIndex ? null : state.activeTooltipIndex);
+                                    } else {
+                                        setActiveIndex(null);
+                                    }
+                                }
+                            }}
+                          >
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis 
                                 dataKey="date" 
@@ -266,6 +279,7 @@ export default function InsightsPage() {
                             />
                             <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${Number(value)/1000}k`} />
                             <Tooltip
+                                active={isMobile ? activeIndex !== null : undefined}
                                 content={<ChartTooltipContent
                                     formatter={(value, name) => (
                                         <div className="flex min-w-[120px] items-center gap-2">
@@ -280,11 +294,23 @@ export default function InsightsPage() {
                                         </div>
                                     )}
                                 />}
-                                cursor={false}
+                                cursor={isMobile ? false : true}
                             />
                             <Legend />
-                             {(reportType === 'both' || reportType === 'offcounter') && <Bar dataKey="offcounter" fill="var(--color-offcounter)" radius={isMobile ? 2 : 4} name="Off-Counter" />}
-                            {(reportType === 'both' || reportType === 'onbar') && <Bar dataKey="onbar" fill="var(--color-onbar)" radius={isMobile ? 2 : 4} name="On-Bar" />}
+                             {(reportType === 'both' || reportType === 'offcounter') && 
+                                <Bar dataKey="offcounter" fill="var(--color-offcounter)" radius={isMobile ? 2 : 4} name="Off-Counter">
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} opacity={isMobile ? (activeIndex === index ? 1 : 0.5) : 1} />
+                                    ))}
+                                </Bar>
+                             }
+                            {(reportType === 'both' || reportType === 'onbar') && 
+                                <Bar dataKey="onbar" fill="var(--color-onbar)" radius={isMobile ? 2 : 4} name="On-Bar">
+                                     {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} opacity={isMobile ? (activeIndex === index ? 1 : 0.5) : 1} />
+                                    ))}
+                                </Bar>
+                            }
                           </BarChart>
                         </ChartContainer>
                     ) : (
@@ -301,3 +327,5 @@ export default function InsightsPage() {
         </div>
     );
 }
+
+    
