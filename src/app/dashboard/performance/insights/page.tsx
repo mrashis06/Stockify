@@ -24,10 +24,18 @@ const RealTimeClock = () => {
     const timerId = setInterval(() => {
       setTime(new Date());
     }, 1000);
+
     return () => clearInterval(timerId);
   }, []);
 
-  const formatTime = (date: Date) => date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
 
   return (
     <div className="font-mono font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">
@@ -173,17 +181,6 @@ export default function InsightsPage() {
         };
     }, [chartData, reportType, trendBy]);
     
-    const headerDate = useMemo(() => {
-        const now = new Date();
-        let fromDate;
-        switch(trendBy) {
-            case 'daily': fromDate = subDays(now, 6); break;
-            case 'weekly': fromDate = subWeeks(now, 7); break;
-            case 'monthly': fromDate = subMonths(now, 5); break;
-        }
-        return `${format(fromDate, 'dd MMM')} - ${format(now, 'dd MMM yyyy')}`;
-    }, [trendBy]);
-    
      const allCategories = useMemo(() => {
         const cats = new Set(masterInventory.map(i => i.category).filter(Boolean));
         return ['all', ...Array.from(cats).sort()];
@@ -193,8 +190,8 @@ export default function InsightsPage() {
         <div className="space-y-8 max-w-7xl mx-auto w-full">
              <header>
                 <h1 className="text-2xl font-bold tracking-tight">Sales Insights</h1>
-                 <div className="flex items-center gap-2">
-                    <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{headerDate}</p>
+                <div className="flex items-center gap-2">
+                    <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd-MMM-yyyy, EEEE')}</p>
                     <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                     <RealTimeClock />
                 </div>
@@ -204,7 +201,7 @@ export default function InsightsPage() {
                 <CardHeader>
                     <CardTitle>Filters</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-6 md:grid-cols-3">
+                <CardContent className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
                      <div className="space-y-2">
                         <label className="text-sm font-medium">Products</label>
                         <Select value={productFilter} onValueChange={setProductFilter}>
@@ -258,9 +255,9 @@ export default function InsightsPage() {
                                 content={<ChartTooltipContent
                                     formatter={(value, name) => (
                                         <div className="flex min-w-[120px] items-center gap-2">
-                                            <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{backgroundColor: name === 'offcounter' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-2))'}} />
+                                            <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{backgroundColor: name === 'Off-Counter' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-2))'}} />
                                             <div className="flex flex-1 justify-between">
-                                                <p className="text-muted-foreground">{name === 'offcounter' ? 'Off-Counter' : 'On-Bar'}</p>
+                                                <p className="text-muted-foreground">{name}</p>
                                                 <p className="font-bold flex items-center gap-1">
                                                     <IndianRupee className="h-3 w-3" />
                                                     {Number(value).toLocaleString('en-IN')}
@@ -290,5 +287,3 @@ export default function InsightsPage() {
         </div>
     );
 }
-
-    
