@@ -373,7 +373,7 @@ export default function PerformancePage() {
     }
 
     return (
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-8 max-w-7xl mx-auto w-full">
             <header>
                 <h1 className="text-2xl font-bold tracking-tight">Product Performance</h1>
                  <div className="flex items-center gap-2">

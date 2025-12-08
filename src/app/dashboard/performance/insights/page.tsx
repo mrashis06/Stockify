@@ -190,7 +190,7 @@ export default function InsightsPage() {
     }, [masterInventory]);
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 max-w-7xl mx-auto w-full">
              <header>
                 <h1 className="text-2xl font-bold tracking-tight">Sales Insights</h1>
                  <div className="flex items-center gap-2">
@@ -243,15 +243,23 @@ export default function InsightsPage() {
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                             <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${Number(value)/1000}k`} />
-                            <Tooltip content={<ChartTooltipContent indicator="dot" formatter={(value, name) => (
-                                <div className="flex flex-col gap-0.5">
-                                    <div className="font-semibold">{name === 'offcounter' ? 'Off-Counter' : 'On-Bar'}</div>
-                                    <div className="flex items-center gap-1.5">
-                                        <IndianRupee className="h-3 w-3 text-muted-foreground"/>
-                                        <span className="font-mono">{Number(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
-                                    </div>
-                                </div>
-                            )} />} cursor={false} />
+                            <Tooltip
+                                content={<ChartTooltipContent
+                                    formatter={(value, name) => (
+                                        <div className="flex min-w-[120px] items-center gap-2">
+                                            <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{backgroundColor: name === 'offcounter' ? 'hsl(var(--chart-1))' : 'hsl(var(--chart-2))'}} />
+                                            <div className="flex flex-1 justify-between">
+                                                <p className="text-muted-foreground">{name === 'offcounter' ? 'Off-Counter' : 'On-Bar'}</p>
+                                                <p className="font-bold flex items-center gap-1">
+                                                    <IndianRupee className="h-3 w-3" />
+                                                    {Number(value).toLocaleString('en-IN')}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                />}
+                                cursor={false}
+                            />
                             <Legend />
                             <Bar dataKey="offcounter" fill="var(--color-offcounter)" radius={isMobile ? 2 : 4} name="Off-Counter" />
                             <Bar dataKey="onbar" fill="var(--color-onbar)" radius={isMobile ? 2 : 4} name="On-Bar" />
