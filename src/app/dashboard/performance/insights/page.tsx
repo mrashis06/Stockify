@@ -204,7 +204,7 @@ export default function InsightsPage() {
                 <CardHeader>
                     <CardTitle>Filters</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-6 md:grid-cols-2">
+                <CardContent className="grid gap-6 md:grid-cols-3">
                      <div className="space-y-2">
                         <label className="text-sm font-medium">Products</label>
                         <Select value={productFilter} onValueChange={setProductFilter}>
@@ -227,6 +227,17 @@ export default function InsightsPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Report Type</label>
+                        <Select value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
+                            <SelectTrigger><SelectValue placeholder="Select report type..." /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="both"><div className="flex items-center gap-2"><Combine className="h-4 w-4" /> Both</div></SelectItem>
+                                <SelectItem value="offcounter"><div className="flex items-center gap-2"><Package className="h-4 w-4" /> Off-Counter</div></SelectItem>
+                                <SelectItem value="onbar"><div className="flex items-center gap-2"><GlassWater className="h-4 w-4" /> On-Bar</div></SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -238,7 +249,7 @@ export default function InsightsPage() {
                 <CardContent>
                      {loading ? (<div className="h-[400px] flex items-center justify-center text-muted-foreground">Loading chart data...</div>) :
                       chartData.length > 0 ? (
-                        <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
+                        <ChartContainer config={chartConfig} className="min-h-[400px] w-full">
                           <BarChart data={chartData} margin={{ top: 20, right: isMobile ? 0 : 20, bottom: 20, left: isMobile ? -20 : 20 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
@@ -261,8 +272,8 @@ export default function InsightsPage() {
                                 cursor={false}
                             />
                             <Legend />
-                            <Bar dataKey="offcounter" fill="var(--color-offcounter)" radius={isMobile ? 2 : 4} name="Off-Counter" />
-                            <Bar dataKey="onbar" fill="var(--color-onbar)" radius={isMobile ? 2 : 4} name="On-Bar" />
+                             {(reportType === 'both' || reportType === 'offcounter') && <Bar dataKey="offcounter" fill="var(--color-offcounter)" radius={isMobile ? 2 : 4} name="Off-Counter" />}
+                            {(reportType === 'both' || reportType === 'onbar') && <Bar dataKey="onbar" fill="var(--color-onbar)" radius={isMobile ? 2 : 4} name="On-Bar" />}
                           </BarChart>
                         </ChartContainer>
                     ) : (
@@ -279,3 +290,5 @@ export default function InsightsPage() {
         </div>
     );
 }
+
+    
