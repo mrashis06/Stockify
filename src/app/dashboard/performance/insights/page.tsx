@@ -127,8 +127,10 @@ export default function InsightsPage() {
                 }
                 
                 let key: string;
-                 if (trend === 'weekly') {
-                    key = format(startOfWeek(day, { weekStartsOn: 1 }), aggregationFormat);
+                if (trend === 'weekly') {
+                    const weekStart = startOfWeek(day, { weekStartsOn: 1 });
+                    const weekEnd = endOfWeek(day, { weekStartsOn: 1 });
+                    key = `${format(weekStart, 'dd MMM')} - ${format(weekEnd, 'dd MMM')}`;
                 } else if (trend === 'monthly') {
                     key = format(startOfMonth(day), aggregationFormat);
                 } else {
