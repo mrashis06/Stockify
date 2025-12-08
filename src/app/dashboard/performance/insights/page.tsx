@@ -20,7 +20,7 @@ import { toast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { IndianRupee, Combine, Package, GlassWater, Calendar as CalendarIcon, TrendingUp, DollarSign, BarChart2 } from 'lucide-react';
-import { ChartTooltipContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
 
 const RealTimeClock = () => {
@@ -197,7 +197,7 @@ export default function InsightsPage() {
                 <CardContent>
                      {loading ? (<div className="h-[400px] flex items-center justify-center text-muted-foreground">Loading chart data...</div>) :
                       chartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={400}>
+                        <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
                           <BarChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
@@ -207,7 +207,7 @@ export default function InsightsPage() {
                             {reportType !== 'onbar' && <Bar dataKey="offcounter" fill="var(--color-offcounter)" radius={isMobile ? 2 : 4} name="Off-Counter" />}
                             {reportType !== 'offcounter' && <Bar dataKey="onbar" fill="var(--color-onbar)" radius={isMobile ? 2 : 4} name="On-Bar" />}
                           </BarChart>
-                        </ResponsiveContainer>
+                        </ChartContainer>
                     ) : (
                         <div className="h-[400px] flex items-center justify-center text-muted-foreground">No sales data for the selected period.</div>
                     )}
@@ -223,3 +223,4 @@ export default function InsightsPage() {
     );
 }
 
+    
