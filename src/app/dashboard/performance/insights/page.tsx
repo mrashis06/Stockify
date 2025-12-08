@@ -84,7 +84,7 @@ export default function InsightsPage() {
         switch (trend) {
             case 'weekly':
                 interval = { start: subWeeks(now, 7), end: now };
-                aggregationFormat = 'dd MMM';
+                aggregationFormat = 'dd MMM'; // Used for tooltip formatting
                 break;
             case 'monthly':
                 interval = { start: subMonths(now, 5), end: now };
@@ -251,7 +251,19 @@ export default function InsightsPage() {
                         <ChartContainer config={chartConfig} className="min-h-[400px] w-full">
                           <BarChart data={chartData} margin={{ top: 20, right: isMobile ? 0 : 20, bottom: 20, left: isMobile ? -20 : 20 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                            <XAxis 
+                                dataKey="date" 
+                                stroke="#888888" 
+                                fontSize={12} 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tickFormatter={(value) => {
+                                    if (isMobile && trendBy === 'weekly') {
+                                        return value.split(' - ')[0]; // Show only start date on mobile for weekly
+                                    }
+                                    return value;
+                                }}
+                            />
                             <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${Number(value)/1000}k`} />
                             <Tooltip
                                 content={<ChartTooltipContent
