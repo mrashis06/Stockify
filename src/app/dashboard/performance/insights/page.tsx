@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { eachDayOfInterval, startOfDay, subDays, format, isSameDay, parseISO, isValid } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts"
 import { useMediaQuery } from 'react-responsive';
 
 import { usePageLoading } from '@/hooks/use-loading';
@@ -20,8 +20,7 @@ import { toast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { IndianRupee, Combine, Package, GlassWater, Calendar as CalendarIcon, TrendingUp, DollarSign, BarChart2 } from 'lucide-react';
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
+import { ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -130,9 +129,8 @@ export default function InsightsPage() {
         setToDate(newTo);
     };
     
-    const { totalSales, avgDailySales, totalUnits } = useMemo(() => {
+    const { totalSales, avgDailySales } = useMemo(() => {
         let total = 0;
-        let units = 0;
         chartData.forEach(d => {
             if (reportType === 'both') total += d.total;
             else if (reportType === 'offcounter') total += d.offcounter;
@@ -141,7 +139,6 @@ export default function InsightsPage() {
         return {
             totalSales: total,
             avgDailySales: chartData.length > 0 ? total / chartData.length : 0,
-            totalUnits: units,
         };
     }, [chartData, reportType]);
     
@@ -176,9 +173,9 @@ export default function InsightsPage() {
                             <div className="flex items-center space-x-2"><RadioGroupItem value="30d" id="30d" /><Label htmlFor="30d">Last 30 days</Label></div>
                         </RadioGroup>
                          <div className="flex items-center gap-2">
-                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : 'From'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar selected={fromDate} onSelect={(d) => {setFromDate(d); setDateRangeOption('custom')}} initialFocus /></PopoverContent></Popover>
+                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-[140px] sm:w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{fromDate ? formatDate(fromDate) : 'From'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar selected={fromDate} onSelect={(d) => {setFromDate(d); setDateRangeOption('custom')}} initialFocus /></PopoverContent></Popover>
                             <span className="text-muted-foreground">-</span>
-                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : 'To'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar selected={toDate} onSelect={(d) => {setToDate(d); setDateRangeOption('custom')}} initialFocus /></PopoverContent></Popover>
+                            <Popover><PopoverTrigger asChild><Button variant="outline" className="w-[140px] sm:w-[180px] justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{toDate ? formatDate(toDate) : 'To'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar selected={toDate} onSelect={(d) => {setToDate(d); setDateRangeOption('custom')}} initialFocus /></PopoverContent></Popover>
                         </div>
                     </div>
                      <RadioGroup value={reportType} onValueChange={(v) => setReportType(v as ReportType)} className="flex flex-wrap gap-4">
@@ -198,7 +195,7 @@ export default function InsightsPage() {
                      {loading ? (<div className="h-[400px] flex items-center justify-center text-muted-foreground">Loading chart data...</div>) :
                       chartData.length > 0 ? (
                         <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                          <BarChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                          <BarChart data={chartData} margin={{ top: 20, right: isMobile ? 0 : 20, bottom: 20, left: isMobile ? -20 : 20 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                             <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${Number(value)/1000}k`} />
@@ -222,5 +219,3 @@ export default function InsightsPage() {
         </div>
     );
 }
-
-    
