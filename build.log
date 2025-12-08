@@ -1,0 +1,57 @@
+
+> nextn@0.1.0 build
+> NODE_ENV=production next build
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   ▲ Next.js 15.3.6
+
+   Creating an optimized production build ...
+ ✓ (pwa) Compiling for server...
+ ✓ (pwa) Compiling for server...
+ ✓ (pwa) Compiling for client (static)...
+ ○ (pwa) Service worker: /vercel/sandbox/primary/public/sw.js
+ ○ (pwa)   URL: /sw.js
+ ○ (pwa)   Scope: /
+ ✓ Compiled successfully in 38.0s
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+   Generating static pages (0/19) ...
+   Generating static pages (4/19) 
+   Generating static pages (9/19) 
+   Generating static pages (14/19) 
+ ✓ Generating static pages (19/19)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    13.7 kB         337 kB
+├ ○ /_not-found                            990 B         105 kB
+├ ○ /dashboard                           11.4 kB         304 kB
+├ ○ /dashboard/daily-sale                11.2 kB         426 kB
+├ ○ /dashboard/godown                    14.6 kB         523 kB
+├ ○ /dashboard/inventory                 9.95 kB         387 kB
+├ ○ /dashboard/map-barcode               10.5 kB         405 kB
+├ ○ /dashboard/onbar                     10.8 kB         321 kB
+├ ○ /dashboard/performance               7.25 kB         456 kB
+├ ○ /dashboard/reports                   10.1 kB         452 kB
+├ ○ /dashboard/sales                     8.13 kB         391 kB
+├ ○ /dashboard/settings                    14 kB         366 kB
+├ ○ /dashboard/staff                     6.33 kB         306 kB
+├ ○ /forgot-password                     3.74 kB         259 kB
+├ ○ /join-shop                           5.15 kB         257 kB
+├ ○ /login                               9.13 kB         269 kB
+└ ○ /signup                              17.2 kB         364 kB
++ First Load JS shared by all             104 kB
+  ├ chunks/2721-0b7ce18a7e264450.js      48.3 kB
+  ├ chunks/4bd1b696-9b07a3616c814f72.js  53.2 kB
+  └ other shared chunks (total)          2.08 kB
+
+
+○  (Static)  prerendered as static content
+
