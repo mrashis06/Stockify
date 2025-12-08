@@ -321,11 +321,10 @@ export default function InsightsPage() {
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Sales</CardTitle><IndianRupee className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold flex items-center"><IndianRupee className="h-6 w-6 mr-1"/>{totalSales.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div><p className="text-xs text-muted-foreground">Total revenue in the selected period.</p></CardContent></Card>
-                <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Average Sales</CardTitle><TrendingUp className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold flex items-center"><IndianRupee className="h-6 w-6 mr-1"/>{avgDailySales.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div><p className="text-xs text-muted-foreground">Average revenue per {trendBy.replace('ly', '')}.</p></CardContent></Card>
+                <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Average Sales</CardTitle><TrendingUp className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold flex items-center"><IndianRupee className="h-6 w-6 mr-1"/>{avgDailySales.toLocaleString('en-IN', {maximumFractionDigits: 0})}</div><p className="text-xs text-muted-foreground">Average revenue per {trendBy === 'daily' ? 'day' : trendBy.slice(0, -2)}.</p></CardContent></Card>
                 <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Top Performing Day</CardTitle><BarChart2 className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{chartData.length > 0 ? [...chartData].sort((a,b) => b.total - a.total)[0].date : 'N/A'}</div><p className="text-xs text-muted-foreground">Highest sales day in the period.</p></CardContent></Card>
             </div>
         </div>
     );
 }
 
-    
