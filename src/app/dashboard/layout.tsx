@@ -4,7 +4,7 @@
 
 import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart, TrendingUp, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Bell, Package, User, LayoutDashboard, FileText, Warehouse, Home, LogOut, ArrowLeft, Archive, GlassWater, Menu, Users, HelpCircle, Circle, Barcode, ShoppingCart, TrendingUp, MoreHorizontal, Trash2, LineChart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
@@ -153,6 +153,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       { href: "/dashboard/map-barcode", pageName: 'Map Barcodes', icon: Barcode, label: "Map Barcodes" },
       { href: "/dashboard/staff", pageName: 'Staff', icon: Users, label: "Staff" },
       { href: "/dashboard/performance", pageName: 'Performance', icon: TrendingUp, label: "Performance" },
+      { href: "/dashboard/performance/insights", pageName: 'Insights', icon: LineChart, label: "Insights" },
   ];
 
   const staffNavItems = [
