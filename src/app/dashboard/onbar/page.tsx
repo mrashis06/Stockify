@@ -22,6 +22,7 @@ import AddOnBarItemDialog from '@/components/dashboard/add-onbar-item-dialog';
 import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
+import { cn } from '@/lib/utils';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -63,6 +64,8 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         addOnBarItem,
         totalOnBarSales,
         endOfDayOnBar,
+        onBarNeedsEOD,
+        resetOnBarEOD,
     } = useInventory();
     
     const { toast } = useToast();
@@ -139,6 +142,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         setIsEndOfDayDialogOpen(false);
         try {
             await endOfDayOnBar();
+            resetOnBarEOD(); // Reset the glow effect
             toast({
                 title: 'On-Bar EOD Processed',
                 description: "Today's closing volumes have been set as tomorrow's opening volumes for all open bottles."
@@ -206,7 +210,11 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
                         <Plus className="mr-2 h-4 w-4" /> Open a Bottle
                     </Button>
-                    <Button onClick={() => setIsEndOfDayDialogOpen(true)} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={saving}>
+                    <Button 
+                        onClick={() => setIsEndOfDayDialogOpen(true)} 
+                        variant="outline" 
+                        className={cn("bg-blue-600 hover:bg-blue-700 text-white", onBarNeedsEOD && "animate-subtle-glow")} 
+                        disabled={saving}>
                         <LogOut className="mr-2 h-4 w-4" /> End of Day
                     </Button>
                 </div>

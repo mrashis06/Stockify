@@ -92,6 +92,8 @@ type InventoryState = {
   totalOnBarSales: number;
   loading: boolean;
   saving: boolean;
+  offCounterNeedsEOD: boolean;
+  onBarNeedsEOD: boolean;
   
   // Actions
   initListeners: () => () => void;
@@ -115,6 +117,10 @@ type InventoryState = {
   refillPeg: (id: string, amount: number) => Promise<void>;
   removeOnBarItem: (id: string) => Promise<void>;
   endOfDayOnBar: () => Promise<void>;
+
+  // EOD State Actions
+  resetOffCounterEOD: () => void;
+  resetOnBarEOD: () => void;
 
   // Internal state management
   _setLoading: (isLoading: boolean) => void;
@@ -181,9 +187,14 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     totalOnBarSales: 0,
     loading: true,
     saving: false,
+    offCounterNeedsEOD: false,
+    onBarNeedsEOD: false,
     
     _setLoading: (isLoading) => set({ loading: isLoading }),
     _setSaving: (isSaving) => set({ saving: isSaving }),
+
+    resetOffCounterEOD: () => set({ offCounterNeedsEOD: false }),
+    resetOnBarEOD: () => set({ onBarNeedsEOD: false }),
 
     initListeners: () => {
         get()._setLoading(true);
@@ -835,6 +846,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             // Perform write
             transaction.set(dailyDocRef, { [id]: itemDailyData }, { merge: true });
         });
+        set({ offCounterNeedsEOD: true });
       } catch (error) {
           console.error(`Error recording sale:`, error);
           throw error;
@@ -894,6 +906,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             
             transaction.set(dailyRef, { [id]: currentItemDaily }, { merge: true });
         });
+        if (field === 'sales' || field === 'added') {
+            set({ offCounterNeedsEOD: true });
+        }
     } catch (error) {
         console.error(`Error updating field ${field}:`, error);
         throw error;
@@ -938,6 +953,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         }
 
         await setDoc(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
+        set({ onBarNeedsEOD: true });
         
     } catch (error) {
         console.error("Error opening bottle: ", error);
@@ -1014,6 +1030,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             });
             transaction.set(dailyDocRef, { [onBarItemId]: itemDailyLog }, { merge: true });
         });
+        set({ onBarNeedsEOD: true });
     } catch(error) {
         console.error("Error selling peg: ", error);
         throw error;
@@ -1080,6 +1097,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             dailyLog.salesValue -= valueToRefund;
             transaction.set(dailyDocRef, { [onBarItemId]: dailyLog }, { merge: true });
         });
+        set({ onBarNeedsEOD: true });
     } catch (error) {
         console.error("Error refilling peg: ", error);
         throw error;
@@ -1151,6 +1169,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 }
             });
             await batch.commit();
+            get().resetOnBarEOD();
 
         } catch (error) {
             console.error("Error during On-Bar end of day process: ", error);

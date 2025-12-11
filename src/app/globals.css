@@ -24,7 +24,6 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 142.1 76.2% 36.3%;
-    --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -209,6 +208,18 @@
     66% { stop-color: #D2691E; } /* Dark Gold/Rum */
 }
 
+@keyframes subtle-glow {
+    0%, 100% {
+        box-shadow: 0 0 8px 2px transparent, 0 0 0px 0px transparent;
+    }
+    50% {
+        box-shadow: 0 0 8px 2px hsl(var(--primary) / 0.5), 0 0 12px 4px hsl(var(--primary) / 0.3);
+    }
+}
+
+.animate-subtle-glow {
+    animation: subtle-glow 2.5s ease-in-out infinite;
+}
 
 /* For aligning the custom SVG 'o' in the logo */
 .logo-container > svg {

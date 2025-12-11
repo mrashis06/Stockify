@@ -48,6 +48,7 @@ import { Separator } from '@/components/ui/separator';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { Checkbox } from '@/components/ui/checkbox';
 import SelectionActionBar from '@/components/dashboard/selection-action-bar';
+import { cn } from '@/lib/utils';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -91,6 +92,8 @@ export default function InventoryPage() {
         updateBrand,
         updateItemField,
         totalOnBarSales,
+        offCounterNeedsEOD,
+        resetOffCounterEOD,
     } = useInventory();
     
     usePageLoading(loading);
@@ -209,6 +212,7 @@ export default function InventoryPage() {
         try {
             // Pass the current, correctly calculated inventory state to the EOD process.
             await endOfDayProcess(processedInventory);
+            resetOffCounterEOD(); // Reset the glow effect
             toast({
                 title: 'End of Day Processed',
                 description: "Today's final stock has been saved as tomorrow's opening stock."
@@ -459,7 +463,11 @@ export default function InventoryPage() {
                     </div>
                 </div>
                  <div className="flex justify-end mt-4">
-                     <Button onClick={() => setIsEndOfDayDialogOpen(true)} variant="outline" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isEndingDay}>
+                     <Button 
+                        onClick={() => setIsEndOfDayDialogOpen(true)} 
+                        variant="outline" 
+                        className={cn("bg-blue-600 hover:bg-blue-700 text-white", offCounterNeedsEOD && "animate-subtle-glow")} 
+                        disabled={isEndingDay}>
                         <LogOut className="mr-2 h-4 w-4" /> End of Day
                     </Button>
                 </div>

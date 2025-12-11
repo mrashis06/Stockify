@@ -11,9 +11,11 @@ import {
 import { db } from '@/lib/firebase';
 import { format, addDays } from 'date-fns';
 import type { InventoryItem } from './use-inventory';
+import { useInventory } from './use-inventory';
 
 export function useEndOfDay() {
   const [isEndingDay, setIsEndingDay] = useState(false);
+  const resetOffCounterEOD = useInventory.getState().resetOffCounterEOD;
 
   const endOfDayProcess = async (finalInventoryState: InventoryItem[]) => {
     setIsEndingDay(true);
@@ -74,6 +76,7 @@ export function useEndOfDay() {
       batch.set(tomorrowDailyRef, tomorrowData, { merge: true });
 
       await batch.commit();
+      resetOffCounterEOD(); // Reset EOD state after successful commit
 
     } catch (error) {
       console.error("Error during Off-Counter end of day process: ", error);
