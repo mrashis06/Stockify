@@ -405,7 +405,7 @@ export default function InventoryPage() {
         </div>
         
         <Card>
-            <CardContent className="p-4 md:p-6">
+            <CardContent className={cn("p-4 md:p-6", (selectedRows.size > 0 || offCounterNeedsEOD) && "pb-24")}>
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
                     <div className="relative w-full md:max-w-xs">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -488,7 +488,7 @@ export default function InventoryPage() {
 
                 <div className="mt-4">
                     {isMobile ? (
-                        <div className="space-y-3 pb-24">
+                        <div className="space-y-3">
                             {filteredInventory.length > 0 ? (
                                 filteredInventory.map(item => {
                                     const isLowStock = (item.closing ?? 0) < 10;
@@ -580,7 +580,7 @@ export default function InventoryPage() {
                             )}
                         </div>
                     ) : (
-                        <div className="overflow-x-auto pb-24 md:pb-0">
+                        <div className="overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                 <TableRow>

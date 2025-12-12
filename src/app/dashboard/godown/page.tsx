@@ -56,6 +56,7 @@ import type { AddGodownItemFormValues } from '@/components/dashboard/add-godown-
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import SelectionActionBar from '@/components/dashboard/selection-action-bar';
+import { cn } from '@/lib/utils';
 
 
 const RealTimeClock = () => {
@@ -269,7 +270,7 @@ export default function GodownPage() {
   }
 
   return (
-    <main className="flex-1 p-4 md:p-8">
+    <main className={cn("flex-1 p-4 md:p-8", (selectedRows.size > 0 || selectedUnprocessedRows.size > 0) && "pb-24")}>
         {selectedRows.size > 0 && (
             <SelectionActionBar
                 count={selectedRows.size}

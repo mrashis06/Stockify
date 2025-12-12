@@ -163,7 +163,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     }
 
     return (
-        <main className="flex-1 p-4 md:p-8">
+        <main className={cn("flex-1 p-4 md:p-8", onBarNeedsEOD && "pb-24")}>
              {onBarNeedsEOD && (
                 <SelectionActionBar
                     count={0} // Special case for EOD
@@ -270,7 +270,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     </p>
                 </div>
             ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-24">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {onBarInventory.map(item => {
                         const isBeer = item.category === 'Beer';
                         const remaining = item.remainingVolume;
