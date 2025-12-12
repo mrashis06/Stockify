@@ -23,6 +23,7 @@ import SellOnBarItemDialog from '@/components/dashboard/sell-onbar-item-dialog';
 import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { cn } from '@/lib/utils';
+import SelectionActionBar from '@/components/dashboard/selection-action-bar';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -163,6 +164,18 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
 
     return (
         <main className="flex-1 p-4 md:p-8">
+             {onBarNeedsEOD && (
+                <SelectionActionBar
+                    count={0} // Special case for EOD
+                    onClear={() => {}}
+                    isEodReminder
+                >
+                    <div className="flex-1 text-center font-medium">On-Bar EOD required.</div>
+                    <Button onClick={() => setIsEndOfDayDialogOpen(true)} size="sm" variant="default">
+                        <LogOut className="mr-2 h-4 w-4" /> Finalize Sales
+                    </Button>
+                </SelectionActionBar>
+            )}
             <AddOnBarItemDialog
                 isOpen={isAddItemOpen}
                 onOpenChange={setIsAddItemOpen}
@@ -213,7 +226,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     <Button 
                         onClick={() => setIsEndOfDayDialogOpen(true)} 
                         variant="outline" 
-                        className={cn("bg-blue-600 hover:bg-blue-700 text-white", onBarNeedsEOD && "animate-subtle-glow")} 
+                        className="bg-blue-600 hover:bg-blue-700 text-white" 
                         disabled={saving}>
                         <LogOut className="mr-2 h-4 w-4" /> End of Day
                     </Button>
@@ -257,7 +270,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                     </p>
                 </div>
             ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-24">
                     {onBarInventory.map(item => {
                         const isBeer = item.category === 'Beer';
                         const remaining = item.remainingVolume;
@@ -347,5 +360,3 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         </main>
     );
 }
-
-    

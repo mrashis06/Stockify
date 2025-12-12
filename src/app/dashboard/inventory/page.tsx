@@ -310,15 +310,29 @@ export default function InventoryPage() {
 
   return (
     <main className="flex-1 p-4 md:p-8">
-        <SelectionActionBar
-            count={selectedRows.size}
-            onClear={() => setSelectedRows(new Set())}
-        >
-            <Button onClick={() => setIsDeleteDialogOpen(true)} size="sm" variant="destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Remove ({selectedRows.size})
-            </Button>
-        </SelectionActionBar>
+        {selectedRows.size > 0 && (
+            <SelectionActionBar
+                count={selectedRows.size}
+                onClear={() => setSelectedRows(new Set())}
+            >
+                <Button onClick={() => setIsDeleteDialogOpen(true)} size="sm" variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove ({selectedRows.size})
+                </Button>
+            </SelectionActionBar>
+        )}
+        {offCounterNeedsEOD && (
+            <SelectionActionBar
+                count={0} // Special case for EOD
+                onClear={() => {}}
+                isEodReminder
+            >
+                <div className="flex-1 text-center font-medium">End of Day process required.</div>
+                 <Button onClick={() => setIsEndOfDayDialogOpen(true)} size="sm" variant="default">
+                    <LogOut className="mr-2 h-4 w-4" /> Finalize Sales
+                </Button>
+            </SelectionActionBar>
+        )}
         <AddBrandDialog
             isOpen={isAddBrandOpen}
             onOpenChange={setIsAddBrandOpen}
@@ -466,7 +480,7 @@ export default function InventoryPage() {
                      <Button 
                         onClick={() => setIsEndOfDayDialogOpen(true)} 
                         variant="outline" 
-                        className={cn("bg-blue-600 hover:bg-blue-700 text-white", offCounterNeedsEOD && "animate-subtle-glow")} 
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
                         disabled={isEndingDay}>
                         <LogOut className="mr-2 h-4 w-4" /> End of Day
                     </Button>
@@ -474,7 +488,7 @@ export default function InventoryPage() {
 
                 <div className="mt-4">
                     {isMobile ? (
-                        <div className="space-y-3">
+                        <div className="space-y-3 pb-24">
                             {filteredInventory.length > 0 ? (
                                 filteredInventory.map(item => {
                                     const isLowStock = (item.closing ?? 0) < 10;
@@ -566,7 +580,7 @@ export default function InventoryPage() {
                             )}
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto pb-24 md:pb-0">
                             <Table>
                                 <TableHeader>
                                 <TableRow>

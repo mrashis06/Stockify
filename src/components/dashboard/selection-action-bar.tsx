@@ -12,14 +12,16 @@ type SelectionActionBarProps = {
   count: number;
   onClear: () => void;
   children: React.ReactNode;
+  isEodReminder?: boolean;
 };
 
 const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
   count,
   onClear,
-  children
+  children,
+  isEodReminder = false,
 }) => {
-  const hasSelection = count > 0;
+  const hasSelection = count > 0 || isEodReminder;
 
   return (
     <AnimatePresence>
@@ -32,26 +34,35 @@ const SelectionActionBar: React.FC<SelectionActionBarProps> = ({
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           className="fixed bottom-4 left-4 right-4 z-50 flex items-center justify-center"
         >
-          <div className="w-full max-w-sm sm:max-w-md rounded-2xl border bg-background/80 p-3 shadow-lg backdrop-blur-md">
+          <div className={cn(
+            "w-full max-w-sm sm:max-w-md rounded-2xl border bg-background/80 p-3 shadow-lg backdrop-blur-md",
+             isEodReminder && "bg-blue-500/10 border-blue-500/30"
+          )}>
             <div className="flex w-full flex-col gap-3">
-              <div className="flex items-center gap-2 px-1">
-                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-full"
-                  onClick={onClear}
-                >
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Clear selection</span>
-                </Button>
-                <p className="flex-1 text-sm font-medium">
-                  {count} selected
-                </p>
-              </div>
-              
-              <Separator />
+              {!isEodReminder && (
+                <>
+                    <div className="flex items-center gap-2 px-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-full"
+                            onClick={onClear}
+                        >
+                            <X className="h-4 w-4" />
+                            <span className="sr-only">Clear selection</span>
+                        </Button>
+                        <p className="flex-1 text-sm font-medium">
+                            {count} selected
+                        </p>
+                    </div>
+                    <Separator />
+                </>
+              )}
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className={cn(
+                  "flex flex-col gap-2 sm:flex-row sm:items-center",
+                  isEodReminder && "items-center"
+              )}>
                 {children}
               </div>
             </div>
