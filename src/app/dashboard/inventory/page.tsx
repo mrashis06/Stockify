@@ -88,7 +88,6 @@ export default function InventoryPage() {
     const { 
         inventory,
         dailyOnBarSales,
-        loading,
         addBrand,
         deleteBrand: deleteProduct,
         updateBrand,
@@ -99,23 +98,17 @@ export default function InventoryPage() {
         initListeners,
         selectedDate,
         setDate,
+        dateChangeConfirmation,
+        confirmDateChange,
+        cancelDateChange,
     } = useInventory();
 
      useEffect(() => {
-        const unsub = initListeners();
+        if (!selectedDate) return;
+        const unsub = initListeners(selectedDate);
         return () => unsub();
-    }, [initListeners]);
+    }, [selectedDate, initListeners]);
     
-    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>(() => {
-        const today = new Date();
-        const yesterday = subDays(today, 1);
-        if (selectedDate.toDateString() === yesterday.toDateString()) {
-            return 'yesterday';
-        }
-        return 'today';
-    });
-    
-    usePageLoading(loading);
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -141,7 +134,6 @@ export default function InventoryPage() {
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
         setDate(newDate);
-        setDateOption(value);
     };
 
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown'> & {initialStock: number}) => {
@@ -327,10 +319,12 @@ export default function InventoryPage() {
         });
     };
 
+  const dateOption = useMemo(() => {
+    if (!selectedDate) return 'today';
+    const today = new Date();
+    return today.toDateString() === selectedDate.toDateString() ? 'today' : 'yesterday';
+  }, [selectedDate]);
 
-  if (loading) {
-    return null;
-  }
 
   return (
     <main className={cn("flex-1 p-4 md:p-8", selectedRows.size > 0 && "pb-24")}>
@@ -388,6 +382,20 @@ export default function InventoryPage() {
                          {isEndingDay ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Confirm End of Day
                     </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={!!dateChangeConfirmation} onOpenChange={(open) => !open && cancelDateChange()}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirm Date Change</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        You have already recorded sales for yesterday. Are you sure you want to go back and modify them?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={cancelDateChange}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmDateChange}>Continue</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

@@ -59,7 +59,6 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         inventory: shopInventory, 
         onBarInventory, 
         dailyOnBarSales,
-        loading, 
         saving,
         sellPeg, 
         removeOnBarItem, 
@@ -72,27 +71,20 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         initListeners,
         selectedDate,
         setDate,
+        dateChangeConfirmation,
+        confirmDateChange,
+        cancelDateChange,
     } = useInventory();
     
     const { toast } = useToast();
     const { formatDate } = useDateFormat();
     
-    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>(() => {
-        const today = new Date();
-        const yesterday = subDays(today, 1);
-        if (selectedDate.toDateString() === yesterday.toDateString()) {
-            return 'yesterday';
-        }
-        return 'today';
-    });
-
     useEffect(() => {
-        const unsub = initListeners();
+        if (!selectedDate) return;
+        const unsub = initListeners(selectedDate);
         return () => unsub();
-    }, [initListeners]);
+    }, [selectedDate, initListeners]);
     
-    usePageLoading(loading);
-
     const [isAddItemOpen, setIsAddItemOpen] = useState(false);
     const [isSellItemOpen, setIsSellItemOpen] = useState(false);
     const [sellingItem, setSellingItem] = useState<OnBarItem | null>(null);
@@ -101,7 +93,6 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
         setDate(newDate);
-        setDateOption(value);
     };
 
     const handleOpenSellDialog = (item: OnBarItem) => {
@@ -182,10 +173,12 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             });
         }
     };
-    
-    if (loading) {
-        return null;
-    }
+
+    const dateOption = useMemo(() => {
+        if (!selectedDate) return 'today';
+        const today = new Date();
+        return today.toDateString() === selectedDate.toDateString() ? 'today' : 'yesterday';
+    }, [selectedDate]);
 
     return (
         <main className={cn("flex-1 p-4 md:p-8", onBarNeedsEOD && "pb-24")}>
@@ -231,6 +224,20 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                             Confirm End of Day
                         </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <AlertDialog open={!!dateChangeConfirmation} onOpenChange={(open) => !open && cancelDateChange()}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Date Change</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            You have already recorded sales for yesterday. Are you sure you want to go back and modify them?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={cancelDateChange}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDateChange}>Continue</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
