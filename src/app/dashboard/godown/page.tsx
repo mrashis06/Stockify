@@ -107,15 +107,6 @@ export default function GodownPage() {
         setDate,
     } = useInventory();
     
-    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>(() => {
-        const today = new Date();
-        const yesterday = subDays(today, 1);
-        if (selectedDate.toDateString() === yesterday.toDateString()) {
-            return 'yesterday';
-        }
-        return 'today';
-    });
-    
     usePageLoading(loading);
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -137,14 +128,15 @@ export default function GodownPage() {
     const { toast } = useToast();
 
      useEffect(() => {
-        const unsub = initListeners();
-        return () => unsub();
-    }, [initListeners]);
+        if (selectedDate) {
+            const unsub = initListeners(selectedDate);
+            return () => unsub();
+        }
+    }, [selectedDate, initListeners]);
 
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
         setDate(newDate);
-        setDateOption(value);
     };
     
     const handleOpenTransferDialog = (item: InventoryItem, destination: 'shop' | 'onbar') => {
@@ -289,9 +281,11 @@ export default function GodownPage() {
         return inventory.filter(item => selectedRows.has(item.id));
     }, [inventory, selectedRows]);
     
-  if (loading) {
-      return null;
-  }
+    const dateOption = useMemo(() => {
+        if (!selectedDate) return 'today';
+        const today = new Date();
+        return today.toDateString() === selectedDate.toDateString() ? 'today' : 'yesterday';
+    }, [selectedDate]);
 
   return (
     <main className={cn("flex-1 p-4 md:p-8", (selectedRows.size > 0 || selectedUnprocessedRows.size > 0) && "pb-24")}>
