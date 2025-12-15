@@ -103,14 +103,23 @@ export default function GodownPage() {
         updateGodownStock,
         addGodownItem,
         initListeners,
+        selectedDate,
+        setDate,
     } = useInventory();
+    
+    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>(() => {
+        const today = new Date();
+        const yesterday = subDays(today, 1);
+        if (selectedDate.toDateString() === yesterday.toDateString()) {
+            return 'yesterday';
+        }
+        return 'today';
+    });
     
     usePageLoading(loading);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
     const [isScanBillOpen, setIsScanBillOpen] = useState(false);
     const [isAddDeliveryOpen, setIsAddDeliveryOpen] = useState(false);
     const [isTransferShopOpen, setIsTransferShopOpen] = useState(false);
@@ -128,13 +137,13 @@ export default function GodownPage() {
     const { toast } = useToast();
 
      useEffect(() => {
-        const unsub = initListeners(selectedDate);
+        const unsub = initListeners();
         return () => unsub();
-    }, [selectedDate, initListeners]);
+    }, [initListeners]);
 
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
-        setSelectedDate(newDate);
+        setDate(newDate);
         setDateOption(value);
     };
     
@@ -166,7 +175,7 @@ export default function GodownPage() {
         try {
             const item = inventory.find(i => i.id === productId);
             if (!item) throw new Error("Product not found");
-            await transferToShop(productId, quantity, selectedDate, price);
+            await transferToShop(productId, quantity, price);
             toast({ title: 'Transfer Successful', description: `${quantity} units of ${item.brand} (${item.size}) transferred to shop for ${formatDate(selectedDate, 'dd-MMM')}.` });
             setIsTransferShopOpen(false);
         } catch (error) {
@@ -346,7 +355,7 @@ export default function GodownPage() {
                 items={selectedItemsForBulkTransfer}
                 onBulkTransfer={async (items) => {
                     try {
-                        const promises = items.map(item => transferToShop(item.productId, item.quantity, selectedDate, item.price));
+                        const promises = items.map(item => transferToShop(item.productId, item.quantity, item.price));
                         await Promise.all(promises);
                         toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to Shop for ${formatDate(selectedDate, 'dd-MMM')}.`});
                         setIsBulkTransferToShopOpen(false);
@@ -538,7 +547,7 @@ export default function GodownPage() {
                              filteredInventory.map(item => {
                                 const isExpanded = expandedRow === item.id;
                                 return (
-                                    <Card key={item.id} className="p-4 space-y-4">
+                                    <Card key={item.id} className={cn("p-4 space-y-4", selectedRows.has(item.id) && "ring-2 ring-primary")}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex items-start gap-3 flex-1">
                                                  <Checkbox
@@ -683,5 +692,3 @@ export default function GodownPage() {
     </main>
   );
 }
-
-    

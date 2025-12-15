@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { useMediaQuery } from 'react-responsive';
+import { useInventory } from '@/hooks/use-inventory';
 
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
@@ -116,8 +117,16 @@ export default function DailySalePage() {
     const { toast } = useToast();
     const { formatDate } = useDateFormat();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
+    const { selectedDate, setDate } = useInventory();
+    
+    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>(() => {
+        const today = new Date();
+        const yesterday = subDays(today, 1);
+        if (selectedDate.toDateString() === yesterday.toDateString()) {
+            return 'yesterday';
+        }
+        return 'today';
+    });
 
     const { blReport, totalSalesValue, loading } = useDailySaleReport(selectedDate);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -127,7 +136,7 @@ export default function DailySalePage() {
 
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
-        setSelectedDate(newDate);
+        setDate(newDate);
         setDateOption(value);
     };
 

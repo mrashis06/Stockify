@@ -94,10 +94,12 @@ type InventoryState = {
   saving: boolean;
   offCounterNeedsEOD: boolean;
   onBarNeedsEOD: boolean;
+  selectedDate: Date;
   
   // Actions
-  initListeners: (date: Date) => () => void;
-  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {initialStock: number}, forDate: Date) => Promise<void>;
+  setDate: (date: Date) => void;
+  initListeners: () => () => void;
+  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {initialStock: number}) => Promise<void>;
   addGodownItem: (data: AddGodownItemFormValues) => Promise<void>;
   processScannedBill: (billDataUri: string, fileName: string, force?: boolean) => Promise<{ status: 'success' | 'already_processed'; matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
@@ -106,15 +108,15 @@ type InventoryState = {
   updateGodownStock: (productId: string, newStock: number) => Promise<void>;
   deleteBrand: (id: string) => Promise<void>;
   deleteUnprocessedItems: (ids: string[]) => Promise<void>;
-  transferToShop: (productId: string, quantityToTransfer: number, forDate: Date, price?: number) => Promise<void>;
+  transferToShop: (productId: string, quantityToTransfer: number, price?: number) => Promise<void>;
   transferToOnBar: (productId: string, quantity: number, pegPrices?: { '30ml': number; '60ml': number }) => Promise<void>;
-  recordSale: (id: string, quantity: number, salePrice: number, soldBy: string, forDate: Date) => Promise<void>;
-  updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string, forDate: Date) => Promise<void>;
+  recordSale: (id: string, quantity: number, salePrice: number, soldBy: string) => Promise<void>;
+  updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => Promise<void>;
   
   // On-Bar Actions
   addOnBarItem: (inventoryItemId: string, volume: number, quantity: number, price: number, pegPrices?: { '30ml': number, '60ml': number }) => Promise<void>;
-  sellPeg: (id: string, pegSize: 30 | 60 | 'custom', forDate: Date, customVolume?: number, customPrice?: number) => Promise<void>;
-  refillPeg: (id: string, amount: number, forDate: Date) => Promise<void>;
+  sellPeg: (id: string, pegSize: 30 | 60 | 'custom', customVolume?: number, customPrice?: number) => Promise<void>;
+  refillPeg: (id: string, amount: number) => Promise<void>;
   removeOnBarItem: (id: string) => Promise<void>;
   endOfDayOnBar: () => Promise<void>;
 
@@ -188,15 +190,23 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     saving: false,
     offCounterNeedsEOD: false,
     onBarNeedsEOD: false,
+    selectedDate: new Date(),
     
     _setLoading: (isLoading) => set({ loading: isLoading }),
     _setSaving: (isSaving) => set({ saving: isSaving }),
 
+    setDate: (date) => set({ selectedDate: date }),
     resetOffCounterEOD: () => set({ offCounterNeedsEOD: false }),
     resetOnBarEOD: () => set({ onBarNeedsEOD: false }),
 
-    initListeners: (date) => {
+    initListeners: () => {
         get()._setLoading(true);
+        const date = get().selectedDate;
+        if (!date) {
+            console.error("initListeners called with invalid date");
+            get()._setLoading(false);
+            return () => {};
+        }
 
         // Clear previous listeners
         listeners.forEach(unsub => unsub());
@@ -309,8 +319,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         return () => listeners.forEach(unsub => unsub());
     },
   
-  addBrand: async (newItemData, forDate) => {
+  addBrand: async (newItemData) => {
     get()._setSaving(true);
+    const forDate = get().selectedDate;
     try {
         await runTransaction(db, async (transaction) => {
             const dateStr = format(forDate, 'yyyy-MM-dd');
@@ -546,12 +557,13 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
   
   linkBarcodeToProduct: async (sourceProductId, destinationProductId) => {
     get()._setSaving(true);
+    const forDate = get().selectedDate;
     try {
         await runTransaction(db, async (transaction) => {
             const sourceRef = doc(db, 'inventory', sourceProductId);
             const destRef = doc(db, 'inventory', destinationProductId);
-            const today = format(new Date(), 'yyyy-MM-dd');
-            const dailyRef = doc(db, 'dailyInventory', today);
+            const dateStr = format(forDate, 'yyyy-MM-dd');
+            const dailyRef = doc(db, 'dailyInventory', dateStr);
 
             const [sourceDoc, destDoc, dailyDoc] = await Promise.all([
                 transaction.get(sourceRef),
@@ -657,8 +669,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  transferToShop: async (productId, quantityToTransfer, forDate, price) => {
+  transferToShop: async (productId, quantityToTransfer, price) => {
     get()._setSaving(true);
+    const forDate = get().selectedDate;
     try {
         await runTransaction(db, async (transaction) => {
             const masterRef = doc(db, 'inventory', productId);
@@ -794,8 +807,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  recordSale: async (id, quantity, salePrice, soldBy, forDate) => {
+  recordSale: async (id, quantity, salePrice, soldBy) => {
       get()._setSaving(true);
+      const forDate = get().selectedDate;
       try {
         await runTransaction(db, async (transaction) => {
             const dateStr = format(forDate, 'yyyy-MM-dd');
@@ -840,8 +854,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
       }
   },
   
- updateItemField: async (id, field, value, forDate) => {
+ updateItemField: async (id, field, value) => {
     get()._setSaving(true);
+    const forDate = get().selectedDate;
     try {
         await runTransaction(db, async (transaction) => {
             const dateStr = format(forDate, 'yyyy-MM-dd');
@@ -948,9 +963,10 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  sellPeg: async (id, pegSize, forDate, customVolume, customPrice) => {
+  sellPeg: async (id, pegSize, customVolume, customPrice) => {
     if (get().saving) return;
     get()._setSaving(true);
+    const forDate = get().selectedDate;
     try {
         const itemRef = doc(db, 'onBarInventory', id);
         const dateStr = format(forDate, 'yyyy-MM-dd');
@@ -1021,9 +1037,10 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  refillPeg: async (id, amount, forDate) => {
+  refillPeg: async (id, amount) => {
     if (get().saving) return;
     get()._setSaving(true);
+    const forDate = get().selectedDate;
     try {
         const itemRef = doc(db, 'onBarInventory', id);
         await runTransaction(db, async (transaction) => {

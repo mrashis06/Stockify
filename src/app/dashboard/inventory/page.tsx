@@ -84,8 +84,6 @@ export default function InventoryPage() {
     const { formatDate } = useDateFormat();
     const searchParams = useSearchParams();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
     
     const { 
         inventory,
@@ -98,13 +96,24 @@ export default function InventoryPage() {
         totalOnBarSales,
         offCounterNeedsEOD,
         resetOffCounterEOD,
-        initListeners
+        initListeners,
+        selectedDate,
+        setDate,
     } = useInventory();
 
      useEffect(() => {
-        const unsub = initListeners(selectedDate);
+        const unsub = initListeners();
         return () => unsub();
-    }, [selectedDate, initListeners]);
+    }, [initListeners]);
+    
+    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>(() => {
+        const today = new Date();
+        const yesterday = subDays(today, 1);
+        if (selectedDate.toDateString() === yesterday.toDateString()) {
+            return 'yesterday';
+        }
+        return 'today';
+    });
     
     usePageLoading(loading);
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
@@ -131,13 +140,13 @@ export default function InventoryPage() {
 
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
-        setSelectedDate(newDate);
+        setDate(newDate);
         setDateOption(value);
     };
 
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown'> & {initialStock: number}) => {
         try {
-            await addBrand(newItemData, selectedDate);
+            await addBrand(newItemData);
             toast({ title: 'Brand Added', description: `${newItemData.brand} (${newItemData.size}) created.` });
         } catch (error) {
             console.error('Error adding brand:', error);
@@ -176,7 +185,7 @@ export default function InventoryPage() {
         }
        
         try {
-            await updateItemField(id, field, processedValue, selectedDate);
+            await updateItemField(id, field, processedValue);
             let description = '';
             switch(field) {
                 case 'sales':
@@ -324,7 +333,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <main className={cn("flex-1 p-4 md:p-8", (selectedRows.size > 0 || offCounterNeedsEOD) && "pb-24")}>
+    <main className={cn("flex-1 p-4 md:p-8", selectedRows.size > 0 && "pb-24")}>
         {selectedRows.size > 0 && (
             <SelectionActionBar
                 count={selectedRows.size}
@@ -333,18 +342,6 @@ export default function InventoryPage() {
                 <Button onClick={() => setIsDeleteDialogOpen(true)} size="sm" variant="destructive">
                     <Trash2 className="mr-2 h-4 w-4" />
                     Remove ({selectedRows.size})
-                </Button>
-            </SelectionActionBar>
-        )}
-        {offCounterNeedsEOD && (
-            <SelectionActionBar
-                count={0} 
-                onClear={() => {}}
-                isEodReminder
-            >
-                <div className="flex-1 text-center font-medium">End of Day process required.</div>
-                 <Button onClick={() => setIsEndOfDayDialogOpen(true)} size="sm" variant="default">
-                    <LogOut className="mr-2 h-4 w-4" /> Finalize Sales
                 </Button>
             </SelectionActionBar>
         )}
@@ -520,7 +517,7 @@ export default function InventoryPage() {
                                     const isExpanded = expandedMobileRow === item.id;
 
                                     return (
-                                        <Card key={item.id} className={`p-4 space-y-4 ${isLowStock ? 'bg-destructive/10' : ''}`}>
+                                        <Card key={item.id} className={cn("p-4 space-y-4", isLowStock && 'bg-destructive/10', selectedRows.has(item.id) && 'ring-2 ring-primary')}>
                                             <div className="flex items-start justify-between gap-4">
                                                 <div className="flex items-start gap-3 flex-1">
                                                     <Checkbox
@@ -629,7 +626,7 @@ export default function InventoryPage() {
                                         return (
                                             <TableRow 
                                                 key={item.id} 
-                                                className={isLowStock ? 'bg-destructive/10 hover:bg-destructive/20' : ''}
+                                                className={cn(isLowStock && 'bg-destructive/10 hover:bg-destructive/20')}
                                                 data-state={selectedRows.has(item.id) ? "selected" : ""}
                                             >
                                                 <TableCell className="text-center">

@@ -251,5 +251,3 @@ export default function SalesPage() {
         </main>
     );
 }
-
-    

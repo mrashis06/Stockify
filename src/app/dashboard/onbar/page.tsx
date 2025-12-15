@@ -69,18 +69,27 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         endOfDayOnBar,
         onBarNeedsEOD,
         resetOnBarEOD,
-        initListeners
+        initListeners,
+        selectedDate,
+        setDate,
     } = useInventory();
     
     const { toast } = useToast();
     const { formatDate } = useDateFormat();
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
+    
+    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>(() => {
+        const today = new Date();
+        const yesterday = subDays(today, 1);
+        if (selectedDate.toDateString() === yesterday.toDateString()) {
+            return 'yesterday';
+        }
+        return 'today';
+    });
 
     useEffect(() => {
-        const unsub = initListeners(selectedDate);
+        const unsub = initListeners();
         return () => unsub();
-    }, [selectedDate, initListeners]);
+    }, [initListeners]);
     
     usePageLoading(loading);
 
@@ -91,7 +100,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
 
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
-        setSelectedDate(newDate);
+        setDate(newDate);
         setDateOption(value);
     };
 
@@ -102,7 +111,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     
     const handleSell = async (id: string, volume: number, price: number) => {
         try {
-            await sellPeg(id, 'custom', selectedDate, volume, price);
+            await sellPeg(id, 'custom', volume, price);
             const item = onBarInventory.find(i => i.id === id);
             const message = item?.category === 'Beer' ? `${volume} unit(s) sold for ₹${price}.` : `${volume}ml sold for ₹${price}.`;
             toast({ title: 'Success', description: message });
@@ -116,7 +125,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     
     const handleOneClickSell = async (item: OnBarItem, pegSize: 30 | 60) => {
         try {
-            await sellPeg(item.id, pegSize, selectedDate);
+            await sellPeg(item.id, pegSize);
             const price = pegSize === 30 ? item.pegPrice30ml : item.pegPrice60ml;
             toast({ title: 'Success', description: `${pegSize}ml sold for ₹${price}.` });
         } catch (error) {
@@ -132,7 +141,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             if (!item) return;
 
             const refillAmount = item.category === 'Beer' ? 1 : 30;
-            await refillPeg(id, refillAmount, selectedDate); 
+            await refillPeg(id, refillAmount); 
             
             const message = item.category === 'Beer' ? 'Last beer sale cancelled.' : `Last sale of 30ml cancelled.`;
             toast({ title: 'Success', description: message });
