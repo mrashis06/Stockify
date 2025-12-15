@@ -68,8 +68,7 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const { user, shopId } = useAuth();
   const router = useRouter();
   
-  // Use the central inventory hook, which has the correct, stable logic
-  const { inventory, onBarInventory, loading, totalOnBarSales } = useInventory();
+  const { inventory, onBarInventory, loading, totalOnBarSales, initListeners } = useInventory();
   
   const [yesterdaySalesData, setYesterdaySalesData] = useState<any>({});
   const [isYesterdayLoading, setIsYesterdayLoading] = useState(true);
@@ -77,8 +76,14 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   const [isLowStockDialogOpen, setIsLowStockDialogOpen] = useState(false);
   
   usePageLoading(loading || isYesterdayLoading);
+  const today = useMemo(() => new Date(), []);
   const yesterday = useMemo(() => subDays(new Date(), 1), []);
   const yesterdayString = useMemo(() => formatDate(yesterday, 'yyyy-MM-dd'), [yesterday, formatDate]);
+
+  useEffect(() => {
+    const unsub = initListeners(today);
+    return () => unsub();
+  }, [today, initListeners]);
 
   useEffect(() => {
     if (user?.role === 'staff') {
@@ -363,5 +368,3 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
-
-    
