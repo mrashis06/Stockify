@@ -77,7 +77,7 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
           brand: '',
           size: '',
           price: 0,
-          category: data.category, // Keep category for next item
+          category: data.category,
           initialStock: 0,
           barcodeId: '',
         });
@@ -97,7 +97,6 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     handleFormSubmit(data, false);
   }
   
-  // Reset state when dialog is closed
   useEffect(() => {
     if (!isOpen) {
       form.reset();
@@ -207,5 +206,3 @@ export default function AddBrandDialog({ isOpen, onOpenChange, onAddBrand }: Add
     </Dialog>
   );
 }
-
-    

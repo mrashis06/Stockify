@@ -24,6 +24,8 @@ import { usePageLoading } from '@/hooks/use-loading';
 import { useDateFormat } from '@/hooks/use-date-format';
 import { cn } from '@/lib/utils';
 import SelectionActionBar from '@/components/dashboard/selection-action-bar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { subDays } from 'date-fns';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -67,10 +69,18 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         endOfDayOnBar,
         onBarNeedsEOD,
         resetOnBarEOD,
+        initListeners
     } = useInventory();
     
     const { toast } = useToast();
     const { formatDate } = useDateFormat();
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
+
+    useEffect(() => {
+        const unsub = initListeners(selectedDate);
+        return () => unsub();
+    }, [selectedDate, initListeners]);
     
     usePageLoading(loading);
 
@@ -79,6 +89,12 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     const [sellingItem, setSellingItem] = useState<OnBarItem | null>(null);
     const [isEndOfDayDialogOpen, setIsEndOfDayDialogOpen] = useState(false);
 
+    const handleDateChange = (value: 'today' | 'yesterday') => {
+        const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
+        setSelectedDate(newDate);
+        setDateOption(value);
+    };
+
     const handleOpenSellDialog = (item: OnBarItem) => {
         setSellingItem(item);
         setIsSellItemOpen(true);
@@ -86,7 +102,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     
     const handleSell = async (id: string, volume: number, price: number) => {
         try {
-            await sellPeg(id, 'custom', volume, price);
+            await sellPeg(id, 'custom', selectedDate, volume, price);
             const item = onBarInventory.find(i => i.id === id);
             const message = item?.category === 'Beer' ? `${volume} unit(s) sold for ₹${price}.` : `${volume}ml sold for ₹${price}.`;
             toast({ title: 'Success', description: message });
@@ -100,7 +116,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
     
     const handleOneClickSell = async (item: OnBarItem, pegSize: 30 | 60) => {
         try {
-            await sellPeg(item.id, pegSize);
+            await sellPeg(item.id, pegSize, selectedDate);
             const price = pegSize === 30 ? item.pegPrice30ml : item.pegPrice60ml;
             toast({ title: 'Success', description: `${pegSize}ml sold for ₹${price}.` });
         } catch (error) {
@@ -116,7 +132,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             if (!item) return;
 
             const refillAmount = item.category === 'Beer' ? 1 : 30;
-            await refillPeg(id, refillAmount); 
+            await refillPeg(id, refillAmount, selectedDate); 
             
             const message = item.category === 'Beer' ? 'Last beer sale cancelled.' : `Last sale of 30ml cancelled.`;
             toast({ title: 'Success', description: message });
@@ -143,7 +159,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         setIsEndOfDayDialogOpen(false);
         try {
             await endOfDayOnBar();
-            resetOnBarEOD(); // Reset the glow effect
+            resetOnBarEOD(); 
             toast({
                 title: 'On-Bar EOD Processed',
                 description: "Today's closing volumes have been set as tomorrow's opening volumes for all open bottles."
@@ -166,7 +182,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
         <main className={cn("flex-1 p-4 md:p-8", onBarNeedsEOD && "pb-24")}>
              {onBarNeedsEOD && (
                 <SelectionActionBar
-                    count={0} // Special case for EOD
+                    count={0}
                     onClear={() => {}}
                     isEodReminder
                 >
@@ -214,19 +230,28 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
                     <div className="flex items-center gap-2">
-                        <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd-MMM-yyyy, EEEE')}</p>
+                        <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(selectedDate, 'dd-MMM-yyyy, EEEE')}</p>
                         <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                         <RealTimeClock />
                     </div>
                 </div>
                 <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
+                    <Select onValueChange={handleDateChange} value={dateOption}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Select Date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="yesterday">Yesterday</SelectItem>
+                        </SelectContent>
+                    </Select>
                     <Button onClick={() => setIsAddItemOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
                         <Plus className="mr-2 h-4 w-4" /> Open a Bottle
                     </Button>
                     <Button 
                         onClick={() => setIsEndOfDayDialogOpen(true)} 
                         variant="outline" 
-                        className="bg-blue-600 hover:bg-blue-700 text-white" 
+                        className={cn("bg-blue-600 hover:bg-blue-700 text-white", onBarNeedsEOD && "animate-subtle-glow")}
                         disabled={saving}>
                         <LogOut className="mr-2 h-4 w-4" /> End of Day
                     </Button>
@@ -250,8 +275,8 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             
              <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
                 <CardHeader>
-                    <CardTitle className="text-lg font-medium text-primary">Today's On-Bar Sales</CardTitle>
-                    <CardDescription>Total value of pegs and bottles sold from open inventory today.</CardDescription>
+                    <CardTitle className="text-lg font-medium text-primary">Sales for {formatDate(selectedDate, 'PPP')}</CardTitle>
+                    <CardDescription>Total value of pegs and bottles sold from open inventory for the selected day.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <p className="text-3xl font-bold text-foreground flex items-center">

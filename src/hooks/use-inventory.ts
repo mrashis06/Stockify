@@ -23,7 +23,7 @@ import {
   deleteField,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, subDays } from 'date-fns';
+import { format, subDays, isToday } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { extractItemsFromBill, BillExtractionOutput } from '@/ai/flows/extract-bill-flow';
 import type { ExtractedItem } from '@/ai/flows/extract-bill-flow';
@@ -96,8 +96,8 @@ type InventoryState = {
   onBarNeedsEOD: boolean;
   
   // Actions
-  initListeners: () => () => void;
-  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {initialStock: number}) => Promise<void>;
+  initListeners: (date: Date) => () => void;
+  addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {initialStock: number}, forDate: Date) => Promise<void>;
   addGodownItem: (data: AddGodownItemFormValues) => Promise<void>;
   processScannedBill: (billDataUri: string, fileName: string, force?: boolean) => Promise<{ status: 'success' | 'already_processed'; matchedCount: number; unmatchedCount: number; }>;
   processScannedDelivery: (unprocessedItemId: string, barcode: string, details: { price: number; quantity: number; brand: string; size: string; category: string }) => Promise<void>;
@@ -108,13 +108,13 @@ type InventoryState = {
   deleteUnprocessedItems: (ids: string[]) => Promise<void>;
   transferToShop: (productId: string, quantityToTransfer: number, price?: number) => Promise<void>;
   transferToOnBar: (productId: string, quantity: number, pegPrices?: { '30ml': number; '60ml': number }) => Promise<void>;
-  recordSale: (id: string, quantity: number, salePrice: number, soldBy: string) => Promise<void>;
-  updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => Promise<void>;
+  recordSale: (id: string, quantity: number, salePrice: number, soldBy: string, forDate: Date) => Promise<void>;
+  updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string, forDate: Date) => Promise<void>;
   
   // On-Bar Actions
   addOnBarItem: (inventoryItemId: string, volume: number, quantity: number, price: number, pegPrices?: { '30ml': number, '60ml': number }) => Promise<void>;
-  sellPeg: (id: string, pegSize: 30 | 60 | 'custom', customVolume?: number, customPrice?: number) => Promise<void>;
-  refillPeg: (id: string, amount: number) => Promise<void>;
+  sellPeg: (id: string, pegSize: 30 | 60 | 'custom', forDate: Date, customVolume?: number, customPrice?: number) => Promise<void>;
+  refillPeg: (id: string, amount: number, forDate: Date) => Promise<void>;
   removeOnBarItem: (id: string) => Promise<void>;
   endOfDayOnBar: () => Promise<void>;
 
@@ -127,7 +127,6 @@ type InventoryState = {
   _setSaving: (isSaving: boolean) => void;
 };
 
-let listenersInitialized = false;
 let listeners: (()=>void)[] = [];
 
 // Simple string similarity function (Jaro-Winkler-like)
@@ -196,15 +195,15 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     resetOffCounterEOD: () => set({ offCounterNeedsEOD: false }),
     resetOnBarEOD: () => set({ onBarNeedsEOD: false }),
 
-    initListeners: () => {
+    initListeners: (date) => {
         get()._setLoading(true);
 
         // Clear previous listeners
         listeners.forEach(unsub => unsub());
         listeners = [];
 
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const yesterdayStr = format(subDays(date, 1), 'yyyy-MM-dd');
 
         let masterInv: InventoryItem[] = [];
         let dailyData: any = {};
@@ -213,7 +212,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         let unprocessed: UnprocessedItem[] = [];
 
         const combineAndSetState = () => {
-             // Guard against running before all data is ready
             if (initialOpeningStocks.size === 0 && masterInv.length > 0) return;
 
             const items: InventoryItem[] = masterInv.map(masterItem => {
@@ -223,7 +221,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 
                 return {
                     ...masterItem,
-                    prevStock: openingStock, // This now holds the STABLE opening stock for the day.
+                    prevStock: openingStock,
                     added,
                     sales,
                     opening: openingStock + added,
@@ -262,12 +260,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
         const invSub = onSnapshot(query(collection(db, "inventory")), (snapshot) => {
             masterInv = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
-            if (initialOpeningStocks.size > 0) { // If opening stocks are ready, update state
+            if (initialOpeningStocks.size > 0) {
                 combineAndSetState();
             }
         });
 
-        const dailySub = onSnapshot(doc(db, 'dailyInventory', today), (doc) => {
+        const dailySub = onSnapshot(doc(db, 'dailyInventory', dateStr), (doc) => {
             dailyData = doc.exists() ? doc.data() : {};
             combineAndSetState();
         });
@@ -282,18 +280,14 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             combineAndSetState();
         });
         
-        // Fetch opening stock data ONCE when listeners are initialized.
         const fetchInitialData = async () => {
             try {
-                // Get master inventory to have a full list of products.
                 const inventorySnapshot = await getDocs(collection(db, 'inventory'));
                 masterInv = inventorySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryItem));
 
-                // Then fetch yesterday's closing data which is today's opening.
-                const yesterdayDoc = await getDoc(doc(db, 'dailyInventory', yesterday));
+                const yesterdayDoc = await getDoc(doc(db, 'dailyInventory', yesterdayStr));
                 const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
 
-                // Create a stable map of opening stocks for today.
                 const openingStocksMap = new Map<string, number>();
                 masterInv.forEach(item => {
                     const opening = yesterdayData[item.id]?.closing ?? item.prevStock ?? 0;
@@ -315,12 +309,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         return () => listeners.forEach(unsub => unsub());
     },
   
-  addBrand: async (newItemData) => {
+  addBrand: async (newItemData, forDate) => {
     get()._setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
-            const today = format(new Date(), 'yyyy-MM-dd');
-            const dailyRef = doc(db, 'dailyInventory', today);
+            const dateStr = format(forDate, 'yyyy-MM-dd');
+            const dailyRef = doc(db, 'dailyInventory', dateStr);
             
             const normalizedBrand = newItemData.brand.toLowerCase().replace(/[^a-z0-9]/g, '');
             const normalizedSize = newItemData.size.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -335,12 +329,10 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
 
             if (masterDoc.exists()) {
-                // If product exists, just add stock to today's record.
                 const currentDaily = dailyData[id] || { added: 0 };
                 currentDaily.added = (currentDaily.added || 0) + (newItemData.initialStock || 0);
                 transaction.set(dailyRef, { [id]: currentDaily }, { merge: true });
             } else {
-                // If product is new, create it in master and daily records.
                 const masterItemData = {
                     brand: newItemData.brand,
                     size: newItemData.size,
@@ -389,14 +381,13 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 const item = doc.data() as InventoryItem;
                 if (item.size.toLowerCase() === normalizedSize.toLowerCase()) {
                     const score = getSimilarity(item.brand, normalizedBrand);
-                    if (score > (bestMatch?.score || 0.85)) { // Use a threshold of 0.85
+                    if (score > (bestMatch?.score || 0.85)) {
                         bestMatch = { doc, score };
                     }
                 }
             });
 
             if (bestMatch) {
-                // Matched an existing product, update its godown stock
                 const existingDoc = bestMatch.doc;
                 const currentStock = existingDoc.data().stockInGodown || 0;
                 transaction.update(existingDoc.ref, { 
@@ -405,7 +396,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                  });
                  toast({ title: 'Stock Updated', description: `Added ${data.quantity} units to existing product: ${existingDoc.data().brand}` });
             } else {
-                // No good match found, create a new product
                 const newId = `manual_${uuidv4()}`;
                 const newProductRef = doc(db, 'inventory', newId);
                 transaction.set(newProductRef, {
@@ -413,7 +403,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                     size: data.size.trim(),
                     category: data.category,
                     stockInGodown: data.quantity,
-                    price: 0, // Price to be set on first transfer to shop
+                    price: 0, 
                     prevStock: 0,
                     barcodeId: null,
                     dateAddedToGodown: serverTimestamp(),
@@ -608,7 +598,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             // Delete the source product
             transaction.delete(sourceRef);
             
-            // Nullify the old daily record entry for the source product
             const dailyUpdate: { [key: string]: any } = {};
             dailyUpdate[sourceProductId] = deleteField();
             transaction.update(dailyRef, dailyUpdate);
@@ -702,7 +691,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const itemDailyData = dailyData[productId] || {};
             itemDailyData.added = (itemDailyData.added || 0) + quantityToTransfer;
             
-            // Ensure full snapshot is saved
             itemDailyData.brand = masterData.brand;
             itemDailyData.size = masterData.size;
             itemDailyData.category = masterData.category;
@@ -806,15 +794,14 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  recordSale: async (id, quantity, salePrice, soldBy) => {
+  recordSale: async (id, quantity, salePrice, soldBy, forDate) => {
       get()._setSaving(true);
       try {
         await runTransaction(db, async (transaction) => {
-            const today = format(new Date(), 'yyyy-MM-dd');
-            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const dateStr = format(forDate, 'yyyy-MM-dd');
+            const dailyDocRef = doc(db, 'dailyInventory', dateStr);
             const masterRef = doc(db, 'inventory', id);
 
-            // Perform all reads first
             const [dailyDoc, masterDoc] = await Promise.all([
                 transaction.get(dailyDocRef),
                 transaction.get(masterRef)
@@ -836,17 +823,15 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 throw new Error(`Insufficient stock. Available: ${openingStock - currentSales}`);
             }
 
-            // Calculations
             itemDailyData.sales = (itemDailyData.sales || 0) + quantity;
             itemDailyData.brand = masterData.brand;
             itemDailyData.size = masterData.size;
             itemDailyData.category = masterData.category;
-            itemDailyData.price = salePrice; // Record the price at the time of sale
+            itemDailyData.price = salePrice; 
 
-            // Perform write
             transaction.set(dailyDocRef, { [id]: itemDailyData }, { merge: true });
         });
-        set({ offCounterNeedsEOD: true });
+        set({ offCounterNeedsEOD: isToday(forDate) });
       } catch (error) {
           console.error(`Error recording sale:`, error);
           throw error;
@@ -855,13 +840,13 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
       }
   },
   
- updateItemField: async (id, field, value) => {
+ updateItemField: async (id, field, value, forDate) => {
     get()._setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
-            const today = format(new Date(), 'yyyy-MM-dd');
+            const dateStr = format(forDate, 'yyyy-MM-dd');
             const masterRef = doc(db, 'inventory', id);
-            const dailyRef = doc(db, 'dailyInventory', today);
+            const dailyRef = doc(db, 'dailyInventory', dateStr);
 
             const masterDoc = await transaction.get(masterRef);
             if (!masterDoc.exists()) throw new Error("Product not found.");
@@ -875,7 +860,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 sales: 0,
             };
 
-            // Always ensure the full snapshot is there
             currentItemDaily.brand = masterData.brand;
             currentItemDaily.size = masterData.size;
             currentItemDaily.category = masterData.category;
@@ -883,7 +867,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             if (field === 'price') {
                 const newPrice = Number(value);
                 currentItemDaily.price = newPrice;
-                transaction.update(masterRef, { price: newPrice });
+                if (isToday(forDate)) {
+                    transaction.update(masterRef, { price: newPrice });
+                }
             } else if (field === 'added') {
                 const oldValue = Number(currentItemDaily.added) || 0;
                 const newValue = Number(value) || 0;
@@ -899,14 +885,13 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                  currentItemDaily[field] = Number(value) || 0;
             }
             
-             // Ensure price is set, use master price as fallback if not already in daily log
             if (currentItemDaily.price === undefined) {
                 currentItemDaily.price = masterData.price;
             }
             
             transaction.set(dailyRef, { [id]: currentItemDaily }, { merge: true });
         });
-        if (field === 'sales' || field === 'added') {
+        if ((field === 'sales' || field === 'added') && isToday(forDate)) {
             set({ offCounterNeedsEOD: true });
         }
     } catch (error) {
@@ -940,11 +925,11 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             category: itemInShopData.category,
             totalVolume: volume,
             remainingVolume: isBeer ? quantity : volume,
-            price: price, // Use the price passed from the dialog
+            price: price, 
             totalQuantity: isBeer ? quantity : 1,
             salesVolume: 0,
             salesValue: 0,
-            source: 'manual' // Manually opened from shop inventory
+            source: 'manual'
         };
 
         if (!isBeer && pegPrices) {
@@ -963,16 +948,15 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  sellPeg: async (id, pegSize, customVolume, customPrice) => {
+  sellPeg: async (id, pegSize, forDate, customVolume, customPrice) => {
     if (get().saving) return;
     get()._setSaving(true);
     try {
         const itemRef = doc(db, 'onBarInventory', id);
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const dailyDocRef = doc(db, 'dailyInventory', today);
+        const dateStr = format(forDate, 'yyyy-MM-dd');
+        const dailyDocRef = doc(db, 'dailyInventory', dateStr);
 
         await runTransaction(db, async (transaction) => {
-            // --- ALL READS FIRST ---
             const itemDoc = await transaction.get(itemRef);
             const dailyDoc = await transaction.get(dailyDocRef);
 
@@ -983,7 +967,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const itemData = itemDoc.data() as OnBarItem;
             const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
             
-            // --- ALL CALCULATIONS ---
             let volumeToSell: number;
             let priceOfSale: number;
 
@@ -1024,13 +1007,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             itemDailyLog.salesVolume = (itemDailyLog.salesVolume || 0) + volumeToSell;
             itemDailyLog.salesValue = (itemDailyLog.salesValue || 0) + priceOfSale;
 
-            // --- ALL WRITES LAST ---
             transaction.update(itemRef, {
                 remainingVolume: newRemainingVolume,
             });
             transaction.set(dailyDocRef, { [onBarItemId]: itemDailyLog }, { merge: true });
         });
-        set({ onBarNeedsEOD: true });
+        if (isToday(forDate)) set({ onBarNeedsEOD: true });
     } catch(error) {
         console.error("Error selling peg: ", error);
         throw error;
@@ -1039,7 +1021,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  refillPeg: async (id, amount) => {
+  refillPeg: async (id, amount, forDate) => {
     if (get().saving) return;
     get()._setSaving(true);
     try {
@@ -1051,20 +1033,20 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             const itemData = itemDoc.data() as OnBarItem;
             const isBeer = itemData.category === 'Beer';
             
-            const today = format(new Date(), 'yyyy-MM-dd');
-            const dailyDocRef = doc(db, 'dailyInventory', today);
+            const dateStr = format(forDate, 'yyyy-MM-dd');
+            const dailyDocRef = doc(db, 'dailyInventory', dateStr);
             const onBarItemId = `on-bar-${itemData.inventoryId}`;
             const dailyDoc = await transaction.get(dailyDocRef);
             
             if (!dailyDoc.exists() || !dailyDoc.data()?.[onBarItemId]) {
-                 throw new Error("No sales recorded for this item today to reverse.");
+                 throw new Error("No sales recorded for this item on the selected date to reverse.");
             }
 
             const dailyLog = dailyDoc.data()?.[onBarItemId];
             const soldAmount = dailyLog.salesVolume || 0;
             const amountToRefill = isBeer ? 1 : amount;
 
-            if (soldAmount < amountToRefill) throw new Error("Cannot refill more than what was sold today.");
+            if (soldAmount < amountToRefill) throw new Error("Cannot refill more than what was sold.");
 
             const newRemainingVolume = itemData.remainingVolume + amountToRefill;
             const totalCapacity = isBeer ? (itemData.totalQuantity || 0) : itemData.totalVolume;
@@ -1075,11 +1057,9 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             
             let valueToRefund: number;
             if (isBeer) {
-                // For beer, the price is per unit.
                 if (itemData.price === undefined) throw new Error("Beer unit price is not set.");
                 valueToRefund = itemData.price;
             } else {
-                // For liquor, calculate refund based on average price per ml sold today.
                 if (soldAmount === 0) throw new Error("Cannot calculate refund value with zero sales volume.");
                 valueToRefund = (dailyLog.salesValue / soldAmount) * amountToRefill;
             }
@@ -1088,7 +1068,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
                 throw new Error("Could not calculate refund value. The transaction cannot proceed.");
             }
             
-            // --- ALL WRITES ---
             transaction.update(itemRef, {
                 remainingVolume: newRemainingVolume,
             });
@@ -1097,7 +1076,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             dailyLog.salesValue -= valueToRefund;
             transaction.set(dailyDocRef, { [onBarItemId]: dailyLog }, { merge: true });
         });
-        set({ onBarNeedsEOD: true });
+        if (isToday(forDate)) set({ onBarNeedsEOD: true });
     } catch (error) {
         console.error("Error refilling peg: ", error);
         throw error;
@@ -1117,7 +1096,6 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
 
             const onBarItemData = onBarItemDoc.data() as OnBarItem;
             
-            // Only return stock if the item came from godown AND has not been sold from.
             if (onBarItemData.source === 'godown' && onBarItemData.salesVolume === 0) {
                  const masterItemRef = doc(db, "inventory", onBarItemData.inventoryId);
                  const masterItemDoc = await transaction.get(masterItemRef);
@@ -1153,14 +1131,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             onBarItems.forEach(item => {
                 const itemRef = doc(db, 'onBarInventory', item.id);
                 if (item.category === 'Beer') {
-                    // For beer, 'remainingVolume' is the count. This becomes the new total quantity.
                      batch.update(itemRef, {
                         totalQuantity: item.remainingVolume,
                         salesVolume: 0,
                         salesValue: 0,
                     });
                 } else {
-                    // For liquor, the 'remainingVolume' becomes the new 'totalVolume'
                     batch.update(itemRef, {
                         totalVolume: item.remainingVolume,
                         salesVolume: 0,
@@ -1179,11 +1155,5 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         }
     },
 }));
-
-// Initialize listeners once
-if (typeof window !== 'undefined' && !listenersInitialized) {
-    useInventoryStore.getState().initListeners();
-    listenersInitialized = true;
-}
 
 export const useInventory = useInventoryStore;

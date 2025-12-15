@@ -212,7 +212,7 @@ export default function DailySalePage() {
 
 
     if (loading) {
-        return null; // Page loading is handled by the hook
+        return null; 
     }
 
     return (

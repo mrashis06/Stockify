@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useMediaQuery } from 'react-responsive';
 import { IndianRupee, Plus, Search, Trash2, ListFilter, Loader2, Pencil, LogOut, GlassWater, Warehouse, Archive, ChevronDown, ChevronUp } from 'lucide-react';
+import { subDays } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -49,6 +50,7 @@ import { useDateFormat } from '@/hooks/use-date-format';
 import { Checkbox } from '@/components/ui/checkbox';
 import SelectionActionBar from '@/components/dashboard/selection-action-bar';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const RealTimeClock = () => {
   const [time, setTime] = useState(new Date());
@@ -82,6 +84,8 @@ export default function InventoryPage() {
     const { formatDate } = useDateFormat();
     const searchParams = useSearchParams();
     const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
     
     const { 
         inventory,
@@ -94,7 +98,13 @@ export default function InventoryPage() {
         totalOnBarSales,
         offCounterNeedsEOD,
         resetOffCounterEOD,
+        initListeners
     } = useInventory();
+
+     useEffect(() => {
+        const unsub = initListeners(selectedDate);
+        return () => unsub();
+    }, [selectedDate, initListeners]);
     
     usePageLoading(loading);
     const { isEndingDay, endOfDayProcess } = useEndOfDay();
@@ -119,9 +129,15 @@ export default function InventoryPage() {
         }
     }, [searchParams]);
 
+    const handleDateChange = (value: 'today' | 'yesterday') => {
+        const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
+        setSelectedDate(newDate);
+        setDateOption(value);
+    };
+
     const handleAddBrand = async (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown'> & {initialStock: number}) => {
         try {
-            await addBrand(newItemData);
+            await addBrand(newItemData, selectedDate);
             toast({ title: 'Brand Added', description: `${newItemData.brand} (${newItemData.size}) created.` });
         } catch (error) {
             console.error('Error adding brand:', error);
@@ -160,7 +176,7 @@ export default function InventoryPage() {
         }
        
         try {
-            await updateItemField(id, field, processedValue);
+            await updateItemField(id, field, processedValue, selectedDate);
             let description = '';
             switch(field) {
                 case 'sales':
@@ -210,9 +226,8 @@ export default function InventoryPage() {
     const handleEndOfDay = async () => {
         setIsEndOfDayDialogOpen(false);
         try {
-            // Pass the current, correctly calculated inventory state to the EOD process.
             await endOfDayProcess(processedInventory);
-            resetOffCounterEOD(); // Reset the glow effect
+            resetOffCounterEOD(); 
             toast({
                 title: 'End of Day Processed',
                 description: "Today's final stock has been saved as tomorrow's opening stock."
@@ -309,7 +324,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <main className="flex-1 p-4 md:p-8">
+    <main className={cn("flex-1 p-4 md:p-8", (selectedRows.size > 0 || offCounterNeedsEOD) && "pb-24")}>
         {selectedRows.size > 0 && (
             <SelectionActionBar
                 count={selectedRows.size}
@@ -323,7 +338,7 @@ export default function InventoryPage() {
         )}
         {offCounterNeedsEOD && (
             <SelectionActionBar
-                count={0} // Special case for EOD
+                count={0} 
                 onClear={() => {}}
                 isEodReminder
             >
@@ -383,7 +398,7 @@ export default function InventoryPage() {
         <div className="mb-6">
             <h1 className="text-2xl font-bold tracking-tight">Off-Counter Inventory</h1>
             <div className="flex items-center gap-2">
-                <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(new Date(), 'dd-MMM-yyyy, EEEE')}</p>
+                <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(selectedDate, 'dd-MMM-yyyy, EEEE')}</p>
                 <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                 <RealTimeClock />
             </div>
@@ -405,7 +420,7 @@ export default function InventoryPage() {
         </div>
         
         <Card>
-            <CardContent className={cn("p-4 md:p-6", (selectedRows.size > 0 || offCounterNeedsEOD) && "pb-24")}>
+            <CardContent className="p-4 md:p-6">
                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
                     <div className="relative w-full md:max-w-xs">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -417,6 +432,15 @@ export default function InventoryPage() {
                          />
                     </div>
                     <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                        <Select onValueChange={handleDateChange} value={dateOption}>
+                            <SelectTrigger className="w-full sm:w-[180px]">
+                                <SelectValue placeholder="Select Date" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="today">Today</SelectItem>
+                                <SelectItem value="yesterday">Yesterday</SelectItem>
+                            </SelectContent>
+                        </Select>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" className="w-full sm:w-[200px] justify-between">
@@ -437,7 +461,7 @@ export default function InventoryPage() {
                                     <DropdownMenuCheckboxItem
                                         key={cat}
                                         checked={selectedCategories.includes(cat)}
-                                        onSelect={(e) => e.preventDefault()} // Prevent closing
+                                        onSelect={(e) => e.preventDefault()}
                                         onCheckedChange={() => handleCategorySelect(cat)}
                                     >
                                         {cat}
@@ -480,7 +504,7 @@ export default function InventoryPage() {
                      <Button 
                         onClick={() => setIsEndOfDayDialogOpen(true)} 
                         variant="outline" 
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        className={cn("bg-blue-600 hover:bg-blue-700 text-white", offCounterNeedsEOD && "animate-subtle-glow")}
                         disabled={isEndingDay}>
                         <LogOut className="mr-2 h-4 w-4" /> End of Day
                     </Button>
@@ -536,7 +560,7 @@ export default function InventoryPage() {
                                                     <Label htmlFor={`added-${item.id}`} className="text-xs">Added</Label>
                                                     <Input
                                                         id={`added-${item.id}`}
-                                                        key={`${item.id}-added`}
+                                                        key={`${item.id}-added-${item.added}`}
                                                         type="number"
                                                         className="h-9"
                                                         defaultValue={item.added || ''}
@@ -549,7 +573,7 @@ export default function InventoryPage() {
                                                     <Label htmlFor={`sales-${item.id}`} className="text-xs">Sales</Label>
                                                     <Input
                                                         id={`sales-${item.id}`}
-                                                        key={`${item.id}-sales`}
+                                                        key={`${item.id}-sales-${item.sales}`}
                                                         type="number"
                                                         className="h-9"
                                                         defaultValue={item.sales || ''}
@@ -639,7 +663,7 @@ export default function InventoryPage() {
                                                 <TableCell>{item.prevStock ?? 0}</TableCell>
                                                 <TableCell>
                                                     <Input
-                                                        key={`${item.id}-added`}
+                                                        key={`${item.id}-added-${item.added}`}
                                                         type="number"
                                                         className="h-8 w-20 bg-card"
                                                         defaultValue={item.added || ''}
@@ -651,7 +675,7 @@ export default function InventoryPage() {
                                                 {showOpening && <TableCell>{item.opening}</TableCell>}
                                                 <TableCell>
                                                     <Input
-                                                        key={`${item.id}-sales`}
+                                                        key={`${item.id}-sales-${item.sales}`}
                                                         type="number"
                                                         className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
                                                         defaultValue={item.sales || ''}

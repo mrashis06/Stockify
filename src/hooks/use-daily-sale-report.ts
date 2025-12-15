@@ -67,14 +67,12 @@ export function useDailySaleReport(date: Date) {
         const salesMap = new Map<string, AggregatedSale>();
         let totalValue = 0;
         
-        // This check is now robust and determines if we should use live or historical prices.
         const isReportForToday = isTodayDateFns(date);
 
         for (const productId in dailyData) {
             const itemLog = dailyData[productId];
             
-            // Handle Off-Counter Sales
-            if (itemLog && itemLog.sales > 0 && !productId.startsWith('on-bar-')) {
+            if (itemLog && itemLog.sales > 0 && !productId.startsWith('on-bar-')) { 
                  const masterItem = masterInventory.find(inv => inv.id === productId);
                  if (masterItem) {
                      const sizeMatch = masterItem.size.match(/(\d+)/);
@@ -89,13 +87,11 @@ export function useDailySaleReport(date: Date) {
                          salesMap.set(key, existing);
                      }
 
-                     // **THE FIX**: Prioritize the historical price saved in the daily log for past dates.
                      const priceToUse = isReportForToday ? masterItem.price : (itemLog.price || masterItem.price);
                      totalValue += (itemLog.sales * (priceToUse || 0));
                  }
             }
             
-            // Handle On-Bar Sales
             else if (itemLog && itemLog.salesValue > 0 && productId.startsWith('on-bar-')) {
                  totalValue += itemLog.salesValue;
                  const category = getCategory(itemLog.category);
@@ -105,7 +101,7 @@ export function useDailySaleReport(date: Date) {
                      if (sizeMl > 0) {
                          const key = `${category}-${sizeMl}`;
                          const existing = salesMap.get(key) || { unitsSold: 0, size: sizeMl, category, breakdown: [] };
-                         existing.unitsSold += itemLog.salesVolume; // salesVolume is in units for beer
+                         existing.unitsSold += itemLog.salesVolume; 
                          existing.breakdown.push(itemLog.salesVolume);
                          salesMap.set(key, existing);
                      }
@@ -135,7 +131,7 @@ export function useDailySaleReport(date: Date) {
         });
 
         return { blReport: report, totalSalesValue: totalValue };
-    }, [dailyData, masterInventory, date, isTodayDateFns]);
+    }, [dailyData, masterInventory, date]);
 
 
     return { blReport, totalSalesValue, loading, getCategory };
