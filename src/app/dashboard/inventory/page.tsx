@@ -403,7 +403,7 @@ export default function InventoryPage() {
         <div className="mb-6">
             <h1 className="text-2xl font-bold tracking-tight">Off-Counter Inventory</h1>
             <div className="flex items-center gap-2">
-                <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(selectedDate, 'dd-MMM-yyyy, EEEE')}</p>
+                <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{selectedDate ? formatDate(selectedDate, 'dd-MMM-yyyy, EEEE') : 'Loading...'}</p>
                 <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                 <RealTimeClock />
             </div>

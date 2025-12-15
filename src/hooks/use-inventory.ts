@@ -95,10 +95,13 @@ type InventoryState = {
   offCounterNeedsEOD: boolean;
   onBarNeedsEOD: boolean;
   selectedDate: Date;
+  dateChangeConfirmation: Date | null;
   
   // Actions
   setDate: (date: Date) => void;
-  initListeners: () => () => void;
+  confirmDateChange: () => void;
+  cancelDateChange: () => void;
+  initListeners: (date: Date) => () => void;
   addBrand: (newItemData: Omit<InventoryItem, 'id' | 'sales' | 'opening' | 'closing' | 'stockInGodown' | 'prevStock' | 'added'> & {initialStock: number}) => Promise<void>;
   addGodownItem: (data: AddGodownItemFormValues) => Promise<void>;
   processScannedBill: (billDataUri: string, fileName: string, force?: boolean) => Promise<{ status: 'success' | 'already_processed'; matchedCount: number; unmatchedCount: number; }>;
@@ -127,6 +130,7 @@ type InventoryState = {
   // Internal state management
   _setLoading: (isLoading: boolean) => void;
   _setSaving: (isSaving: boolean) => void;
+  _setSelectedDate: (date: Date) => void;
 };
 
 let listeners: (()=>void)[] = [];
@@ -191,22 +195,54 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     offCounterNeedsEOD: false,
     onBarNeedsEOD: false,
     selectedDate: new Date(),
+    dateChangeConfirmation: null,
     
     _setLoading: (isLoading) => set({ loading: isLoading }),
     _setSaving: (isSaving) => set({ saving: isSaving }),
+    _setSelectedDate: (date: Date) => set({ selectedDate: date }),
 
-    setDate: (date) => set({ selectedDate: date }),
+    setDate: async (newDate: Date) => {
+        const currentDate = get().selectedDate;
+        if (isToday(newDate) || newDate.getTime() === currentDate.getTime()) {
+            set({ selectedDate: newDate, dateChangeConfirmation: null });
+            return;
+        }
+
+        const dateStr = format(newDate, 'yyyy-MM-dd');
+        const dailyDocRef = doc(db, 'dailyInventory', dateStr);
+        const dailyDoc = await getDoc(dailyDocRef);
+
+        let hasSales = false;
+        if (dailyDoc.exists()) {
+            const data = dailyDoc.data();
+            for (const key in data) {
+                if (data[key]?.sales > 0 || data[key]?.salesValue > 0) {
+                    hasSales = true;
+                    break;
+                }
+            }
+        }
+        
+        if (hasSales) {
+            set({ dateChangeConfirmation: newDate });
+        } else {
+            set({ selectedDate: newDate, dateChangeConfirmation: null });
+        }
+    },
+    confirmDateChange: () => {
+        const newDate = get().dateChangeConfirmation;
+        if (newDate) {
+            set({ selectedDate: newDate, dateChangeConfirmation: null });
+        }
+    },
+    cancelDateChange: () => {
+        set({ dateChangeConfirmation: null });
+    },
     resetOffCounterEOD: () => set({ offCounterNeedsEOD: false }),
     resetOnBarEOD: () => set({ onBarNeedsEOD: false }),
 
-    initListeners: () => {
+    initListeners: (date) => {
         get()._setLoading(true);
-        const date = get().selectedDate;
-        if (!date) {
-            console.error("initListeners called with invalid date");
-            get()._setLoading(false);
-            return () => {};
-        }
 
         // Clear previous listeners
         listeners.forEach(unsub => unsub());

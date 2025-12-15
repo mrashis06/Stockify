@@ -246,7 +246,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">On-Bar Inventory</h1>
                     <div className="flex items-center gap-2">
-                        <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{formatDate(selectedDate, 'dd-MMM-yyyy, EEEE')}</p>
+                        <p className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">{selectedDate ? formatDate(selectedDate, 'dd-MMM-yyyy, EEEE') : 'Loading...'}</p>
                         <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-foreground/80">&bull;</span>
                         <RealTimeClock />
                     </div>
@@ -291,7 +291,7 @@ export default function OnBarPage({ params, searchParams }: { params: { slug: st
             
              <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
                 <CardHeader>
-                    <CardTitle className="text-lg font-medium text-primary">Sales for {formatDate(selectedDate, 'PPP')}</CardTitle>
+                    <CardTitle className="text-lg font-medium text-primary">Sales for {selectedDate ? formatDate(selectedDate, 'PPP') : '...'}</CardTitle>
                     <CardDescription>Total value of pegs and bottles sold from open inventory for the selected day.</CardDescription>
                 </CardHeader>
                 <CardContent>
