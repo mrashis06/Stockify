@@ -35,9 +35,10 @@ type TransferToShopDialogProps = {
   onOpenChange: (isOpen: boolean) => void;
   item: InventoryItem; 
   onTransfer: (productId: string, quantity: number, price?: number) => void;
+  selectedDate: Date;
 };
 
-export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTransfer }: TransferToShopDialogProps) {
+export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTransfer, selectedDate }: TransferToShopDialogProps) {
   
   const inventory = useInventoryStore(state => state.inventory);
   const liveItem = inventory.find(i => i.id === item.id);

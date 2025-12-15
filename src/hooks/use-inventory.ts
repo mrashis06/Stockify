@@ -106,7 +106,7 @@ type InventoryState = {
   updateGodownStock: (productId: string, newStock: number) => Promise<void>;
   deleteBrand: (id: string) => Promise<void>;
   deleteUnprocessedItems: (ids: string[]) => Promise<void>;
-  transferToShop: (productId: string, quantityToTransfer: number, price?: number) => Promise<void>;
+  transferToShop: (productId: string, quantityToTransfer: number, forDate: Date, price?: number) => Promise<void>;
   transferToOnBar: (productId: string, quantity: number, pegPrices?: { '30ml': number; '60ml': number }) => Promise<void>;
   recordSale: (id: string, quantity: number, salePrice: number, soldBy: string, forDate: Date) => Promise<void>;
   updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string, forDate: Date) => Promise<void>;
@@ -657,12 +657,12 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
     }
   },
 
-  transferToShop: async (productId, quantityToTransfer, price) => {
+  transferToShop: async (productId, quantityToTransfer, forDate, price) => {
     get()._setSaving(true);
     try {
         await runTransaction(db, async (transaction) => {
             const masterRef = doc(db, 'inventory', productId);
-            const dailyRef = doc(db, 'dailyInventory', format(new Date(), 'yyyy-MM-dd'));
+            const dailyRef = doc(db, 'dailyInventory', format(forDate, 'yyyy-MM-dd'));
 
             const masterDoc = await transaction.get(masterRef);
             if (!masterDoc.exists()) throw new Error("Product not found.");
@@ -696,7 +696,7 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
             itemDailyData.category = masterData.category;
             itemDailyData.price = price !== undefined ? Number(price) : masterData.price;
             if (itemDailyData.prevStock === undefined) {
-                const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+                const yesterday = format(subDays(forDate, 1), 'yyyy-MM-dd');
                 const yesterdayDailyRef = doc(db, 'dailyInventory', yesterday);
                 const yesterdayDoc = await getDoc(yesterdayDailyRef);
                 itemDailyData.prevStock = yesterdayDoc.exists() ? (yesterdayDoc.data()?.[productId]?.closing ?? 0) : 0;

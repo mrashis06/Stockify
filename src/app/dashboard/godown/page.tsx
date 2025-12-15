@@ -57,6 +57,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import SelectionActionBar from '@/components/dashboard/selection-action-bar';
 import { cn } from '@/lib/utils';
+import { subDays } from 'date-fns';
 
 
 const RealTimeClock = () => {
@@ -107,6 +108,8 @@ export default function GodownPage() {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('All Categories');
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [dateOption, setDateOption] = useState<'today' | 'yesterday'>('today');
     const [isScanBillOpen, setIsScanBillOpen] = useState(false);
     const [isAddDeliveryOpen, setIsAddDeliveryOpen] = useState(false);
     const [isTransferShopOpen, setIsTransferShopOpen] = useState(false);
@@ -122,6 +125,12 @@ export default function GodownPage() {
     const [isDeleteUnprocessedOpen, setIsDeleteUnprocessedOpen] = useState(false);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const { toast } = useToast();
+
+    const handleDateChange = (value: 'today' | 'yesterday') => {
+        const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
+        setSelectedDate(newDate);
+        setDateOption(value);
+    };
     
     const handleOpenTransferDialog = (item: InventoryItem, destination: 'shop' | 'onbar') => {
         setSelectedItem(item);
@@ -151,8 +160,8 @@ export default function GodownPage() {
         try {
             const item = inventory.find(i => i.id === productId);
             if (!item) throw new Error("Product not found");
-            await transferToShop(productId, quantity, price);
-            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item.brand} (${item.size}) transferred to shop.` });
+            await transferToShop(productId, quantity, selectedDate, price);
+            toast({ title: 'Transfer Successful', description: `${quantity} units of ${item.brand} (${item.size}) transferred to shop for ${formatDate(selectedDate, 'dd-MMM')}.` });
             setIsTransferShopOpen(false);
         } catch (error) {
             console.error('Error transferring to shop:', error);
@@ -313,6 +322,7 @@ export default function GodownPage() {
                 onOpenChange={setIsTransferShopOpen}
                 item={selectedItem}
                 onTransfer={handleTransferToShop}
+                selectedDate={selectedDate}
             />
         )}
         {selectedItem && (
@@ -330,9 +340,9 @@ export default function GodownPage() {
                 items={selectedItemsForBulkTransfer}
                 onBulkTransfer={async (items) => {
                     try {
-                        const promises = items.map(item => transferToShop(item.productId, item.quantity, item.price));
+                        const promises = items.map(item => transferToShop(item.productId, item.quantity, selectedDate, item.price));
                         await Promise.all(promises);
-                        toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to Shop.`});
+                        toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to Shop for ${formatDate(selectedDate, 'dd-MMM')}.`});
                         setIsBulkTransferToShopOpen(false);
                         setSelectedRows(new Set());
                     } catch(e) {
@@ -487,6 +497,15 @@ export default function GodownPage() {
                          />
                     </div>
                     <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                        <Select onValueChange={handleDateChange} value={dateOption}>
+                            <SelectTrigger className="w-full sm:w-[180px]">
+                                <SelectValue placeholder="Select Date" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="today">Today</SelectItem>
+                                <SelectItem value="yesterday">Yesterday</SelectItem>
+                            </SelectContent>
+                        </Select>
                         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                             <SelectTrigger className="w-full sm:w-[180px]">
                                 <SelectValue placeholder="All Categories" />

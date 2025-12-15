@@ -97,7 +97,7 @@ export default function BulkTransferDialog({ isOpen, onOpenChange, items, onBulk
   const onSubmit = (data: BulkTransferFormValues) => {
     const itemsToTransfer = data.items
       .filter(item => item.quantity > 0)
-      .map(({ productId, quantity, price }) => ({ productId, quantity, price }));
+      .map(({ productId, quantity, price }) => ({ productId: productId, quantity: Number(quantity), price }));
     
     if (itemsToTransfer.length > 0) {
       onBulkTransfer(itemsToTransfer);
