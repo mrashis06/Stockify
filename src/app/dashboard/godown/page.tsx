@@ -102,6 +102,7 @@ export default function GodownPage() {
         updateBrand,
         updateGodownStock,
         addGodownItem,
+        initListeners,
     } = useInventory();
     
     usePageLoading(loading);
@@ -125,6 +126,11 @@ export default function GodownPage() {
     const [isDeleteUnprocessedOpen, setIsDeleteUnprocessedOpen] = useState(false);
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const { toast } = useToast();
+
+     useEffect(() => {
+        const unsub = initListeners(selectedDate);
+        return () => unsub();
+    }, [selectedDate, initListeners]);
 
     const handleDateChange = (value: 'today' | 'yesterday') => {
         const newDate = value === 'today' ? new Date() : subDays(new Date(), 1);
@@ -677,3 +683,5 @@ export default function GodownPage() {
     </main>
   );
 }
+
+    
