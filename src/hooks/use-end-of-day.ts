@@ -9,7 +9,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, addDays, isToday } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import type { InventoryItem } from './use-inventory';
 import { useInventory } from './use-inventory';
 
@@ -45,10 +45,9 @@ export function useEndOfDay() {
         const inventoryUpdateRef = doc(db, 'inventory', item.id);
         const finalClosingStock = Math.max(0, item.closing ?? 0);
 
-        // Update master inventory's prevStock only if we are processing today's EOD
-        if (isToday(forDate)) {
-            batch.update(inventoryUpdateRef, { prevStock: finalClosingStock });
-        }
+        // Update master inventory's prevStock to be used as next day's opening.
+        // This makes the stock chain reliable regardless of when EOD is run.
+        batch.update(inventoryUpdateRef, { prevStock: finalClosingStock });
         
         // Prepare tomorrow's opening stock
         if (!tomorrowData[item.id]) {
