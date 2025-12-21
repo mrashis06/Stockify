@@ -9,7 +9,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, addDays } from 'date-fns';
+import { format, addDays, isToday } from 'date-fns';
 import type { InventoryItem } from './use-inventory';
 import { useInventory } from './use-inventory';
 
@@ -24,6 +24,10 @@ export function useEndOfDay() {
       if (!finalInventoryState || finalInventoryState.length === 0) {
         console.log("No inventory data provided to process EOD.");
         return;
+      }
+      
+      if (!forDate || !(forDate instanceof Date)) {
+          throw new Error("A valid date must be provided for the EOD process.");
       }
 
       const batch = writeBatch(db);
@@ -42,7 +46,7 @@ export function useEndOfDay() {
         const finalClosingStock = Math.max(0, item.closing ?? 0);
 
         // Update master inventory's prevStock only if we are processing today's EOD
-        if (format(forDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')) {
+        if (isToday(forDate)) {
             batch.update(inventoryUpdateRef, { prevStock: finalClosingStock });
         }
         

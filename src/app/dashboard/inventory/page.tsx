@@ -109,7 +109,7 @@ export default function InventoryPage() {
         return () => unsub();
     }, [selectedDate, initListeners]);
     
-    const { isEndingDay, endOfDayProcess } = useEndOfDay(selectedDate);
+    const { isEndingDay, endOfDayProcess } = useEndOfDay();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<string[]>(['All Categories']);
@@ -228,7 +228,7 @@ export default function InventoryPage() {
         if (!selectedDate) return;
         setIsEndOfDayDialogOpen(false);
         try {
-            await endOfDayProcess(processedInventory);
+            await endOfDayProcess(processedInventory, selectedDate);
             resetOffCounterEOD(); 
             toast({
                 title: 'End of Day Processed',
