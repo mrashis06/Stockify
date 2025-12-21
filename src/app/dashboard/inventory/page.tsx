@@ -109,7 +109,7 @@ export default function InventoryPage() {
         return () => unsub();
     }, [selectedDate, initListeners]);
     
-    const { isEndingDay, endOfDayProcess } = useEndOfDay();
+    const { isEndingDay, endOfDayProcess } = useEndOfDay(selectedDate);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<string[]>(['All Categories']);
@@ -228,7 +228,7 @@ export default function InventoryPage() {
         if (!selectedDate) return;
         setIsEndOfDayDialogOpen(false);
         try {
-            await endOfDayProcess(processedInventory, selectedDate);
+            await endOfDayProcess(processedInventory);
             resetOffCounterEOD(); 
             toast({
                 title: 'End of Day Processed',
@@ -630,8 +630,7 @@ export default function InventoryPage() {
                                     filteredInventory.map(item => {
                                         const isLowStock = (item.closing ?? 0) < 10;
                                         const amount = (item.sales ?? 0) * item.price;
-                                        const isEditable = isToday(selectedDate);
-
+                                        
                                         return (
                                             <TableRow 
                                                 key={item.id} 
@@ -656,51 +655,39 @@ export default function InventoryPage() {
                                                 <TableCell>
                                                     <div className="flex items-center">
                                                         <IndianRupee className="h-4 w-4 mr-1 shrink-0" />
-                                                        {isEditable ? (
-                                                            <Input
-                                                                key={`${item.id}-price`}
-                                                                type="number"
-                                                                className="h-8 w-24 bg-card"
-                                                                defaultValue={item.price}
-                                                                onBlur={(e) => handleFieldChange(item.id, 'price', e.target.value)}
-                                                                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                                                            />
-                                                        ) : (
-                                                            item.price
-                                                        )}
+                                                        <Input
+                                                            key={`${item.id}-price`}
+                                                            type="number"
+                                                            className="h-8 w-24 bg-card"
+                                                            defaultValue={item.price}
+                                                            onBlur={(e) => handleFieldChange(item.id, 'price', e.target.value)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                        />
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>{item.prevStock ?? 0}</TableCell>
                                                 <TableCell>
-                                                    {isEditable ? (
-                                                        <Input
-                                                            key={`${item.id}-added-${item.added}`}
-                                                            type="number"
-                                                            className="h-8 w-20 bg-card"
-                                                            defaultValue={item.added || ''}
-                                                            placeholder="0"
-                                                            onBlur={(e) => handleFieldChange(item.id, 'added', e.target.value || '0')}
-                                                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                                                        />
-                                                    ) : (
-                                                        item.added
-                                                    )}
+                                                    <Input
+                                                        key={`${item.id}-added-${item.added}`}
+                                                        type="number"
+                                                        className="h-8 w-20 bg-card"
+                                                        defaultValue={item.added || ''}
+                                                        placeholder="0"
+                                                        onBlur={(e) => handleFieldChange(item.id, 'added', e.target.value || '0')}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                    />
                                                 </TableCell>
                                                 {showOpening && <TableCell>{item.opening}</TableCell>}
                                                 <TableCell>
-                                                     {isEditable ? (
-                                                        <Input
-                                                            key={`${item.id}-sales-${item.sales}`}
-                                                            type="number"
-                                                            className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
-                                                            defaultValue={item.sales || ''}
-                                                            placeholder="0"
-                                                            onBlur={(e) => handleFieldChange(item.id, 'sales', e.target.value || '0')}
-                                                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                                                        />
-                                                     ) : (
-                                                        item.sales
-                                                     )}
+                                                     <Input
+                                                        key={`${item.id}-sales-${item.sales}`}
+                                                        type="number"
+                                                        className={`h-8 w-20 bg-card ${isLowStock && (item.sales ?? 0) > 0 ? 'bg-destructive/50' : ''}`}
+                                                        defaultValue={item.sales || ''}
+                                                        placeholder="0"
+                                                        onBlur={(e) => handleFieldChange(item.id, 'sales', e.target.value || '0')}
+                                                        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                                                    />
                                                 </TableCell>
                                                 {showClosing && <TableCell className={isLowStock ? 'text-destructive font-bold' : ''}>{item.closing}</TableCell>}
                                                 <TableCell>
@@ -823,3 +810,4 @@ export default function InventoryPage() {
     </main>
   );
 }
+
