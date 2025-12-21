@@ -17,7 +17,7 @@ export function useEndOfDay() {
   const [isEndingDay, setIsEndingDay] = useState(false);
   const resetOffCounterEOD = useInventory.getState().resetOffCounterEOD;
 
-  const endOfDayProcess = async (finalInventoryState: InventoryItem[]) => {
+  const endOfDayProcess = async (finalInventoryState: InventoryItem[], forDate: Date) => {
     setIsEndingDay(true);
 
     try {
@@ -27,11 +27,11 @@ export function useEndOfDay() {
       }
 
       const batch = writeBatch(db);
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+      const dateStr = format(forDate, 'yyyy-MM-dd');
+      const tomorrowStr = format(addDays(forDate, 1), 'yyyy-MM-dd');
 
-      const todayDailyRef = doc(db, 'dailyInventory', today);
-      const tomorrowDailyRef = doc(db, 'dailyInventory', tomorrow);
+      const todayDailyRef = doc(db, 'dailyInventory', dateStr);
+      const tomorrowDailyRef = doc(db, 'dailyInventory', tomorrowStr);
 
       const tomorrowDoc = await getDoc(tomorrowDailyRef);
       const tomorrowData = tomorrowDoc.exists() ? tomorrowDoc.data() : {};
@@ -41,8 +41,10 @@ export function useEndOfDay() {
         const inventoryUpdateRef = doc(db, 'inventory', item.id);
         const finalClosingStock = Math.max(0, item.closing ?? 0);
 
-        // Update master inventory's prevStock for the absolute latest state
-        batch.update(inventoryUpdateRef, { prevStock: finalClosingStock });
+        // Update master inventory's prevStock only if we are processing today's EOD
+        if (format(forDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')) {
+            batch.update(inventoryUpdateRef, { prevStock: finalClosingStock });
+        }
         
         // Prepare tomorrow's opening stock
         if (!tomorrowData[item.id]) {
@@ -65,6 +67,14 @@ export function useEndOfDay() {
           // Set the final closing stock and the final price
           itemData.closing = finalClosingStock;
           itemData.price = item.price; // THE CRITICAL FIX: Save the final price.
+          
+          // Preserve existing values not being overwritten
+          itemData.added = item.added;
+          itemData.sales = item.sales;
+          itemData.prevStock = item.prevStock;
+          itemData.brand = item.brand;
+          itemData.size = item.size;
+          itemData.category = item.category;
 
           // Place the updated item data back into the payload
           todayUpdatePayload[itemKey] = itemData;
