@@ -256,24 +256,20 @@ export default function ReportsPage() {
         const onBarMap = new Map<string, OnBarSoldItem>();
 
         reportData.forEach(entry => {
-            const isToday = isSameDay(parseISO(entry.date), new Date());
+            const isReportForToday = isSameDay(parseISO(entry.date), new Date());
             for (const productId in entry.log) {
                 const itemLog = entry.log[productId] as any;
                 
                 if (itemLog && itemLog.sales > 0 && !productId.startsWith('on-bar-')) { 
                     const masterItem = masterInventoryMap.get(productId);
-                    
-                    // **THE FIX**: Prioritize the historical price saved in the daily log for past dates.
-                    const priceToUse = isToday ? (masterItem?.price || 0) : (Number(itemLog.price || masterItem?.price || 0));
+                    const priceToUse = isReportForToday ? (masterItem?.price || 0) : (Number(itemLog.price || masterItem?.price || 0));
 
                     if (priceToUse > 0) {
                         const existing = offCounterMap.get(productId);
                         if (existing) {
                             existing.unitsSold += itemLog.sales;
-                            // Recalculate total amount with the correct historical average price if needed
                             const newTotalAmount = existing.totalAmount + (itemLog.sales * priceToUse);
                             existing.totalAmount = newTotalAmount;
-                            // Update price to be the average if it varies across days in a range.
                             existing.price = newTotalAmount / existing.unitsSold;
                         } else {
                             const brand = itemLog.brand || masterItem?.brand || 'Unknown';
@@ -403,8 +399,8 @@ export default function ReportsPage() {
                     const itemLog = entry.log[productId] as any;
                     if (itemLog && itemLog.sales > 0 && !productId.startsWith('on-bar-')) {
                         const masterItem = masterInventoryMap.get(productId);
-                        // **THE FIX** Always use historical price from the log.
-                        const price = Number(itemLog.price || masterItem?.price || 0);
+                        const isReportForToday = isSameDay(parseISO(entry.date), new Date());
+                        const price = isReportForToday ? (masterItem?.price || 0) : (Number(itemLog.price || masterItem?.price || 0));
                         if (price > 0) {
                             const totalAmount = itemLog.sales * price;
                             dailyOffCounter.push([itemLog.brand, itemLog.size, itemLog.category, price.toFixed(2), itemLog.sales, totalAmount.toFixed(2)]);
@@ -864,3 +860,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    

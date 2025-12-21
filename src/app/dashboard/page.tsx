@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from 'next/navigation';
 import { doc, onSnapshot, collection, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { subDays, format } from 'date-fns';
+import { subDays, format, isSameDay } from 'date-fns';
 import { useDateFormat } from "@/hooks/use-date-format";
 
 import {
@@ -155,22 +155,15 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   }, [activeInventory, totalOnBarSales]);
 
   
-  const calculateTotalSales = (salesData: any, masterInventory: InventoryItem[]) => {
+  const calculateTotalSales = (salesData: any) => {
     let total = 0;
-    const inventoryMap = new Map(masterInventory.map(item => [item.id, item]));
-
     for (const key in salesData) {
         if (Object.prototype.hasOwnProperty.call(salesData, key)) {
             const itemLog = salesData[key];
-            
-            if (itemLog && itemLog.salesValue) { // For On-Bar sales which store direct value
+            if (itemLog && itemLog.salesValue) {
                 total += Number(itemLog.salesValue);
-            } else if (itemLog && itemLog.sales > 0) { // For Off-Counter sales from a snapshot
-                 const masterItem = inventoryMap.get(key);
-                 const price = itemLog.price || masterItem?.price || 0;
-                 if (price > 0) {
-                     total += Number(itemLog.sales) * Number(price);
-                 }
+            } else if (itemLog && itemLog.sales > 0 && itemLog.price > 0) {
+                 total += Number(itemLog.sales) * Number(itemLog.price);
             }
         }
     }
@@ -178,18 +171,15 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
   };
 
   const yesterdaysSales = useMemo(() => {
-    // We pass the processedInventory as master inventory because it's the most complete list of items
-    return calculateTotalSales(yesterdaySalesData, processedInventory)
-  }, [yesterdaySalesData, processedInventory]);
+    return calculateTotalSales(yesterdaySalesData)
+  }, [yesterdaySalesData]);
 
   const { lowStockItems, outOfStockItems } = useMemo(() => {
     const low: InventoryItem[] = [];
     const out: InventoryItem[] = [];
     const onBarMap = new Map(onBarInventory.map(item => [item.inventoryId, item]));
 
-    // **THE FIX**: Loop over the complete master `inventory` list, not the filtered `processedInventory`.
     inventory.forEach(item => {
-      // Find the corresponding processed item to get today's `closing` stock
       const processedItem = processedInventory.find(p => p.id === item.id);
       const shopStock = processedItem?.closing ?? 0;
       
@@ -202,7 +192,6 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
       if (totalStock <= 0) {
         out.push(item);
       } else if (shopStock > 0 && shopStock < 10) {
-        // Use `processedItem` for low stock alerts as it contains the correct `closing` value
         if (processedItem) low.push(processedItem);
       }
     });
@@ -368,3 +357,5 @@ export default function DashboardPage({ params, searchParams }: { params: { slug
     </main>
   );
 }
+
+    

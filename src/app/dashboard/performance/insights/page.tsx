@@ -104,6 +104,7 @@ export default function InsightsPage() {
             const allDays = eachDayOfInterval(interval);
             for (const day of allDays) {
                 const dateStr = format(day, 'yyyy-MM-dd');
+                const isReportForToday = isSameDay(day, new Date());
                 const dailyDocRef = doc(db, 'dailyInventory', dateStr);
                 const docSnap = await getDoc(dailyDocRef);
                 const dailyLog: DailyLog = docSnap.exists() ? docSnap.data() as DailyLog : {};
@@ -122,8 +123,10 @@ export default function InsightsPage() {
                     if (productId.startsWith('on-bar-')) {
                         dailyOnBar += itemLog.salesValue || 0;
                     } else if (itemLog.sales && itemLog.sales > 0) {
-                        const price = itemLog.price || masterItem?.price || 0;
-                        dailyOffCounter += itemLog.sales * price;
+                        const price = isReportForToday ? masterItem?.price : (itemLog.price || masterItem?.price);
+                        if (price) {
+                            dailyOffCounter += itemLog.sales * price;
+                        }
                     }
                 }
                 
@@ -328,3 +331,4 @@ export default function InsightsPage() {
     );
 }
 
+    
