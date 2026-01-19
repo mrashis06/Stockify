@@ -57,7 +57,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import SelectionActionBar from '@/components/dashboard/selection-action-bar';
 import { cn } from '@/lib/utils';
-import { subDays } from 'date-fns';
+import { subDays, isToday } from 'date-fns';
 
 
 const RealTimeClock = () => {
@@ -285,8 +285,7 @@ export default function GodownPage() {
     
     const dateOption = useMemo(() => {
         if (!selectedDate) return 'today';
-        const today = new Date();
-        return today.toDateString() === selectedDate.toDateString() ? 'today' : 'yesterday';
+        return isToday(selectedDate) ? 'today' : 'yesterday';
     }, [selectedDate]);
 
   return (
@@ -686,3 +685,5 @@ export default function GodownPage() {
     </main>
   );
 }
+
+    
