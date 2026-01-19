@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { IndianRupee, Info } from 'lucide-react';
+import { IndianRupee, Info, Loader2 } from 'lucide-react';
 import { useMediaQuery } from 'react-responsive';
 
 import {
@@ -78,6 +78,7 @@ type BulkTransferToOnBarDialogProps = {
 
 export default function BulkTransferToOnBarDialog({ isOpen, onOpenChange, items, onBulkTransfer }: BulkTransferToOnBarDialogProps) {
   const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { items: [] },
@@ -89,25 +90,29 @@ export default function BulkTransferToOnBarDialog({ isOpen, onOpenChange, items,
   });
 
   useEffect(() => {
-    if (items) {
-      const formItems: BulkTransferOnBarItem[] = items
-        .filter(item => item.category !== 'IML') // Filter out IML items
-        .map(item => ({
-            productId: item.id,
-            brand: item.brand,
-            size: item.size,
-            category: item.category,
-            stockInGodown: item.stockInGodown,
-            price: item.price,
-            quantity: 0,
-            pegPrice30ml: undefined,
-            pegPrice60ml: undefined,
-        }));
-      replace(formItems);
+    if (isOpen) {
+        if (items) {
+          const formItems: BulkTransferOnBarItem[] = items
+            .filter(item => item.category !== 'IML') // Filter out IML items
+            .map(item => ({
+                productId: item.id,
+                brand: item.brand,
+                size: item.size,
+                category: item.category,
+                stockInGodown: item.stockInGodown,
+                price: item.price,
+                quantity: 0,
+                pegPrice30ml: undefined,
+                pegPrice60ml: undefined,
+            }));
+          replace(formItems);
+        }
+    } else {
+        setIsSubmitting(false);
     }
-  }, [items, replace]);
+  }, [isOpen, items, replace]);
 
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = async (data: FormValues) => {
     const itemsToTransfer = data.items
       .filter(item => item.quantity > 0)
       .map(({ productId, quantity, pegPrice30ml, pegPrice60ml }) => ({
@@ -116,10 +121,16 @@ export default function BulkTransferToOnBarDialog({ isOpen, onOpenChange, items,
         pegPrices: pegPrice30ml ? { '30ml': pegPrice30ml, '60ml': pegPrice60ml || pegPrice30ml * 2 } : undefined,
       }));
     
-    if (itemsToTransfer.length > 0) {
-      onBulkTransfer(itemsToTransfer);
-    } else {
+    if (itemsToTransfer.length === 0) {
       onOpenChange(false);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+        await onBulkTransfer(itemsToTransfer);
+    } catch (error) {
+        setIsSubmitting(false);
     }
   };
 
@@ -268,8 +279,11 @@ export default function BulkTransferToOnBarDialog({ isOpen, onOpenChange, items,
               )}
             </ScrollArea>
             <DialogFooter className="pt-6">
-                <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                <Button type="submit">Confirm & Transfer</Button>
+                <DialogClose asChild><Button type="button" variant="secondary" disabled={isSubmitting}>Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm & Transfer
+                </Button>
             </DialogFooter>
           </form>
         </Form>

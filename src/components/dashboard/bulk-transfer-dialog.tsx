@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { IndianRupee, Info } from 'lucide-react';
+import { IndianRupee, Info, Loader2 } from 'lucide-react';
 
 import {
   Dialog,
@@ -67,6 +67,7 @@ type BulkTransferDialogProps = {
 
 export default function BulkTransferDialog({ isOpen, onOpenChange, items, onBulkTransfer }: BulkTransferDialogProps) {
   const isMobile = useMediaQuery({ query: '(max-width: 768px)' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm<BulkTransferFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -80,29 +81,39 @@ export default function BulkTransferDialog({ isOpen, onOpenChange, items, onBulk
   });
 
   useEffect(() => {
-    if (items) {
-      const formItems: BulkTransferItem[] = items.map(item => ({
-        productId: item.id,
-        brand: item.brand,
-        size: item.size,
-        stockInGodown: item.stockInGodown,
-        isNewProduct: item.price === 0,
-        price: item.price > 0 ? item.price : undefined,
-        quantity: '',
-      }));
-      replace(formItems);
+    if (isOpen) {
+        if (items) {
+          const formItems: BulkTransferItem[] = items.map(item => ({
+            productId: item.id,
+            brand: item.brand,
+            size: item.size,
+            stockInGodown: item.stockInGodown,
+            isNewProduct: item.price === 0,
+            price: item.price > 0 ? item.price : undefined,
+            quantity: '',
+          }));
+          replace(formItems);
+        }
+    } else {
+        setIsSubmitting(false);
     }
-  }, [items, replace]);
+  }, [isOpen, items, replace]);
 
-  const onSubmit = (data: BulkTransferFormValues) => {
+  const onSubmit = async (data: BulkTransferFormValues) => {
     const itemsToTransfer = data.items
       .filter(item => item.quantity > 0)
       .map(({ productId, quantity, price }) => ({ productId: productId, quantity: Number(quantity), price }));
     
-    if (itemsToTransfer.length > 0) {
-      onBulkTransfer(itemsToTransfer);
-    } else {
-      onOpenChange(false); // Close if no items to transfer
+    if (itemsToTransfer.length === 0) {
+        onOpenChange(false);
+        return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+        await onBulkTransfer(itemsToTransfer);
+    } catch (error) {
+        setIsSubmitting(false);
     }
   };
 
@@ -223,8 +234,11 @@ export default function BulkTransferDialog({ isOpen, onOpenChange, items, onBulk
               )}
             </ScrollArea>
             <DialogFooter className="pt-6">
-                <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                <Button type="submit">Confirm & Transfer</Button>
+                <DialogClose asChild><Button type="button" variant="secondary" disabled={isSubmitting}>Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm & Transfer
+                </Button>
             </DialogFooter>
           </form>
         </Form>

@@ -6,7 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { IndianRupee, Info } from 'lucide-react';
+import { IndianRupee, Info, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,7 @@ type TransferToShopDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   item: InventoryItem; 
-  onTransfer: (productId: string, quantity: number, price?: number) => void;
+  onTransfer: (productId: string, quantity: number, price?: number) => Promise<void>;
   selectedDate: Date;
 };
 
@@ -43,6 +43,7 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   const inventory = useInventoryStore(state => state.inventory);
   const liveItem = inventory.find(i => i.id === item.id);
   const isNewProduct = liveItem ? liveItem.price === 0 : item.price === 0;
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formSchema = z.object({
     quantity: z.coerce.number().int()
@@ -64,17 +65,23 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
   });
 
   useEffect(() => {
-    if (liveItem) {
+    if (liveItem && isOpen) {
       form.reset({
         quantity: '' as any,
         price: liveItem.price > 0 ? liveItem.price : ('' as any),
       });
+    } else if (!isOpen) {
+        setIsSubmitting(false);
     }
-  }, [liveItem, form]);
+  }, [liveItem, isOpen, form]);
 
-  const onSubmit = (data: TransferFormValues) => {
-    onTransfer(item.id, data.quantity, data.price);
-    onOpenChange(false);
+  const onSubmit = async (data: TransferFormValues) => {
+    setIsSubmitting(true);
+    try {
+        await onTransfer(item.id, data.quantity, data.price);
+    } catch(error) {
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -138,9 +145,12 @@ export default function TransferToShopDialog({ isOpen, onOpenChange, item, onTra
 
             <DialogFooter>
                 <DialogClose asChild>
-                    <Button type="button" variant="secondary">Cancel</Button>
+                    <Button type="button" variant="secondary" disabled={isSubmitting}>Cancel</Button>
                 </DialogClose>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700">Confirm Transfer</Button>
+                <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm Transfer
+                </Button>
             </DialogFooter>
           </form>
         </Form>

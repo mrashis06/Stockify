@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { IndianRupee } from 'lucide-react';
+import { IndianRupee, Loader2 } from 'lucide-react';
 
 import {
   Dialog,
@@ -32,12 +32,13 @@ type TransferToOnBarDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   item: InventoryItem; 
-  onTransfer: (productId: string, quantity: number, pegPrices?: { '30ml': number, '60ml': number }) => void;
+  onTransfer: (productId: string, quantity: number, pegPrices?: { '30ml': number, '60ml': number }) => Promise<void>;
 };
 
 export default function TransferToOnBarDialog({ isOpen, onOpenChange, item, onTransfer }: TransferToOnBarDialogProps) {
   
   const isBeer = item?.category === 'Beer';
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formSchema = z.object({
     quantity: z.coerce.number().int()
@@ -65,16 +66,22 @@ export default function TransferToOnBarDialog({ isOpen, onOpenChange, item, onTr
         pegPrice30ml: '' as any,
         pegPrice60ml: '' as any,
       });
+    } else {
+        setIsSubmitting(false);
     }
   }, [isOpen, item, form]);
 
-  const onSubmit = (data: TransferFormValues) => {
-    const pegPrices = data.pegPrice30ml 
-        ? { '30ml': data.pegPrice30ml, '60ml': data.pegPrice60ml || data.pegPrice30ml * 2 }
-        : undefined;
+  const onSubmit = async (data: TransferFormValues) => {
+    setIsSubmitting(true);
+    try {
+        const pegPrices = data.pegPrice30ml 
+            ? { '30ml': data.pegPrice30ml, '60ml': data.pegPrice60ml || data.pegPrice30ml * 2 }
+            : undefined;
 
-    onTransfer(item.id, data.quantity, pegPrices);
-    onOpenChange(false);
+        await onTransfer(item.id, data.quantity, pegPrices);
+    } catch(error) {
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -134,9 +141,12 @@ export default function TransferToOnBarDialog({ isOpen, onOpenChange, item, onTr
 
             <DialogFooter>
                 <DialogClose asChild>
-                    <Button type="button" variant="secondary">Cancel</Button>
+                    <Button type="button" variant="secondary" disabled={isSubmitting}>Cancel</Button>
                 </DialogClose>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700">Confirm Transfer</Button>
+                <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm Transfer
+                </Button>
             </DialogFooter>
           </form>
         </Form>
