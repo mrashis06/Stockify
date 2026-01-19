@@ -112,7 +112,9 @@ type InventoryState = {
   deleteBrand: (id: string) => Promise<void>;
   deleteUnprocessedItems: (ids: string[]) => Promise<void>;
   transferToShop: (productId: string, quantityToTransfer: number, price?: number) => Promise<void>;
+  bulkTransferToShop: (items: { productId: string; quantity: number; price?: number }[]) => Promise<void>;
   transferToOnBar: (productId: string, quantity: number, pegPrices?: { '30ml': number; '60ml': number }) => Promise<void>;
+  bulkTransferToOnBar: (items: { productId: string; quantity: number; pegPrices?: { '30ml': number; '60ml': number } }[]) => Promise<void>;
   recordSale: (id: string, quantity: number, salePrice: number, soldBy: string) => Promise<void>;
   updateItemField: (id: string, field: 'added' | 'sales' | 'price' | 'size', value: number | string) => Promise<void>;
   
@@ -760,6 +762,79 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
         get()._setSaving(false);
     }
  },
+
+ bulkTransferToShop: async (itemsToTransfer) => {
+    if (itemsToTransfer.length === 0) return;
+    get()._setSaving(true);
+    const forDate = get().selectedDate;
+    try {
+        await runTransaction(db, async (transaction) => {
+            const dateStr = format(forDate, 'yyyy-MM-dd');
+            const yesterdayStr = format(subDays(forDate, 1), 'yyyy-MM-dd');
+
+            const dailyRef = doc(db, 'dailyInventory', dateStr);
+            const yesterdayDailyRef = doc(db, 'dailyInventory', yesterdayStr);
+
+            const [dailyDoc, yesterdayDoc] = await Promise.all([
+                transaction.get(dailyRef),
+                transaction.get(yesterdayDailyRef)
+            ]);
+
+            const dailyData = dailyDoc.exists() ? dailyDoc.data() : {};
+            const yesterdayData = yesterdayDoc.exists() ? yesterdayDoc.data() : {};
+            
+            const masterRefs = itemsToTransfer.map(item => doc(db, 'inventory', item.productId));
+            const masterDocs = await Promise.all(masterRefs.map(ref => transaction.get(ref)));
+
+            for (let i = 0; i < itemsToTransfer.length; i++) {
+                const item = itemsToTransfer[i];
+                const masterDoc = masterDocs[i];
+
+                if (!masterDoc.exists()) throw new Error(`Product ${item.productId} not found.`);
+                
+                const masterData = masterDoc.data() as InventoryItem;
+
+                if ((masterData.stockInGodown || 0) < item.quantity) {
+                    throw new Error(`Not enough stock for ${masterData.brand}. Available: ${masterData.stockInGodown || 0}`);
+                }
+                
+                const updateData: any = {
+                    stockInGodown: masterData.stockInGodown - item.quantity,
+                    lastTransferred: {
+                        date: serverTimestamp(),
+                        quantity: item.quantity,
+                        destination: 'shop',
+                    }
+                };
+                if (item.price !== undefined) {
+                    updateData.price = Number(item.price);
+                }
+                transaction.update(masterDoc.ref, updateData);
+
+                const itemDailyData = dailyData[item.productId] || {};
+                itemDailyData.added = (itemDailyData.added || 0) + item.quantity;
+                
+                itemDailyData.brand = masterData.brand;
+                itemDailyData.size = masterData.size;
+                itemDailyData.category = masterData.category;
+                itemDailyData.price = item.price !== undefined ? Number(item.price) : masterData.price;
+
+                if (itemDailyData.prevStock === undefined) {
+                    itemDailyData.prevStock = yesterdayData[item.productId]?.closing ?? masterData.prevStock ?? 0;
+                }
+                
+                dailyData[item.productId] = itemDailyData;
+            }
+            
+            transaction.set(dailyRef, dailyData, { merge: true });
+        });
+    } catch (error) {
+        console.error("Error during bulk transfer to shop:", error);
+        throw error;
+    } finally {
+        get()._setSaving(false);
+    }
+},
  
   transferToOnBar: async (productId, quantity, pegPrices) => {
     get()._setSaving(true);
@@ -840,6 +915,91 @@ const useInventoryStore = create<InventoryState>((set, get) => ({
       throw error;
     } finally {
       get()._setSaving(false);
+    }
+  },
+
+  bulkTransferToOnBar: async (itemsToTransfer) => {
+    if (itemsToTransfer.length === 0) return;
+    get()._setSaving(true);
+    try {
+        const onBarSnapshot = await getDocs(collection(db, 'onBarInventory'));
+        const onBarMap = new Map<string, {id: string, data: OnBarItem}>();
+        onBarSnapshot.forEach(doc => {
+            const data = doc.data() as OnBarItem;
+            onBarMap.set(data.inventoryId, {id: doc.id, data});
+        });
+
+        await runTransaction(db, async (transaction) => {
+            const masterRefs = itemsToTransfer.map(item => doc(db, 'inventory', item.productId));
+            const masterDocs = await Promise.all(masterRefs.map(ref => transaction.get(ref)));
+
+            for (let i = 0; i < itemsToTransfer.length; i++) {
+                const itemToTransfer = itemsToTransfer[i];
+                const masterDoc = masterDocs[i];
+
+                if (!masterDoc.exists()) throw new Error(`Product ${itemToTransfer.productId} not found.`);
+                
+                const masterData = masterDoc.data() as InventoryItem;
+                if ((masterData.stockInGodown || 0) < itemToTransfer.quantity) {
+                    throw new Error(`Not enough stock for ${masterData.brand}. Available: ${masterData.stockInGodown || 0}`);
+                }
+
+                transaction.update(masterDoc.ref, {
+                    stockInGodown: masterData.stockInGodown - itemToTransfer.quantity,
+                    lastTransferred: {
+                        date: serverTimestamp(),
+                        quantity: itemToTransfer.quantity,
+                        destination: 'onbar',
+                    }
+                });
+
+                const isBeer = masterData.category === 'Beer';
+                const volumeMatch = masterData.size.match(/(\d+)/);
+                const volumePerUnit = volumeMatch ? parseInt(volumeMatch[0], 10) : 0;
+
+                const existingOnBar = onBarMap.get(itemToTransfer.productId);
+
+                if (existingOnBar) {
+                    const onBarRef = doc(db, 'onBarInventory', existingOnBar.id);
+                    const existingData = existingOnBar.data;
+                    
+                    const newRemainingVolume = existingData.remainingVolume + (isBeer ? itemToTransfer.quantity : (volumePerUnit * itemToTransfer.quantity));
+                    const newTotalQuantity = (existingData.totalQuantity || 0) + itemToTransfer.quantity;
+
+                    transaction.update(onBarRef, {
+                        remainingVolume: newRemainingVolume,
+                        totalQuantity: newTotalQuantity
+                    });
+                } else {
+                    const onBarItemPayload: Omit<OnBarItem, 'id' | 'openedAt'> = {
+                        inventoryId: itemToTransfer.productId,
+                        brand: masterData.brand,
+                        size: masterData.size,
+                        category: masterData.category,
+                        totalVolume: volumePerUnit,
+                        remainingVolume: isBeer ? itemToTransfer.quantity : (volumePerUnit * itemToTransfer.quantity),
+                        price: masterData.price,
+                        totalQuantity: itemToTransfer.quantity,
+                        salesVolume: 0,
+                        salesValue: 0,
+                        source: 'godown',
+                    };
+
+                    if (!isBeer && itemToTransfer.pegPrices) {
+                        onBarItemPayload.pegPrice30ml = itemToTransfer.pegPrices['30ml'];
+                        onBarItemPayload.pegPrice60ml = itemToTransfer.pegPrices['60ml'];
+                    }
+
+                    const newOnBarDocRef = doc(collection(db, "onBarInventory"));
+                    transaction.set(newOnBarDocRef, { ...onBarItemPayload, openedAt: serverTimestamp() });
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error during bulk transfer to on-bar:", error);
+        throw error;
+    } finally {
+        get()._setSaving(false);
     }
   },
 

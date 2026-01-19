@@ -98,7 +98,9 @@ export default function GodownPage() {
         processScannedDelivery,
         deleteUnprocessedItems,
         transferToShop,
+        bulkTransferToShop,
         transferToOnBar,
+        bulkTransferToOnBar,
         updateBrand,
         updateGodownStock,
         addGodownItem,
@@ -349,8 +351,7 @@ export default function GodownPage() {
                 items={selectedItemsForBulkTransfer}
                 onBulkTransfer={async (items) => {
                     try {
-                        const promises = items.map(item => transferToShop(item.productId, item.quantity, item.price));
-                        await Promise.all(promises);
+                        await bulkTransferToShop(items);
                         toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to Shop for ${formatDate(selectedDate, 'dd-MMM')}.`});
                         setIsBulkTransferToShopOpen(false);
                         setSelectedRows(new Set());
@@ -368,8 +369,7 @@ export default function GodownPage() {
                 items={selectedItemsForBulkTransfer}
                 onBulkTransfer={async (items) => {
                     try {
-                        const promises = items.map(item => transferToOnBar(item.productId, item.quantity, item.pegPrices));
-                        await Promise.all(promises);
+                        await bulkTransferToOnBar(items);
                         toast({ title: 'Bulk Transfer Successful', description: `${items.length} item types transferred to On-Bar.`});
                         setIsBulkTransferToOnBarOpen(false);
                         setSelectedRows(new Set());
